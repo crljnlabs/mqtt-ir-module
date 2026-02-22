@@ -130,7 +130,23 @@ class FirmwareCatalog:
         firmware = self.resolve_firmware(agent_type=agent_type, version=None, require_installable=True)
         factory_file = str(firmware.get("factory_file") or "").strip()
         ota_file = str(firmware.get("ota_file") or "").strip()
-        filename = factory_file or ota_file
+        factory_exists = bool(factory_file and (self._files_dir / factory_file).is_file())
+        ota_exists = bool(ota_file and (self._files_dir / ota_file).is_file())
+        filename = ""
+        offset = 0
+
+        # Use factory image only when it is distinct from OTA image.
+        # If both names are the same, treat it as OTA-only and flash to app offset.
+        if factory_exists and factory_file != ota_file:
+            filename = factory_file
+            offset = 0
+        elif ota_exists:
+            filename = ota_file
+            offset = 0x10000
+        elif factory_exists:
+            filename = factory_file
+            offset = 0
+
         if not filename:
             raise ValueError("firmware_file_missing")
         url = self.build_firmware_url(request=request, public_base_url=public_base_url, filename=filename)
@@ -143,7 +159,7 @@ class FirmwareCatalog:
                     "parts": [
                         {
                             "path": url,
-                            "offset": 0,
+                            "offset": offset,
                         }
                     ],
                 }

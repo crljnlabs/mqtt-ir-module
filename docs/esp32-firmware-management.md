@@ -27,6 +27,26 @@ Use this when an ESP32 client is blank or has no compatible firmware yet.
 
 If the install button is not shown, no installable firmware is currently available.
 
+### Browser install URL (HTTPS)
+
+Use the Hub UI over HTTPS in a desktop browser:
+
+- `https://<hub-host>/settings`
+
+ESP Web Tools installation in browser requires a secure context (`https://` or `http://localhost`).
+
+### If HTTPS is not available: direct firmware download
+
+If browser-based install is not available, download firmware directly and flash with a USB tool/workflow.
+For first install on a blank device, use the merged `factory` image.
+
+| Version | Download | SHA-256 | Flash usage (`ESP32-WROOM-32D`, `esp32dev`) | RAM usage (`ESP32-WROOM-32D`, `esp32dev`) |
+| --- | --- | --- | --- | --- |
+| `v0.0.1` | `http://<hub-host>/firmware/esp32-ir-client-v0.0.1.factory.bin` | `d9e11f0d1f4433e9072e96a3738704479ae36f62ac7f7a005de4315debfc3600` | `88.1%` (used `1155193` bytes from `1310720` bytes) | `14.8%` (used `48432` bytes from `327680` bytes) |
+
+OTA image for already installed devices:
+- `http://<hub-host>/firmware/esp32-ir-client-v0.0.1.bin`
+
 ## 2. USB driver selection and installation
 
 ### Important: ESP-WROOM-32D alone does not define the USB driver
@@ -99,14 +119,15 @@ From repository root:
 
 ```bash
 cd esp-agent
-./create-fw.sh
+./build_and_publish.sh
 ```
 
 The script can:
 
 - Build `esp32dev` firmware
-- Copy the built `.bin` to `backend/firmware_template/files/`
-- Upsert `backend/firmware_template/catalog.json` with checksum fields
+- Copy OTA image (`.bin`) to `backend/firmware_template/files/`
+- Generate merged factory image (`.factory.bin`) for ESP Web Tools initial flash
+- Upsert `backend/firmware_template/catalog.json` with OTA/factory checksum fields
 
 ### Option B: manual process
 
@@ -159,7 +180,7 @@ Example catalog entry:
   "installable": true,
   "ota_file": "esp32-ir-client-v0.1.0.bin",
   "ota_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-  "factory_file": "esp32-ir-client-v0.1.0.bin",
+  "factory_file": "esp32-ir-client-v0.1.0.factory.bin",
   "factory_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
   "notes": "stable"
 }
