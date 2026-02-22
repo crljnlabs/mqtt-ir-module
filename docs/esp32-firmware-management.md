@@ -40,12 +40,9 @@ ESP Web Tools installation in browser requires a secure context (`https://` or `
 If browser-based install is not available, download firmware directly and flash with a USB tool/workflow.
 For first install on a blank device, use the merged `factory` image.
 
-| Version | Download | SHA-256 | Flash usage (`ESP32-WROOM-32D`, `esp32dev`) | RAM usage (`ESP32-WROOM-32D`, `esp32dev`) |
+| Version | Factory download | SHA-256 | Flash usage (`ESP32-WROOM-32D`, `esp32dev`) | RAM usage (`ESP32-WROOM-32D`, `esp32dev`) |
 | --- | --- | --- | --- | --- |
 | `v0.0.1` | `http://<hub-host>/firmware/esp32-ir-client-v0.0.1.factory.bin` | `d9e11f0d1f4433e9072e96a3738704479ae36f62ac7f7a005de4315debfc3600` | `88.1%` (used `1155193` bytes from `1310720` bytes) | `14.8%` (used `48432` bytes from `327680` bytes) |
-
-OTA image for already installed devices:
-- `http://<hub-host>/firmware/esp32-ir-client-v0.0.1.bin`
 
 ## 2. USB driver selection and installation
 
