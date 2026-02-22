@@ -327,19 +327,32 @@ export function LearningWizard({
     let isActive = true
     let socket = null
     let reconnectTimer = null
+    let reconnectAttempts = 0
+
+    const clearReconnectTimer = () => {
+      if (reconnectTimer == null) return
+      window.clearTimeout(reconnectTimer)
+      reconnectTimer = null
+    }
 
     const scheduleReconnect = () => {
       if (!isActive) return
       if (reconnectTimer != null) return
+      const delayMs = Math.min(10000, 1000 * (2 ** reconnectAttempts))
+      reconnectAttempts = Math.min(reconnectAttempts + 1, 6)
       reconnectTimer = window.setTimeout(() => {
         reconnectTimer = null
         connect()
-      }, 1000)
+      }, delayMs)
     }
 
     const connect = () => {
       if (!isActive) return
+      if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return
       socket = createLearningStatusSocket({
+        onOpen: () => {
+          reconnectAttempts = 0
+        },
         onMessage: (payload) => {
           if (!isActive) return
           const normalized = normalizeLearningStatusPayload(payload)
@@ -352,14 +365,31 @@ export function LearningWizard({
       })
     }
 
+    const reconnectNow = () => {
+      if (!isActive) return
+      clearReconnectTimer()
+      if (socket && socket.readyState === WebSocket.CONNECTING) return
+      socket?.close()
+      socket = null
+      connect()
+    }
+
+    const handleOnline = () => reconnectNow()
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return
+      if (socket && socket.readyState === WebSocket.OPEN) return
+      reconnectNow()
+    }
+
     connect()
+    window.addEventListener('online', handleOnline)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
       isActive = false
-      if (reconnectTimer != null) {
-        window.clearTimeout(reconnectTimer)
-        reconnectTimer = null
-      }
+      window.removeEventListener('online', handleOnline)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      clearReconnectTimer()
       socket?.close()
     }
   }, [open, queryClient])
