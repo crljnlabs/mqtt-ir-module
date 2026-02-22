@@ -188,25 +188,30 @@ bool applyRuntimeStateSnapshot(JsonObjectConst payload) {
   }
 
   bool pinsChanged = false;
-  if (payload.containsKey("pairing_hub_id")) {
-    gPairingHubId = String(payload["pairing_hub_id"] | "");
+  const JsonVariantConst pairingHubId = payload["pairing_hub_id"];
+  if (!pairingHubId.isUnbound()) {
+    gPairingHubId = String(pairingHubId | "");
     gPairingHubId.trim();
   }
-  if (payload.containsKey("debug")) {
-    gDebugEnabled = parseBoolStateValue(payload["debug"], gDebugEnabled);
+  const JsonVariantConst debugValue = payload["debug"];
+  if (!debugValue.isUnbound()) {
+    gDebugEnabled = parseBoolStateValue(debugValue, gDebugEnabled);
   }
-  if (payload.containsKey("reboot_required")) {
-    gRebootRequired = parseBoolStateValue(payload["reboot_required"], gRebootRequired);
+  const JsonVariantConst rebootRequired = payload["reboot_required"];
+  if (!rebootRequired.isUnbound()) {
+    gRebootRequired = parseBoolStateValue(rebootRequired, gRebootRequired);
   }
-  if (payload.containsKey("ir_rx_pin")) {
-    const int nextRx = parseStatePin(payload["ir_rx_pin"], gRuntimeConfig.irRxPin);
+  const JsonVariantConst rxPin = payload["ir_rx_pin"];
+  if (!rxPin.isUnbound()) {
+    const int nextRx = parseStatePin(rxPin, gRuntimeConfig.irRxPin);
     if (isValidPin(nextRx)) {
       pinsChanged = pinsChanged || (nextRx != gRuntimeConfig.irRxPin);
       gRuntimeConfig.irRxPin = nextRx;
     }
   }
-  if (payload.containsKey("ir_tx_pin")) {
-    const int nextTx = parseStatePin(payload["ir_tx_pin"], gRuntimeConfig.irTxPin);
+  const JsonVariantConst txPin = payload["ir_tx_pin"];
+  if (!txPin.isUnbound()) {
+    const int nextTx = parseStatePin(txPin, gRuntimeConfig.irTxPin);
     if (isValidPin(nextTx)) {
       pinsChanged = pinsChanged || (nextTx != gRuntimeConfig.irTxPin);
       gRuntimeConfig.irTxPin = nextTx;
@@ -279,7 +284,7 @@ bool parseAcceptTopic(const String& topic, String& sessionOut) {
   return !sessionOut.isEmpty();
 }
 
-bool parsePayloadObject(const byte* payload, unsigned int length, DynamicJsonDocument& doc) {
+bool parsePayloadObject(const byte* payload, unsigned int length, JsonDocument& doc) {
   const DeserializationError error = deserializeJson(doc, payload, length);
   return !error && doc.is<JsonObject>();
 }

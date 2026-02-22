@@ -9,7 +9,7 @@ namespace agent {
 namespace {
 
 void publishPairingOffer(const String& sessionId, const String& nonce) {
-  DynamicJsonDocument doc(1024);
+  JsonDocument doc;
   doc["session_id"] = sessionId;
   doc["nonce"] = nonce;
   doc["agent_uid"] = gAgentId;
@@ -41,7 +41,7 @@ void handlePairingOpen(const byte* payload, unsigned int length) {
   if (!gPairingHubId.isEmpty()) {
     return;
   }
-  DynamicJsonDocument doc(1536);
+  JsonDocument doc;
   if (!parsePayloadObject(payload, length, doc)) {
     return;
   }
@@ -71,7 +71,7 @@ void handlePairingAccept(const String& topic, const byte* payload, unsigned int 
   if (!parseAcceptTopic(topic, sessionFromTopic)) {
     return;
   }
-  DynamicJsonDocument doc(1024);
+  JsonDocument doc;
   if (!parsePayloadObject(payload, length, doc)) {
     return;
   }
@@ -99,7 +99,7 @@ void handlePairingUnpair(const String& topic, const byte* payload, unsigned int 
   if (topic != expected) {
     return;
   }
-  DynamicJsonDocument doc(512);
+  JsonDocument doc;
   if (!parsePayloadObject(payload, length, doc)) {
     return;
   }
@@ -113,7 +113,7 @@ void handlePairingUnpair(const String& topic, const byte* payload, unsigned int 
   gPairingNonce = "";
   publishState();
 
-  DynamicJsonDocument ack(512);
+  JsonDocument ack;
   ack["agent_uid"] = gAgentId;
   ack["command_id"] = commandId;
   ack["acked_at"] = nowSecondsText();

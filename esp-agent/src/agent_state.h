@@ -90,7 +90,7 @@ void scheduleReboot(unsigned long delayMs);
 
 bool parseCommandTopic(const String& topic, String& commandOut);
 bool parseAcceptTopic(const String& topic, String& sessionOut);
-bool parsePayloadObject(const byte* payload, unsigned int length, DynamicJsonDocument& doc);
+bool parsePayloadObject(const byte* payload, unsigned int length, JsonDocument& doc);
 int majorFromVersion(const String& version);
 String buildAgentId();
 

@@ -21,7 +21,7 @@ void publishState() {
   if (!gMqttClient.connected()) {
     return;
   }
-  DynamicJsonDocument doc(1536);
+  JsonDocument doc;
   doc["pairing_hub_id"] = gPairingHubId;
   doc["debug"] = gDebugEnabled;
   doc["agent_type"] = kAgentType;
@@ -35,7 +35,7 @@ void publishState() {
   doc["ir_rx_pin"] = gRuntimeConfig.irRxPin;
   doc["power_mode"] = gEcoMode ? "eco" : "active";
   doc["updated_at"] = nowSecondsText();
-  JsonArray commands = doc.createNestedArray("runtime_commands");
+  JsonArray commands = doc["runtime_commands"].to<JsonArray>();
   commands.add("runtime/debug/get");
   commands.add("runtime/debug/set");
   commands.add("runtime/config/get");

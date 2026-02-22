@@ -22,14 +22,14 @@ void sendCommandResponse(
     const String& errorCode,
     const String& errorMessage,
     int statusCode) {
-  DynamicJsonDocument responseDoc(kMqttBufferSize);
+  JsonDocument responseDoc;
   responseDoc["request_id"] = requestId;
   responseDoc["ok"] = ok;
   if (ok) {
-    JsonObject resultObject = responseDoc.createNestedObject("result");
+    JsonObject resultObject = responseDoc["result"].to<JsonObject>();
     fillResult(resultObject);
   } else {
-    JsonObject errorObject = responseDoc.createNestedObject("error");
+    JsonObject errorObject = responseDoc["error"].to<JsonObject>();
     errorObject["code"] = errorCode;
     errorObject["message"] = errorMessage;
     errorObject["status_code"] = statusCode;
@@ -211,8 +211,10 @@ bool executeRuntimeConfigSet(
     String& errorCode,
     String& errorMessage,
     int& statusCode) {
-  bool hasRx = payload.containsKey("ir_rx_pin");
-  bool hasTx = payload.containsKey("ir_tx_pin");
+  const JsonVariantConst rxPin = payload["ir_rx_pin"];
+  const JsonVariantConst txPin = payload["ir_tx_pin"];
+  bool hasRx = !rxPin.isUnbound();
+  bool hasTx = !txPin.isUnbound();
   if (!hasRx && !hasTx) {
     errorCode = "validation_error";
     errorMessage = "At least one pin must be provided";
@@ -223,13 +225,13 @@ bool executeRuntimeConfigSet(
   int nextRx = gRuntimeConfig.irRxPin;
   int nextTx = gRuntimeConfig.irTxPin;
   if (hasRx) {
-    if (!payload["ir_rx_pin"].is<int>()) {
+    if (!rxPin.is<int>()) {
       errorCode = "validation_error";
       errorMessage = "ir_rx_pin must be an integer";
       statusCode = 400;
       return false;
     }
-    nextRx = payload["ir_rx_pin"].as<int>();
+    nextRx = rxPin.as<int>();
     if (!isValidPin(nextRx)) {
       errorCode = "validation_error";
       errorMessage = "ir_rx_pin is out of range";
@@ -238,13 +240,13 @@ bool executeRuntimeConfigSet(
     }
   }
   if (hasTx) {
-    if (!payload["ir_tx_pin"].is<int>()) {
+    if (!txPin.is<int>()) {
       errorCode = "validation_error";
       errorMessage = "ir_tx_pin must be an integer";
       statusCode = 400;
       return false;
     }
-    nextTx = payload["ir_tx_pin"].as<int>();
+    nextTx = txPin.as<int>();
     if (!isValidPin(nextTx)) {
       errorCode = "validation_error";
       errorMessage = "ir_tx_pin is out of range";
@@ -326,7 +328,7 @@ void handleCommand(const String& command, JsonObjectConst payload) {
   int statusCode = 500;
   bool commandOk = false;
   bool shouldReboot = false;
-  DynamicJsonDocument resultDoc(kMqttBufferSize);
+  JsonDocument resultDoc;
   JsonObject result = resultDoc.to<JsonObject>();
 
   if (command == "send") {
@@ -348,7 +350,7 @@ void handleCommand(const String& command, JsonObjectConst payload) {
     result["debug"] = gDebugEnabled;
     commandOk = true;
   } else if (command == "runtime/debug/set") {
-    if (!payload.containsKey("debug")) {
+    if (payload["debug"].isUnbound()) {
       commandOk = false;
       errorCode = "validation_error";
       errorMessage = "debug is required";

@@ -29,7 +29,7 @@ void onMqttMessage(char* topicChars, byte* payload, unsigned int length) {
   const String topic(topicChars ? topicChars : "");
   if (topic == topicState()) {
     gRetainedStateReceived = true;
-    DynamicJsonDocument doc(kMqttBufferSize);
+    JsonDocument doc;
     if (!parsePayloadObject(payload, length, doc)) {
       return;
     }
@@ -56,7 +56,7 @@ void onMqttMessage(char* topicChars, byte* payload, unsigned int length) {
     return;
   }
 
-  DynamicJsonDocument doc(kMqttBufferSize);
+  JsonDocument doc;
   if (!parsePayloadObject(payload, length, doc)) {
     return;
   }
