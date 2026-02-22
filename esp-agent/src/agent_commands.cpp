@@ -257,9 +257,9 @@ bool executeRuntimeConfigSet(
   gRuntimeConfig.irRxPin = nextRx;
   gRuntimeConfig.irTxPin = nextTx;
   if (changed) {
-    saveRuntimeConfig();
-    saveRebootRequired(true);
+    initIrHardware();
   }
+  saveRebootRequired(false);
   publishState();
 
   result["ir_rx_pin"] = gRuntimeConfig.irRxPin;

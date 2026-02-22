@@ -18,8 +18,6 @@ docker run --rm \
   -e MQTT_PORT=1883 \
   -e MQTT_USERNAME=user \
   -e MQTT_PASSWORD=pass \
-  -e DATA_DIR=/data \
-  -v ir_agent_data:/data \
   mqtt-ir-agent:latest
 ```
 
@@ -38,8 +36,6 @@ docker run --rm \
   Use when your host exposes different device paths. Values must match mapped container device paths.
 - `IR_WIDEBAND` (optional, default: `false`)
   Enable only if your receiver requires wideband mode.
-- `DATA_DIR` (optional, default: `/data`)
-  Use only if you want a different internal path. For persistence, mount a volume to this path.
 - `DEBUG` (optional, default: `false`)
   Enables debug behavior and additional diagnostics.
 
@@ -51,7 +47,7 @@ docker run --rm \
 
 - Agent MQTT identity is derived from jmqtt client identity (stable deterministic client id generation).
 - When unbound, agent keeps listening on `ir/pairing/open` until it is accepted by a Hub.
-- Runtime state is persisted on retained MQTT topic `ir/agents/<agent_id>/state`.
+- Runtime state (pairing/debug/runtime metadata) is synchronized via retained MQTT topic `ir/agents/<agent_id>/state` (no local filesystem persistence in agent mode).
 - Agent always listens for `ir/pairing/unpair/<agent_id>`. On unpair command, it clears binding, publishes an ack, and returns to pairable mode.
 - While bound, agent executes Hub commands received on:
   - `ir/agents/<agent_id>/cmd/send`
@@ -69,7 +65,7 @@ docker run --rm \
 - This image does not host the Hub UI.
 - This image does not expose an HTTP API.
 - Hub pairing is initiated from Hub side (Agents page).
-- If you do not mount a volume for `DATA_DIR`, pairing binding and local state are lost when the container is recreated.
+- MQTT connection settings for this mode are provided by env (`MQTT_HOST`, `MQTT_PORT`, `MQTT_USERNAME`, `MQTT_PASSWORD`).
 
 ## Troubleshooting
 

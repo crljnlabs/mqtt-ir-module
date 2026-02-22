@@ -95,30 +95,19 @@ void saveRuntimeConfig() {
   gPrefs.putUShort("mqtt_port", gRuntimeConfig.mqttPort);
   gPrefs.putString("mqtt_user", gRuntimeConfig.mqttUser);
   gPrefs.putString("mqtt_pass", gRuntimeConfig.mqttPass);
-  gPrefs.putInt("ir_tx_pin", gRuntimeConfig.irTxPin);
-  gPrefs.putInt("ir_rx_pin", gRuntimeConfig.irRxPin);
   gPrefs.end();
 }
 
 void savePairingHubId(const String& hubId) {
   gPairingHubId = hubId;
-  gPrefs.begin(kPrefsNamespace, false);
-  gPrefs.putString("pair_hub_id", gPairingHubId);
-  gPrefs.end();
 }
 
 void saveDebugFlag(bool enabled) {
   gDebugEnabled = enabled;
-  gPrefs.begin(kPrefsNamespace, false);
-  gPrefs.putBool("debug", gDebugEnabled);
-  gPrefs.end();
 }
 
 void saveRebootRequired(bool required) {
   gRebootRequired = required;
-  gPrefs.begin(kPrefsNamespace, false);
-  gPrefs.putBool("reboot_req", gRebootRequired);
-  gPrefs.end();
 }
 
 void loadPersistedState() {
@@ -130,12 +119,101 @@ void loadPersistedState() {
   }
   gRuntimeConfig.mqttUser = gPrefs.getString("mqtt_user", "");
   gRuntimeConfig.mqttPass = gPrefs.getString("mqtt_pass", "");
-  gRuntimeConfig.irTxPin = gPrefs.getInt("ir_tx_pin", kDefaultIrTxPin);
-  gRuntimeConfig.irRxPin = gPrefs.getInt("ir_rx_pin", kDefaultIrRxPin);
-  gPairingHubId = gPrefs.getString("pair_hub_id", "");
-  gDebugEnabled = gPrefs.getBool("debug", false);
-  gRebootRequired = gPrefs.getBool("reboot_req", false);
   gPrefs.end();
+}
+
+namespace {
+
+bool parseBoolStateValue(JsonVariantConst value, bool fallback) {
+  if (value.is<bool>()) {
+    return value.as<bool>();
+  }
+  if (value.is<int>()) {
+    return value.as<int>() != 0;
+  }
+  if (value.is<unsigned int>()) {
+    return value.as<unsigned int>() != 0U;
+  }
+  if (value.is<long>()) {
+    return value.as<long>() != 0L;
+  }
+  if (value.is<unsigned long>()) {
+    return value.as<unsigned long>() != 0UL;
+  }
+  if (value.is<float>()) {
+    return value.as<float>() != 0.0f;
+  }
+  if (value.is<double>()) {
+    return value.as<double>() != 0.0;
+  }
+  if (!value.is<const char*>()) {
+    return fallback;
+  }
+  String text = String(value.as<const char*>());
+  text.trim();
+  text.toLowerCase();
+  if (text == "1" || text == "true" || text == "yes" || text == "y" || text == "on") {
+    return true;
+  }
+  if (text == "0" || text == "false" || text == "no" || text == "n" || text == "off") {
+    return false;
+  }
+  return fallback;
+}
+
+int parseStatePin(JsonVariantConst value, int fallback) {
+  if (value.is<int>()) {
+    return value.as<int>();
+  }
+  if (value.is<unsigned int>()) {
+    return static_cast<int>(value.as<unsigned int>());
+  }
+  if (value.is<long>()) {
+    return static_cast<int>(value.as<long>());
+  }
+  if (value.is<unsigned long>()) {
+    return static_cast<int>(value.as<unsigned long>());
+  }
+  if (value.is<const char*>()) {
+    return parsePin(String(value.as<const char*>()), fallback);
+  }
+  return fallback;
+}
+
+}  // namespace
+
+bool applyRuntimeStateSnapshot(JsonObjectConst payload) {
+  if (payload.isNull()) {
+    return false;
+  }
+
+  bool pinsChanged = false;
+  if (payload.containsKey("pairing_hub_id")) {
+    gPairingHubId = String(payload["pairing_hub_id"] | "");
+    gPairingHubId.trim();
+  }
+  if (payload.containsKey("debug")) {
+    gDebugEnabled = parseBoolStateValue(payload["debug"], gDebugEnabled);
+  }
+  if (payload.containsKey("reboot_required")) {
+    gRebootRequired = parseBoolStateValue(payload["reboot_required"], gRebootRequired);
+  }
+  if (payload.containsKey("ir_rx_pin")) {
+    const int nextRx = parseStatePin(payload["ir_rx_pin"], gRuntimeConfig.irRxPin);
+    if (isValidPin(nextRx)) {
+      pinsChanged = pinsChanged || (nextRx != gRuntimeConfig.irRxPin);
+      gRuntimeConfig.irRxPin = nextRx;
+    }
+  }
+  if (payload.containsKey("ir_tx_pin")) {
+    const int nextTx = parseStatePin(payload["ir_tx_pin"], gRuntimeConfig.irTxPin);
+    if (isValidPin(nextTx)) {
+      pinsChanged = pinsChanged || (nextTx != gRuntimeConfig.irTxPin);
+      gRuntimeConfig.irTxPin = nextTx;
+    }
+  }
+
+  return pinsChanged;
 }
 
 uint16_t parseMqttPort(const String& value, uint16_t fallback) {

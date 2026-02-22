@@ -1,6 +1,7 @@
 #include "agent_mqtt.h"
 
 #include "agent_commands.h"
+#include "agent_ir.h"
 #include "agent_pairing.h"
 #include "agent_runtime_state.h"
 #include "agent_state.h"
@@ -9,8 +10,34 @@
 
 namespace agent {
 
+namespace {
+
+bool gRetainedStateReceived = false;
+constexpr unsigned long kRetainedStateTimeoutMs = 1200;
+
+void waitForRetainedStateSnapshot() {
+  const unsigned long deadline = millis() + kRetainedStateTimeoutMs;
+  while (!gRetainedStateReceived && millis() < deadline) {
+    gMqttClient.loop();
+    delay(2);
+  }
+}
+
+}  // namespace
+
 void onMqttMessage(char* topicChars, byte* payload, unsigned int length) {
   const String topic(topicChars ? topicChars : "");
+  if (topic == topicState()) {
+    gRetainedStateReceived = true;
+    DynamicJsonDocument doc(kMqttBufferSize);
+    if (!parsePayloadObject(payload, length, doc)) {
+      return;
+    }
+    if (applyRuntimeStateSnapshot(doc.as<JsonObjectConst>())) {
+      initIrHardware();
+    }
+    return;
+  }
   if (topic == "ir/pairing/open") {
     handlePairingOpen(payload, length);
     return;
@@ -65,6 +92,9 @@ bool connectMqtt() {
   }
 
   gMqttClient.publish(topicStatus().c_str(), "online", true);
+  gRetainedStateReceived = false;
+  gMqttClient.subscribe(topicState().c_str());
+  waitForRetainedStateSnapshot();
   gMqttClient.subscribe("ir/pairing/open");
   gMqttClient.subscribe(topicPairingAccept().c_str());
   gMqttClient.subscribe(topicPairingUnpair().c_str());

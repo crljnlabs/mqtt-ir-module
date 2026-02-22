@@ -80,6 +80,7 @@ void savePairingHubId(const String& hubId);
 void saveDebugFlag(bool enabled);
 void saveRebootRequired(bool required);
 void loadPersistedState();
+bool applyRuntimeStateSnapshot(JsonObjectConst payload);
 
 uint16_t parseMqttPort(const String& value, uint16_t fallback);
 int parsePin(const String& value, int fallback);
