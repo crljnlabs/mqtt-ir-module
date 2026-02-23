@@ -18,7 +18,7 @@ class SettingsUpdate(BaseModel):
         default=None,
         max_length=64,
         pattern=r"^[A-Za-z0-9_-]*$",
-        description="Optional MQTT instance segment used in base topic ir-hub[/<instance>]",
+        description="Optional hub instance segment used in base topic ir/hubs/<instance_or_main>",
     )
     press_takes_default: Optional[int] = Field(default=None, ge=1, le=50, description="Default number of press takes")
     capture_timeout_ms_default: Optional[int] = Field(default=None, ge=100, le=60000, description="Default capture timeout in ms")

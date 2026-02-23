@@ -10,6 +10,10 @@ export function stopLearning() {
   return requestJson('/learn/stop', {method: 'POST'})
 }
 
+export function getLearningSessionStatus() {
+  return requestJson('/learn/status')
+}
+
 export function capturePress(
     {remoteId, takes, timeoutMs, overwrite, buttonName}) {
   return requestJson('/learn/capture', {

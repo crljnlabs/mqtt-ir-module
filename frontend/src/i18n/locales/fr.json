@@ -2,7 +2,8 @@
   "nav": {
     "home": "Accueil",
     "remotes": "Télécommandes",
-    "settings": "Paramètres"
+    "settings": "Paramètres",
+    "agents": "Agents"
   },
   "app": {
     "name": "Hub"
@@ -133,15 +134,20 @@
     "mqttPasswordHint": "Laissez vide pour conserver le mot de passe actuellement stocké.",
     "mqttPasswordStoredHint": "Un mot de passe est actuellement stocké de manière chiffrée dans la base de données.",
     "mqttBaseTopicLabel": "Instance",
-    "mqttBaseTopicHint": "Optionnel. À utiliser seulement si plusieurs services partagent le même broker. Autorisés : lettres, chiffres, _ et -.",
+    "mqttBaseTopicHint": "Optionnel. Permet au broker MQTT de distinguer plusieurs hubs partageant le même broker. Autorisés : lettres, chiffres, _ et -.",
     "mqttMasterKeyMissing": "SETTINGS_MASTER_KEY est manquant. L’enregistrement des mots de passe MQTT est bloqué.",
     "mqttSaved": "Paramètres MQTT enregistrés.",
     "mqttSaveFailed": "Échec de l’enregistrement des paramètres MQTT.",
-    "registeredAgentsTitle": "Agents enregistrés",
     "noAgentsRegistered": "Aucun agent n'est enregistré.",
     "openAgentPage": "Ouvrir la page de l'agent",
     "homeassistantEnabledLabel": "Home Assistant activé",
-    "homeassistantEnabledHint": "Active la publication MQTT Discovery pour Home Assistant (mode Hub uniquement)."
+    "homeassistantEnabledHint": "Active la publication MQTT Discovery pour Home Assistant (mode Hub uniquement).",
+    "mqttConnectionStatusLabel": "Connexion MQTT",
+    "mqttConnected": "Connecté",
+    "mqttDisconnected": "Déconnecté",
+    "mqttNotConfigured": "Non configuré",
+    "mqttLastErrorLabel": "Dernière erreur",
+    "hubIsAgentReadonlyHint": "Lecture seule. Défini via LOCAL_AGENT_ENABLED dans les variables d’environnement."
   },
   "wizard": {
     "title": "Assistant d'apprentissage",
@@ -188,7 +194,12 @@
     "summaryPress": "Court",
     "summaryHold": "Long",
     "summaryOk": "OK",
-    "summaryMissing": "-"
+    "summaryMissing": "-",
+    "noLearnCapableAgent": "Aucun agent disponible ne peut apprendre les signaux IR.",
+    "assignAgentFirst": "Sélectionnez d’abord un agent assigné à cette télécommande avant l’apprentissage.",
+    "assignedAgentMissing": "L’agent assigné n’est pas enregistré.",
+    "assignedAgentOffline": "L’agent assigné est hors ligne.",
+    "assignedAgentCannotLearn": "L’agent assigné ne peut pas apprendre les signaux IR."
   },
   "errors": {
     "unauthorizedTitle": "L'accès en écriture nécessite une clé API",
@@ -298,6 +309,34 @@
     "configurationUrlAuto": "Utiliser l'URL actuelle",
     "configurationUrlSaved": "URL de configuration enregistrée.",
     "assignedRemotesTitle": "Télécommandes assignées",
-    "assignedRemotesEmpty": "Aucune télécommande n'est assignée à cet agent."
+    "assignedRemotesEmpty": "Aucune télécommande n'est assignée à cet agent.",
+    "assignExistingRemoteAction": "Assigner une télécommande existante",
+    "assignExistingRemoteTitle": "Assigner une télécommande existante",
+    "assignExistingRemoteDescription": "Assignez une télécommande existante à cet agent. Les télécommandes non assignées sont affichées en premier.",
+    "assignExistingRemoteEmpty": "Aucune télécommande disponible pour l'assignation.",
+    "assignExistingRemoteSuggestedTitle": "Suggestions (non assignées)",
+    "assignExistingRemoteOtherTitle": "Assignées à un autre agent",
+    "assignExistingRemoteAssignedTo": "Assignée à {{id}}",
+    "assignExistingRemoteAssignButton": "Assigner",
+    "assignExistingRemoteSuccess": "{{name}} assignée.",
+    "noAgentsRegistered": "Aucun agent n’est enregistré.",
+    "openAgentPage": "Ouvrir la page de l’agent",
+    "pairingTitle": "Appairage des agents",
+    "pairingOpened": "Mode d’appairage démarré.",
+    "pairingClosed": "Mode d’appairage arrêté.",
+    "pairingRequiresMqtt": "L’appairage est désactivé tant que MQTT n’est pas configuré.",
+    "pairingMqttDisconnected": "L’appairage est désactivé tant que MQTT n’est pas connecté.",
+    "pairingClosedState": "L’appairage est actuellement fermé.",
+    "pairingOpenState": "L’appairage est ouvert.",
+    "pairingOpenWithSeconds": "Appairage ouvert ({{seconds}} s restantes).",
+    "pairingMqttHelp": "Démarrez ou arrêtez ici l’appairage des agents via MQTT.",
+    "pairingStatusOpen": "Ouvert",
+    "pairingStatusClosed": "Fermé",
+    "pairingDisabledHint": "Connectez-vous à MQTT dans les paramètres avant de démarrer l’appairage.",
+    "openSettings": "Ouvrir les paramètres",
+    "startPairing": "Démarrer l’appairage",
+    "stopPairing": "Arrêter l’appairage",
+    "updateInProgressHint": "Installation du firmware en cours. Gardez cette page ouverte jusqu’au redémarrage de l’agent.",
+    "updateTimeoutHint": "Aucune confirmation reçue pour l’instant. La mise à jour est peut-être encore en cours sur l’agent."
   }
 }

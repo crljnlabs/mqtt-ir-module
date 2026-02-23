@@ -57,6 +57,21 @@ class IrLearningService:
         with self._lock:
             return self._session.remote_name if self._session else None
 
+    @property
+    def agent_id(self) -> Optional[str]:
+        with self._lock:
+            return self._session.agent_id if self._session else None
+
+    def is_learning_for_agent(self, agent_id: str) -> bool:
+        normalized_agent_id = str(agent_id or "").strip()
+        if not normalized_agent_id:
+            return False
+        with self._lock:
+            session = self._session
+            if not session:
+                return False
+            return str(session.agent_id).strip() == normalized_agent_id
+
     def start(self, remote_id: int, extend: bool) -> Dict[str, Any]:
         with self._lock:
             if self._session is not None:

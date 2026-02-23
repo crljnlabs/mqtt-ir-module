@@ -12,28 +12,42 @@ class AgentRegistry:
     def __init__(self, database: Database) -> None:
         self._db = database
         self._agents: Dict[str, Agent] = {}
+        self._online_ids: set[str] = set()
         self._lock = threading.Lock()
 
-    def register_agent(self, agent: Agent) -> None:
+    def register_agent(self, agent: Agent, online: Optional[bool] = None, last_seen: Optional[float] = None) -> None:
         with self._lock:
             self._agents[agent.agent_id] = agent
         status = agent.get_status()
         capabilities = agent.capabilities or {}
+        reported_online = str(status.get("status") or "online").strip().lower() == "online"
+        is_online = reported_online if online is None else bool(online)
+        if last_seen is None and is_online:
+            last_seen = time.time()
         self._db.agents.upsert(
             agent_id=agent.agent_id,
             name=agent.name,
+            icon=None,
             transport=agent.transport,
-            status=str(status.get("status") or "online"),
+            status="online" if is_online else "offline",
             can_send=self._resolve_can_send(capabilities),
             can_learn=self._resolve_can_learn(capabilities),
             sw_version=self._resolve_sw_version(capabilities),
             agent_topic=self._resolve_agent_topic(capabilities),
-            last_seen=time.time(),
+            last_seen=last_seen,
+            pending=False,
+            pairing_session_id=None,
         )
+        with self._lock:
+            if is_online:
+                self._online_ids.add(agent.agent_id)
+            else:
+                self._online_ids.discard(agent.agent_id)
 
     def unregister_agent(self, agent_id: str) -> None:
         with self._lock:
             self._agents.pop(agent_id, None)
+            self._online_ids.discard(agent_id)
         self._db.agents.set_status(agent_id=agent_id, status="offline", last_seen=time.time())
 
     def list_agents(self) -> List[Dict[str, Any]]:
@@ -89,7 +103,8 @@ class AgentRegistry:
             raise AgentRoutingError(code="agent_required", message="Remote must be assigned to an agent", status_code=400)
         with self._lock:
             agent = self._agents.get(agent_id)
-        if not agent:
+            is_online = agent_id in self._online_ids
+        if not agent or not is_online:
             raise AgentRoutingError(code="agent_offline", message="Assigned agent is offline or unavailable", status_code=503)
         return agent
 
@@ -97,7 +112,30 @@ class AgentRegistry:
         normalized_agent_id = str(agent_id or "").strip()
         if not normalized_agent_id:
             return
-        self._db.agents.update_last_seen(agent_id=normalized_agent_id, last_seen=time.time())
+        now = time.time()
+        self._db.agents.set_status(agent_id=normalized_agent_id, status="online", last_seen=now)
+        with self._lock:
+            if normalized_agent_id in self._agents:
+                self._online_ids.add(normalized_agent_id)
+
+    def set_agent_online(self, agent_id: str, last_seen: Optional[float] = None) -> None:
+        normalized_agent_id = str(agent_id or "").strip()
+        if not normalized_agent_id:
+            return
+        seen_at = time.time() if last_seen is None else float(last_seen)
+        self._db.agents.set_status(agent_id=normalized_agent_id, status="online", last_seen=seen_at)
+        with self._lock:
+            if normalized_agent_id in self._agents:
+                self._online_ids.add(normalized_agent_id)
+
+    def set_agent_offline(self, agent_id: str, last_seen: Optional[float] = None) -> None:
+        normalized_agent_id = str(agent_id or "").strip()
+        if not normalized_agent_id:
+            return
+        seen_at = time.time() if last_seen is None else float(last_seen)
+        self._db.agents.set_status(agent_id=normalized_agent_id, status="offline", last_seen=seen_at)
+        with self._lock:
+            self._online_ids.discard(normalized_agent_id)
 
     def _resolve_can_send(self, capabilities: Dict[str, Any]) -> bool:
         if "can_send" in capabilities:
@@ -131,4 +169,4 @@ class AgentRegistry:
 
     def _get_active_ids(self) -> set[str]:
         with self._lock:
-            return set(self._agents.keys())
+            return set(self._online_ids)

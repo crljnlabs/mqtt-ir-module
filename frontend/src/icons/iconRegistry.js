@@ -71,6 +71,7 @@ export function getMdiIconPath(value) {
 
 export const DEFAULT_REMOTE_ICON = 'remoteTv'
 export const DEFAULT_BUTTON_ICON = 'tapButton'
+export const DEFAULT_AGENT_ICON = 'mdi:robot-outline'
 
 export const ICONS = [
   // Remote

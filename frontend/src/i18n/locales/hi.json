@@ -2,7 +2,8 @@
   "nav": {
     "home": "होम",
     "remotes": "रिमोट",
-    "settings": "सेटिंग्स"
+    "settings": "सेटिंग्स",
+    "agents": "एजेंट"
   },
   "app": {
     "name": "Hub"
@@ -133,15 +134,20 @@
     "mqttPasswordHint": "मौजूदा संग्रहीत पासवर्ड बनाए रखने के लिए खाली छोड़ें।",
     "mqttPasswordStoredHint": "वर्तमान में पासवर्ड डेटाबेस में एन्क्रिप्टेड रूप में संग्रहीत है।",
     "mqttBaseTopicLabel": "इंस्टेंस",
-    "mqttBaseTopicHint": "वैकल्पिक। इसे केवल तब उपयोग करें जब कई सेवाएं एक ही ब्रोकर साझा करती हों। मान्य: अक्षर, अंक, _ और -।",
+    "mqttBaseTopicHint": "वैकल्पिक। एक ही ब्रोकर पर कई हब अलग करने के लिए MQTT ब्रोकर इसका उपयोग करता है। मान्य: अक्षर, अंक, _ और -।",
     "mqttMasterKeyMissing": "SETTINGS_MASTER_KEY नहीं है। MQTT पासवर्ड सहेजना ब्लॉक किया गया है।",
     "mqttSaved": "MQTT सेटिंग्स सहेजी गईं।",
     "mqttSaveFailed": "MQTT सेटिंग्स सहेजने में विफल।",
-    "registeredAgentsTitle": "पंजीकृत एजेंट",
     "noAgentsRegistered": "कोई एजेंट पंजीकृत नहीं है।",
     "openAgentPage": "एजेंट पेज खोलें",
     "homeassistantEnabledLabel": "Home Assistant सक्षम",
-    "homeassistantEnabledHint": "Home Assistant के लिए MQTT Discovery प्रकाशन सक्षम करें (केवल Hub मोड)।"
+    "homeassistantEnabledHint": "Home Assistant के लिए MQTT Discovery प्रकाशन सक्षम करें (केवल Hub मोड)।",
+    "mqttConnectionStatusLabel": "MQTT कनेक्शन",
+    "mqttConnected": "कनेक्टेड",
+    "mqttDisconnected": "डिसकनेक्टेड",
+    "mqttNotConfigured": "कॉन्फ़िगर नहीं",
+    "mqttLastErrorLabel": "आख़िरी त्रुटि",
+    "hubIsAgentReadonlyHint": "सिर्फ पढ़ने के लिए। इसे LOCAL_AGENT_ENABLED environment variable से सेट किया जाता है।"
   },
   "wizard": {
     "title": "लर्निंग विज़ार्ड",
@@ -188,7 +194,12 @@
     "summaryPress": "दबाएँ",
     "summaryHold": "दबाकर रखें",
     "summaryOk": "OK",
-    "summaryMissing": "-"
+    "summaryMissing": "-",
+    "noLearnCapableAgent": "कोई उपलब्ध एजेंट नहीं है जो IR सिग्नल सीख सके।",
+    "assignAgentFirst": "सीखने से पहले इस रिमोट के लिए एक असाइन किया गया एजेंट चुनें।",
+    "assignedAgentMissing": "असाइन किया गया एजेंट रजिस्टर्ड नहीं है।",
+    "assignedAgentOffline": "असाइन किया गया एजेंट ऑफलाइन है।",
+    "assignedAgentCannotLearn": "असाइन किया गया एजेंट IR सिग्नल नहीं सीख सकता।"
   },
   "errors": {
     "unauthorizedTitle": "लेखन के लिए API key आवश्यक है",
@@ -298,6 +309,34 @@
     "configurationUrlAuto": "वर्तमान URL उपयोग करें",
     "configurationUrlSaved": "कॉन्फ़िगरेशन URL सहेजा गया।",
     "assignedRemotesTitle": "असाइन किए गए रिमोट",
-    "assignedRemotesEmpty": "इस एजेंट को कोई रिमोट असाइन नहीं है।"
+    "assignedRemotesEmpty": "इस एजेंट को कोई रिमोट असाइन नहीं है।",
+    "assignExistingRemoteAction": "मौजूदा रिमोट असाइन करें",
+    "assignExistingRemoteTitle": "मौजूदा रिमोट असाइन करें",
+    "assignExistingRemoteDescription": "इस एजेंट को कोई मौजूदा रिमोट असाइन करें। बिना असाइन किए रिमोट पहले दिखाए जाते हैं।",
+    "assignExistingRemoteEmpty": "असाइन करने के लिए कोई रिमोट उपलब्ध नहीं है।",
+    "assignExistingRemoteSuggestedTitle": "सुझाव (बिना असाइन किए)",
+    "assignExistingRemoteOtherTitle": "किसी दूसरे एजेंट को असाइन",
+    "assignExistingRemoteAssignedTo": "{{id}} को असाइन",
+    "assignExistingRemoteAssignButton": "असाइन करें",
+    "assignExistingRemoteSuccess": "{{name}} असाइन किया गया।",
+    "noAgentsRegistered": "कोई एजेंट पंजीकृत नहीं है।",
+    "openAgentPage": "एजेंट पेज खोलें",
+    "pairingTitle": "एजेंट पेयरिंग",
+    "pairingOpened": "पेयरिंग मोड शुरू हो गया।",
+    "pairingClosed": "पेयरिंग मोड बंद हो गया।",
+    "pairingRequiresMqtt": "MQTT कॉन्फ़िगर होने तक पेयरिंग बंद रहेगी।",
+    "pairingMqttDisconnected": "MQTT कनेक्ट होने तक पेयरिंग बंद रहेगी।",
+    "pairingClosedState": "पेयरिंग अभी बंद है।",
+    "pairingOpenState": "पेयरिंग खुली है।",
+    "pairingOpenWithSeconds": "पेयरिंग खुली है ({{seconds}} सेकंड शेष)।",
+    "pairingMqttHelp": "यहां MQTT के जरिए एजेंट पेयरिंग शुरू या रोकें।",
+    "pairingStatusOpen": "खुला",
+    "pairingStatusClosed": "बंद",
+    "pairingDisabledHint": "पेयरिंग शुरू करने से पहले Settings में MQTT से कनेक्ट करें।",
+    "openSettings": "सेटिंग्स खोलें",
+    "startPairing": "पेयरिंग शुरू करें",
+    "stopPairing": "पेयरिंग रोकें",
+    "updateInProgressHint": "फर्मवेयर इंस्टॉल हो रहा है। एजेंट रीस्टार्ट होने तक यह पेज खुला रखें।",
+    "updateTimeoutHint": "अभी पुष्टि नहीं मिली है। अपडेट अभी भी एजेंट पर चल रहा हो सकता है।"
   }
 }

@@ -1,22 +1,28 @@
 #!/usr/bin/env python3
-from contextlib import asynccontextmanager
-from typing import Dict, Any
+import json
+import signal
+import threading
+from typing import Optional
 
-from fastapi import FastAPI, APIRouter
+from jmqtt import QualityOfService as QoS
 
 from agents import LocalAgent, LocalTransport
-from agents.agent_id_store import get_or_create_agent_id
-from connections import PairingManagerAgent, RuntimeLoader
+from connections import (
+    AgentRuntimeStateStore,
+    AgentCommandHandler,
+    AgentLogReporter,
+    PairingManagerAgent,
+    RuntimeLoader,
+)
 from electronics.ir_ctl_engine import IrCtlEngine
 from electronics.ir_signal_parser import IrSignalParser
-from helper import Environment, SettingsCipher
-from database import Database
+from helper import Environment
 from runtime_version import SOFTWARE_VERSION
 
-env = Environment()
-database = Database(data_dir=env.data_folder)
-settings_cipher = SettingsCipher(env.settings_master_key)
+AGENT_LOG_STREAM_LEVEL = "info"
+AGENT_PROTOCOL_VERSION = "1"
 
+env = Environment()
 parser = IrSignalParser()
 engine = IrCtlEngine(
     ir_rx_device=env.ir_rx_device,
@@ -24,75 +30,115 @@ engine = IrCtlEngine(
     wideband_default=env.ir_wideband,
 )
 local_transport = LocalTransport(engine=engine, parser=parser)
-local_agent_id = get_or_create_agent_id(data_dir=env.data_folder)
-local_agent = LocalAgent(transport=local_transport, agent_id=local_agent_id)
+local_agent = LocalAgent(transport=local_transport, agent_id="local-agent-runtime", name="Local Agent Runtime")
+
 runtime_loader = RuntimeLoader(
-    settings_store=database.settings,
-    settings_cipher=settings_cipher,
+    settings_store=None,
+    settings_cipher=None,
     role="agent",
+    environment=env,
 )
+state_store = AgentRuntimeStateStore(
+    runtime_loader=runtime_loader,
+    agent_id_resolver=lambda: _resolve_runtime_agent_uid(),
+    static_state={
+        "agent_type": "docker",
+        "protocol_version": AGENT_PROTOCOL_VERSION,
+        "sw_version": SOFTWARE_VERSION,
+        "can_send": True,
+        "can_learn": True,
+        "ota_supported": False,
+        "reboot_required": False,
+        "runtime_commands": [
+            "runtime/debug/get",
+            "runtime/debug/set",
+            "runtime/config/get",
+        ],
+    },
+)
+agent_log_reporter = AgentLogReporter(
+    agent_id_resolver=lambda: _resolve_runtime_agent_uid(),
+    logger_name="agent_runtime_events",
+    dispatch=lambda agent_id, event: _dispatch_runtime_log(agent_id, event),
+    min_dispatch_level=AGENT_LOG_STREAM_LEVEL,
+)
+local_agent.set_log_reporter(agent_log_reporter)
 pairing_manager = PairingManagerAgent(
     runtime_loader=runtime_loader,
-    settings_store=database.settings,
-    agent_uid=local_agent.agent_id,
-    readable_name=local_agent.name,
+    binding_store=state_store,
+    readable_name="IR Agent",
     sw_version=SOFTWARE_VERSION,
     can_send=True,
-    can_learn=bool(local_agent.capabilities.get("canLearn")),
+    can_learn=True,
+    agent_type="docker",
+    protocol_version=AGENT_PROTOCOL_VERSION,
+    ota_supported=False,
     reset_binding=env.agent_pairing_reset,
+    log_reporter=agent_log_reporter,
 )
+command_handler = AgentCommandHandler(
+    runtime_loader=runtime_loader,
+    binding_store=state_store,
+    local_agent=local_agent,
+    log_reporter=agent_log_reporter,
+)
+state_store.set_debug_change_handler(
+    lambda enabled: agent_log_reporter.set_min_dispatch_level("debug" if enabled else AGENT_LOG_STREAM_LEVEL)
+)
+_shutdown_event = threading.Event()
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    database.init()
-    runtime_loader.start()
-    pairing_manager.start()
+def _handle_shutdown_signal(signum: int, frame: Optional[object]) -> None:
+    _shutdown_event.set()
+
+
+def _resolve_runtime_agent_uid() -> str:
+    client_id = str(runtime_loader.mqtt_client_id() or "").strip()
+    if client_id:
+        return client_id
+    runtime_status = runtime_loader.status()
+    fallback = str(runtime_status.get("client_id") or runtime_status.get("node_id") or "").strip()
+    return fallback
+
+
+def _dispatch_runtime_log(agent_id: str, event: dict) -> None:
+    normalized_agent_id = str(agent_id or "").strip()
+    if not normalized_agent_id:
+        return
+    connection = runtime_loader.mqtt_connection()
+    if connection is None:
+        return
+    topic = f"ir/agents/{normalized_agent_id}/logs"
     try:
-        yield
+        connection.publish(
+            topic,
+            json.dumps(event, separators=(",", ":")),
+            qos=QoS.AtMostOnce,
+            retain=False,
+        )
+    except Exception:
+        # Do not fail agent runtime on non-critical log publishing errors.
+        pass
+
+
+def run() -> int:
+    runtime_loader.start()
+    state_store.start()
+    agent_log_reporter.set_min_dispatch_level("debug" if state_store.debug_enabled() else AGENT_LOG_STREAM_LEVEL)
+    pairing_manager.start()
+    command_handler.start()
+    try:
+        while not _shutdown_event.wait(timeout=1.0):
+            pass
+        return 0
     finally:
+        command_handler.stop()
         pairing_manager.stop()
+        state_store.stop()
         runtime_loader.stop()
 
-app = FastAPI(
-    title="mqtt-ir-agent",
-    version=SOFTWARE_VERSION,
-    lifespan=lifespan,
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
-    openapi_url="/api/openapi.json",
-)
 
-api = APIRouter(prefix="/api")
-
-
-@api.get("/health")
-def health() -> Dict[str, Any]:
-    return {"ok": True}
-
-
-@api.get("/status/electronics")
-def agent_electronics_status() -> Dict[str, Any]:
-    return {
-        "ir_rx_device": env.ir_rx_device,
-        "ir_tx_device": env.ir_tx_device,
-        "debug": env.debug,
-    }
-
-
-@api.get("/status/agent")
-def agent_status() -> Dict[str, Any]:
-    return local_agent.get_status()
-
-
-@api.get("/status/mqtt")
-def agent_mqtt_status() -> Dict[str, Any]:
-    return runtime_loader.status()
-
-
-@api.get("/status/pairing")
-def agent_pairing_status() -> Dict[str, Any]:
-    return pairing_manager.status()
-
-
-app.include_router(api)
+if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, _handle_shutdown_signal)
+    signal.signal(signal.SIGINT, _handle_shutdown_signal)
+    raise SystemExit(run())

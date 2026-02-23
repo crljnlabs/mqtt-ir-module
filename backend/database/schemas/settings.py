@@ -315,6 +315,5 @@ class Settings(DatabaseBase):
 
     def _build_mqtt_base_topic(self, instance: str) -> str:
         normalized_instance = str(instance or "").strip().strip("/")
-        if not normalized_instance:
-            return "ir-hub"
-        return f"ir-hub/{normalized_instance}"
+        hub_id = normalized_instance or "main"
+        return f"ir/hubs/{hub_id}"

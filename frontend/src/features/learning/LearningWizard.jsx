@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Drawer } from '../../components/ui/Drawer.jsx'
 import { Button } from '../../components/ui/Button.jsx'
@@ -9,8 +9,9 @@ import { Collapse } from '../../components/ui/Collapse.jsx'
 import { Badge } from '../../components/ui/Badge.jsx'
 import { ErrorCallout } from '../../components/ui/ErrorCallout.jsx'
 import { useToast } from '../../components/ui/ToastProvider.jsx'
-import { startLearning, stopLearning, capturePress, captureHold } from '../../api/learningApi.js'
+import { startLearning, stopLearning, capturePress, captureHold, getLearningSessionStatus } from '../../api/learningApi.js'
 import { createLearningStatusSocket } from '../../api/learningStatusSocket.js'
+import { getLearningStatus } from '../../api/statusApi.js'
 import { ApiErrorMapper } from '../../utils/apiErrorMapper.js'
 
 export function LearningWizard({
@@ -40,20 +41,46 @@ export function LearningWizard({
   // Local capture progress and status pushed over WebSocket.
   const [captured, setCaptured] = useState([]) // { name, press, hold }
   const [activeButtonName, setActiveButtonName] = useState(null)
+  const [activeButtonId, setActiveButtonId] = useState(null)
   const [learnStatus, setLearnStatus] = useState({ learn_enabled: false, logs: [] })
+  const [qualityLogStartIndex, setQualityLogStartIndex] = useState(0)
   // Track timeouts locally because timeout errors are not logged in the status stream.
   const [captureTimeout, setCaptureTimeout] = useState({ mode: null, take: null })
 
   const logContainerRef = useRef(null)
   const currentCaptureRef = useRef(null)
 
-  // Use cached learning status to avoid extra polling during learning.
-  const learningStatus = queryClient.getQueryData(['status-learning'])
-  const learningActive = Boolean(learningStatus?.learn_enabled)
-  const learningRemoteId = learningStatus?.learn_remote_id ?? null
+  // Keep a polling fallback so status stays usable even if WebSocket events are missed.
+  const learningStatusQuery = useQuery({
+    queryKey: ['status-learning'],
+    queryFn: getLearningStatus,
+    enabled: open,
+    refetchInterval: open ? 2000 : false,
+  })
+  const learningSessionStatusQuery = useQuery({
+    queryKey: ['learn-status'],
+    queryFn: getLearningSessionStatus,
+    enabled: open,
+    refetchInterval: open ? 2000 : false,
+  })
+  const learningStatus = learningStatusQuery.data || null
+  const learningSessionStatus = learningSessionStatusQuery.data || null
+  const liveLearningActive = Boolean(learnStatus?.learn_enabled)
+  const liveLearningRemoteId = learnStatus?.remote_id ?? null
+  const polledSessionActive = Boolean(learningSessionStatus?.learn_enabled)
+  const polledSessionRemoteId = learningSessionStatus?.remote_id ?? null
+  const fallbackLearningActive = Boolean(learningStatus?.learn_enabled)
+  const fallbackLearningRemoteId = learningStatus?.learn_remote_id ?? null
+  const learningActive = liveLearningActive || polledSessionActive || fallbackLearningActive
+  const learningRemoteId = liveLearningRemoteId ?? polledSessionRemoteId ?? fallbackLearningRemoteId
+  const isCurrentRemoteLearning = learningActive && isSameRemote(learningRemoteId, remoteId)
 
   // Derive log list and key for scroll-to-latest behavior.
-  const statusLogs = learnStatus.logs || []
+  const statusLogs = useMemo(() => {
+    const liveLogs = Array.isArray(learnStatus.logs) ? learnStatus.logs : []
+    const polledLogs = Array.isArray(learningSessionStatus?.logs) ? learningSessionStatus.logs : []
+    return polledLogs.length > liveLogs.length ? polledLogs : liveLogs
+  }, [learnStatus.logs, learningSessionStatus?.logs])
   const latestLogKey = statusLogs.length
     ? `${statusLogs[statusLogs.length - 1].timestamp}_${statusLogs[statusLogs.length - 1].level}_${statusLogs[statusLogs.length - 1].message}`
     : ''
@@ -63,7 +90,10 @@ export function LearningWizard({
     if (!currentCapture || currentCapture.mode !== 'press') return []
     return buildPressTakeStates(currentCapture, pressTimeoutTake)
   }, [currentCapture, pressTimeoutTake])
-  const qualityScores = useMemo(() => getQualityScores(statusLogs), [statusLogs])
+  const qualityScores = useMemo(
+    () => getQualityScores(statusLogs, activeButtonId, qualityLogStartIndex),
+    [statusLogs, activeButtonId, qualityLogStartIndex],
+  )
   const qualityRows = useMemo(() => buildQualityRows(qualityScores), [qualityScores])
   const qualityHasAdvice = useMemo(() => qualityRows.some((row) => row.showAdvice), [qualityRows])
   const mutedSuccessStyle = { backgroundColor: 'rgb(var(--success) / 0.7)' }
@@ -76,17 +106,43 @@ export function LearningWizard({
   // Mutations coordinate server-side learning actions with consistent error handling.
   const startMutation = useMutation({
     mutationFn: async () => {
-      if (learningActive && learningRemoteId && Number(learningRemoteId) !== Number(remoteId)) {
-        const remoteLabel = learningStatus?.learn_remote_name || learningRemoteId
+      let latestLearningStatus = null
+      try {
+        latestLearningStatus = await queryClient.fetchQuery({
+          queryKey: ['status-learning'],
+          queryFn: getLearningStatus,
+        })
+      } catch {
+        latestLearningStatus = queryClient.getQueryData(['status-learning'])
+      }
+      const latestLearningActive = Boolean(latestLearningStatus?.learn_enabled)
+      const latestLearningRemoteId = latestLearningStatus?.learn_remote_id ?? null
+      const latestLearningRemoteName = latestLearningStatus?.learn_remote_name ?? null
+
+      if (latestLearningActive && latestLearningRemoteId && !isSameRemote(latestLearningRemoteId, remoteId)) {
+        const remoteLabel = latestLearningRemoteName || latestLearningRemoteId
         throw new Error(t('wizard.errorLearningActiveOther', { remote: remoteLabel }))
       }
-      if (learningActive && Number(learningRemoteId) === Number(remoteId)) {
-        return learnStatus
+      if (latestLearningActive && isSameRemote(latestLearningRemoteId, remoteId)) {
+        return {
+          learn_enabled: true,
+          remote_id: latestLearningRemoteId ?? toNumber(remoteId),
+          remote_name: latestLearningRemoteName || remoteName || null,
+          agent_id: latestLearningStatus?.learn_agent_id ?? latestLearningStatus?.agent_id ?? null,
+          logs: Array.isArray(learnStatus?.logs) ? learnStatus.logs : [],
+        }
       }
       return startLearning({ remoteId, extend: Boolean(startExtend) })
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      const normalized = normalizeLearningStatusPayload(data, remoteId, remoteName)
+      if (normalized.learn_enabled) {
+        setLearnStatus(normalized)
+      }
+      queryClient.setQueryData(['learn-status'], normalized)
+      queryClient.setQueryData(['status-learning'], toLearningStatusSummary(normalized))
       queryClient.invalidateQueries({ queryKey: ['status-learning'] })
+      queryClient.invalidateQueries({ queryKey: ['learn-status'] })
       queryClient.invalidateQueries({ queryKey: ['remotes'] })
     },
     onError: (error) => {
@@ -103,7 +159,22 @@ export function LearningWizard({
   const stopMutation = useMutation({
     mutationFn: stopLearning,
     onSuccess: () => {
+      setLearnStatus({ learn_enabled: false, logs: [] })
+      queryClient.setQueryData(['learn-status'], {
+        learn_enabled: false,
+        remote_id: null,
+        remote_name: null,
+        agent_id: null,
+        logs: [],
+      })
+      queryClient.setQueryData(['status-learning'], {
+        learn_enabled: false,
+        learn_remote_id: null,
+        learn_remote_name: null,
+        learn_agent_id: null,
+      })
       queryClient.invalidateQueries({ queryKey: ['status-learning'] })
+      queryClient.invalidateQueries({ queryKey: ['learn-status'] })
     },
     onError: (e) => toast.show({ title: t('wizard.title'), message: errorMapper.getMessage(e, 'wizard.errorStopFailed') }),
   })
@@ -126,10 +197,15 @@ export function LearningWizard({
     },
     onMutate: () => {
       setCaptureTimeout({ mode: null, take: null })
+      setActiveButtonId(null)
+      setQualityLogStartIndex(statusLogs.length)
+      setLearnStatus((prev) => ensureLearningActive(prev, remoteId, remoteName))
     },
     onSuccess: (data) => {
       const name = data?.button?.name || buttonName.trim() || t('wizard.defaultButtonName')
+      const buttonId = toNumber(data?.button?.id)
       setActiveButtonName(name)
+      setActiveButtonId(buttonId > 0 ? buttonId : null)
       setCaptured((prev) => {
         const next = prev.filter((x) => x.name !== name)
         next.push({ name, press: true, hold: false })
@@ -170,6 +246,7 @@ export function LearningWizard({
     },
     onMutate: () => {
       setCaptureTimeout({ mode: null, take: null })
+      setLearnStatus((prev) => ensureLearningActive(prev, remoteId, remoteName))
     },
     onSuccess: () => {
       const name = activeButtonName || targetButton?.name
@@ -194,18 +271,32 @@ export function LearningWizard({
   useEffect(() => {
     if (!open) return
     // Reset wizard state and start a learning session when opening the drawer.
+    startMutation.reset()
+    pressMutation.reset()
+    holdMutation.reset()
     const settingsSnapshot = queryClient.getQueryData(['settings'])
+    const statusSnapshot = queryClient.getQueryData(['status-learning'])
+    const sameRemoteActive = Boolean(statusSnapshot?.learn_enabled && isSameRemote(statusSnapshot?.learn_remote_id, remoteId))
     const defaultTakes = getSettingNumber(settingsSnapshot?.press_takes_default, 5)
     const defaultTimeoutMs = getSettingNumber(settingsSnapshot?.capture_timeout_ms_default, 3000)
     setCaptured([])
     setActiveButtonName(targetButton?.name || null)
+    setActiveButtonId(null)
     setButtonName(targetButton?.name || '')
-    setLearnStatus({ learn_enabled: false, logs: [] })
+    setLearnStatus({
+      learn_enabled: sameRemoteActive,
+      remote_id: sameRemoteActive ? statusSnapshot?.learn_remote_id ?? toNumber(remoteId) : null,
+      remote_name: sameRemoteActive ? statusSnapshot?.learn_remote_name || remoteName || null : null,
+      logs: [],
+    })
+    setQualityLogStartIndex(0)
     setCaptureTimeout({ mode: null, take: null })
     setStep('press')
     setAdvancedOpen(false)
     setTakes(defaultTakes)
     setTimeoutMs(defaultTimeoutMs)
+    void learningStatusQuery.refetch()
+    void learningSessionStatusQuery.refetch()
     startMutation.mutate()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -213,6 +304,9 @@ export function LearningWizard({
   useEffect(() => {
     if (open) return
     // Clear wizard state when the drawer closes to avoid stale data.
+    startMutation.reset()
+    pressMutation.reset()
+    holdMutation.reset()
     setStep('press')
     setButtonName('')
     setAdvancedOpen(false)
@@ -220,25 +314,85 @@ export function LearningWizard({
     setTimeoutMs(3000)
     setCaptured([])
     setActiveButtonName(null)
+    setActiveButtonId(null)
     setLearnStatus({ learn_enabled: false, logs: [] })
+    setQualityLogStartIndex(0)
     setCaptureTimeout({ mode: null, take: null })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   useEffect(() => {
     if (!open) return
-    // Keep a single WebSocket open while the drawer is active.
+    // Keep status streaming resilient by reconnecting after transient socket failures.
     let isActive = true
-    const socket = createLearningStatusSocket({
-      onMessage: (payload) => {
-        if (isActive) setLearnStatus(payload)
-      },
-    })
+    let socket = null
+    let reconnectTimer = null
+    let reconnectAttempts = 0
+
+    const clearReconnectTimer = () => {
+      if (reconnectTimer == null) return
+      window.clearTimeout(reconnectTimer)
+      reconnectTimer = null
+    }
+
+    const scheduleReconnect = () => {
+      if (!isActive) return
+      if (reconnectTimer != null) return
+      const delayMs = Math.min(10000, 1000 * (2 ** reconnectAttempts))
+      reconnectAttempts = Math.min(reconnectAttempts + 1, 6)
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = null
+        connect()
+      }, delayMs)
+    }
+
+    const connect = () => {
+      if (!isActive) return
+      if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return
+      socket = createLearningStatusSocket({
+        onOpen: () => {
+          reconnectAttempts = 0
+        },
+        onMessage: (payload) => {
+          if (!isActive) return
+          const normalized = normalizeLearningStatusPayload(payload)
+          setLearnStatus(normalized)
+          queryClient.setQueryData(['learn-status'], normalized)
+          queryClient.setQueryData(['status-learning'], toLearningStatusSummary(normalized))
+        },
+        onClose: () => scheduleReconnect(),
+        onError: () => scheduleReconnect(),
+      })
+    }
+
+    const reconnectNow = () => {
+      if (!isActive) return
+      clearReconnectTimer()
+      if (socket && socket.readyState === WebSocket.CONNECTING) return
+      socket?.close()
+      socket = null
+      connect()
+    }
+
+    const handleOnline = () => reconnectNow()
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return
+      if (socket && socket.readyState === WebSocket.OPEN) return
+      reconnectNow()
+    }
+
+    connect()
+    window.addEventListener('online', handleOnline)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
       isActive = false
-      socket.close()
+      window.removeEventListener('online', handleOnline)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      clearReconnectTimer()
+      socket?.close()
     }
-  }, [open])
+  }, [open, queryClient])
 
   // Keep logs pinned to the newest entry when new logs arrive.
   useEffect(() => {
@@ -256,7 +410,7 @@ export function LearningWizard({
     return `${prefix}_${String(idx).padStart(4, '0')}`
   }, [learnStatus.next_button_index, t])
 
-  const canClose = !learningActive || Number(learningRemoteId) !== Number(remoteId)
+  const canClose = !isCurrentRemoteLearning
 
   // Use a single exit handler so closing the drawer stops learning when needed.
   const handleStopAndClose = async () => {
@@ -375,7 +529,7 @@ export function LearningWizard({
               <div className="font-semibold text-sm">{t('wizard.statusTitle')}</div>
             </div>
 
-            {learnStatus?.learn_enabled ? null : (
+            {isCurrentRemoteLearning ? null : (
               <div className="mt-2 text-xs text-[rgb(var(--muted))]">{t('wizard.statusInactive')}</div>
             )}
 
@@ -473,8 +627,10 @@ export function LearningWizard({
   function resetForNextButton() {
     setStep('press')
     setActiveButtonName(null)
+    setActiveButtonId(null)
     setButtonName('')
     setAdvancedOpen(false)
+    setQualityLogStartIndex(statusLogs.length)
     setCaptureTimeout({ mode: null, take: null })
   }
 }
@@ -595,15 +751,22 @@ function buildPressTakeStates(capture, timeoutTake) {
   return states
 }
 
-function getQualityScores(logs) {
-  // Extract the latest press/hold quality scores from capture completion logs.
+function getQualityScores(logs, buttonId, startIndex) {
+  // Extract the latest press/hold quality scores for the active button only.
   if (!Array.isArray(logs) || !logs.length) return { press: null, hold: null }
+  const expectedButtonId = toNumber(buttonId)
+  if (expectedButtonId <= 0) return { press: null, hold: null }
+  const safeStart = Math.max(0, Math.min(logs.length, toNumber(startIndex)))
+  const scopedLogs = logs.slice(safeStart)
+  if (!scopedLogs.length) return { press: null, hold: null }
 
   let press = null
   let hold = null
 
-  for (let i = logs.length - 1; i >= 0; i -= 1) {
-    const entry = logs[i]
+  for (let i = scopedLogs.length - 1; i >= 0; i -= 1) {
+    const entry = scopedLogs[i]
+    const entryButtonId = toNumber(entry?.data?.button_id)
+    if (entryButtonId !== expectedButtonId) continue
     if (!press && entry?.message === 'Capture press finished') {
       const rawScore = entry?.data?.quality
       if (rawScore != null) {
@@ -696,4 +859,52 @@ function findLastIndex(items, predicate) {
     if (predicate(items[i], i)) return i
   }
   return -1
+}
+
+function normalizeLearningStatusPayload(payload, fallbackRemoteId = null, fallbackRemoteName = null) {
+  if (!payload || typeof payload !== 'object') {
+    return { learn_enabled: false, remote_id: null, remote_name: null, logs: [] }
+  }
+  const logs = Array.isArray(payload.logs) ? payload.logs : []
+  const remoteId = payload.remote_id ?? payload.learn_remote_id ?? fallbackRemoteId
+  const remoteName = payload.remote_name ?? payload.learn_remote_name ?? fallbackRemoteName
+  const agentId = payload.agent_id ?? payload.learn_agent_id ?? null
+  return {
+    ...payload,
+    learn_enabled: Boolean(payload.learn_enabled),
+    remote_id: remoteId ?? null,
+    remote_name: remoteName ?? null,
+    agent_id: agentId ?? null,
+    logs,
+  }
+}
+
+function toLearningStatusSummary(payload) {
+  const normalized = normalizeLearningStatusPayload(payload)
+  if (!normalized.learn_enabled) {
+    return { learn_enabled: false, learn_remote_id: null, learn_remote_name: null, learn_agent_id: null }
+  }
+  return {
+    learn_enabled: true,
+    learn_remote_id: normalized.remote_id ?? null,
+    learn_remote_name: normalized.remote_name ?? null,
+    learn_agent_id: normalized.agent_id ?? null,
+  }
+}
+
+function ensureLearningActive(previous, remoteId, remoteName) {
+  const normalized = normalizeLearningStatusPayload(previous, remoteId, remoteName)
+  return {
+    ...normalized,
+    learn_enabled: true,
+    remote_id: normalized.remote_id ?? toNumber(remoteId) ?? null,
+    remote_name: normalized.remote_name || remoteName || null,
+    logs: normalized.logs,
+  }
+}
+
+function isSameRemote(left, right) {
+  const leftValue = toNumber(left)
+  const rightValue = toNumber(right)
+  return leftValue > 0 && rightValue > 0 && leftValue === rightValue
 }

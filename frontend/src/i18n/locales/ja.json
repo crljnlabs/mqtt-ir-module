@@ -2,7 +2,8 @@
   "nav": {
     "home": "ホーム",
     "remotes": "リモコン",
-    "settings": "設定"
+    "settings": "設定",
+    "agents": "エージェント"
   },
   "app": {
     "name": "Hub"
@@ -133,15 +134,20 @@
     "mqttPasswordHint": "現在の保存済みパスワードを維持する場合は空欄のままにします。",
     "mqttPasswordStoredHint": "現在、パスワードはデータベースに暗号化して保存されています。",
     "mqttBaseTopicLabel": "インスタンス",
-    "mqttBaseTopicHint": "任意。複数サービスが同じブローカーを共有する場合のみ使用します。使用可能: 英数字、_、-。",
+    "mqttBaseTopicHint": "任意。同じブローカーを共有する複数ハブを区別するために MQTT ブローカーが使用します。使用可能: 英数字、_、-。",
     "mqttMasterKeyMissing": "SETTINGS_MASTER_KEY がありません。MQTTパスワードの保存はブロックされています。",
     "mqttSaved": "MQTT設定を保存しました。",
     "mqttSaveFailed": "MQTT設定の保存に失敗しました。",
-    "registeredAgentsTitle": "登録済みエージェント",
     "noAgentsRegistered": "登録されたエージェントはありません。",
     "openAgentPage": "エージェントページを開く",
     "homeassistantEnabledLabel": "Home Assistant 有効",
-    "homeassistantEnabledHint": "Home Assistant向けのMQTT Discovery公開を有効にします（Hubモードのみ）。"
+    "homeassistantEnabledHint": "Home Assistant向けのMQTT Discovery公開を有効にします（Hubモードのみ）。",
+    "mqttConnectionStatusLabel": "MQTT 接続",
+    "mqttConnected": "接続済み",
+    "mqttDisconnected": "未接続",
+    "mqttNotConfigured": "未設定",
+    "mqttLastErrorLabel": "最新エラー",
+    "hubIsAgentReadonlyHint": "読み取り専用。環境変数 LOCAL_AGENT_ENABLED で設定されます。"
   },
   "wizard": {
     "title": "学習ウィザード",
@@ -188,7 +194,12 @@
     "summaryPress": "短押し",
     "summaryHold": "長押し",
     "summaryOk": "OK",
-    "summaryMissing": "-"
+    "summaryMissing": "-",
+    "noLearnCapableAgent": "IR 信号を学習できる利用可能なエージェントがありません。",
+    "assignAgentFirst": "学習前に、このリモコンに割り当てるエージェントを選択してください。",
+    "assignedAgentMissing": "割り当てられたエージェントは登録されていません。",
+    "assignedAgentOffline": "割り当てられたエージェントはオフラインです。",
+    "assignedAgentCannotLearn": "割り当てられたエージェントは IR 信号を学習できません。"
   },
   "errors": {
     "unauthorizedTitle": "書き込みにはAPIキーが必要です",
@@ -298,6 +309,34 @@
     "configurationUrlAuto": "現在のURLを使用",
     "configurationUrlSaved": "設定URLを保存しました。",
     "assignedRemotesTitle": "割り当て済みリモコン",
-    "assignedRemotesEmpty": "このエージェントに割り当てられたリモコンはありません。"
+    "assignedRemotesEmpty": "このエージェントに割り当てられたリモコンはありません。",
+    "assignExistingRemoteAction": "既存リモコンを割り当て",
+    "assignExistingRemoteTitle": "既存リモコンを割り当て",
+    "assignExistingRemoteDescription": "既存のリモコンをこのエージェントに割り当てます。未割り当てのリモコンが先に表示されます。",
+    "assignExistingRemoteEmpty": "割り当て可能なリモコンはありません。",
+    "assignExistingRemoteSuggestedTitle": "候補（未割り当て）",
+    "assignExistingRemoteOtherTitle": "他のエージェントに割り当て済み",
+    "assignExistingRemoteAssignedTo": "{{id}} に割り当て済み",
+    "assignExistingRemoteAssignButton": "割り当て",
+    "assignExistingRemoteSuccess": "{{name}} を割り当てました。",
+    "noAgentsRegistered": "登録されたエージェントはありません。",
+    "openAgentPage": "エージェントページを開く",
+    "pairingTitle": "エージェントのペアリング",
+    "pairingOpened": "ペアリングモードを開始しました。",
+    "pairingClosed": "ペアリングモードを停止しました。",
+    "pairingRequiresMqtt": "MQTT が設定されるまでペアリングは無効です。",
+    "pairingMqttDisconnected": "MQTT が接続されるまでペアリングは無効です。",
+    "pairingClosedState": "現在ペアリングは閉じています。",
+    "pairingOpenState": "ペアリングは開いています。",
+    "pairingOpenWithSeconds": "ペアリング中（残り {{seconds}} 秒）。",
+    "pairingMqttHelp": "ここで MQTT 経由のエージェントのペアリングを開始または停止します。",
+    "pairingStatusOpen": "有効",
+    "pairingStatusClosed": "無効",
+    "pairingDisabledHint": "ペアリング開始前に設定で MQTT に接続してください。",
+    "openSettings": "設定を開く",
+    "startPairing": "ペアリング開始",
+    "stopPairing": "ペアリング停止",
+    "updateInProgressHint": "ファームウェアをインストール中です。エージェントが再起動するまでこのページを開いたままにしてください。",
+    "updateTimeoutHint": "まだ確認応答がありません。更新はエージェント上で継続している可能性があります。"
   }
 }

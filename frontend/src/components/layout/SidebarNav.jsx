@@ -1,18 +1,26 @@
 import React, { useMemo } from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import Icon from '@mdi/react'
-import { mdiHomeOutline, mdiRemoteTv, mdiCogOutline } from '@mdi/js'
+import { mdiHomeOutline, mdiRemoteTv, mdiCogOutline, mdiAccountGroupOutline } from '@mdi/js'
 import { getAppConfig } from '../../utils/appConfig.js'
 
-function Item({ to, icon, label }) {
+function isActive(pathname, to) {
+  if (to === '/') return pathname === '/'
+  if (to === '/remotes') return pathname.startsWith('/remotes')
+  if (to === '/agents') return pathname === '/agents' || pathname.startsWith('/agent/')
+  if (to === '/settings') return pathname.startsWith('/settings')
+  return pathname === to
+}
+
+function Item({ to, icon, label, active }) {
   return (
     <NavLink
       to={to}
-      className={({ isActive }) =>
+      className={() =>
         [
           'flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold cursor-pointer transition-colors',
-          isActive ? 'bg-[rgb(var(--bg))] border border-[rgb(var(--border))]' : 'hover:bg-[rgb(var(--bg))]',
+          active ? 'bg-[rgb(var(--bg))] border border-[rgb(var(--border))]' : 'hover:bg-[rgb(var(--bg))]',
         ].join(' ')
       }
     >
@@ -24,6 +32,7 @@ function Item({ to, icon, label }) {
 
 export function SidebarNav() {
   const { t } = useTranslation()
+  const location = useLocation()
 
   const appIconSrc = useMemo(() => {
     const { publicBaseUrl } = getAppConfig()
@@ -44,9 +53,10 @@ export function SidebarNav() {
         </div>
 
         <nav className="flex flex-col gap-2">
-          <Item to="/" icon={mdiHomeOutline} label={t('nav.home')} />
-          <Item to="/remotes" icon={mdiRemoteTv} label={t('nav.remotes')} />
-          <Item to="/settings" icon={mdiCogOutline} label={t('nav.settings')} />
+          <Item to="/" icon={mdiHomeOutline} label={t('nav.home')} active={isActive(location.pathname, '/')} />
+          <Item to="/remotes" icon={mdiRemoteTv} label={t('nav.remotes')} active={isActive(location.pathname, '/remotes')} />
+          <Item to="/agents" icon={mdiAccountGroupOutline} label={t('nav.agents')} active={isActive(location.pathname, '/agents')} />
+          <Item to="/settings" icon={mdiCogOutline} label={t('nav.settings')} active={isActive(location.pathname, '/settings')} />
         </nav>
       </div>
     </aside>

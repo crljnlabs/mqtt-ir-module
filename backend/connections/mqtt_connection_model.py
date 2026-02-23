@@ -12,12 +12,20 @@ class MQTTConnectionModel:
     port: int
     username: str
     password: str
-    instance: str
+    node_id: str
     readable_name: str
+
+    @staticmethod
+    def technical_name_for_role(role: ConnectionRole) -> str:
+        return f"ir-{role}"
+
+    @staticmethod
+    def readable_name_for_role(role: ConnectionRole) -> str:
+        return "IR Hub" if role == "hub" else "IR Agent"
 
     @property
     def technical_name(self) -> str:
-        return f"ir-{self.role}"
+        return self.technical_name_for_role(self.role)
 
     @property
     def app_name(self) -> str:
@@ -25,13 +33,13 @@ class MQTTConnectionModel:
 
     @property
     def base_topic(self) -> str:
-        if not self.instance:
-            return self.technical_name
-        return f"{self.technical_name}/{self.instance}"
+        if self.role == "hub":
+            return f"ir/hubs/{self.node_id}"
+        return f"ir/agents/{self.node_id}"
 
     @property
     def availability_topic(self) -> str:
-        return f"{self.base_topic}/{self.role}/status"
+        return f"{self.base_topic}/status"
 
     @property
     def is_mqtt_configured(self) -> bool:

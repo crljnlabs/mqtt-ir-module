@@ -14,7 +14,7 @@ export function RemoteTile({ remote, onEdit, onDelete }) {
   return (
     <div
       className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--card))] shadow-[var(--shadow)] p-4 flex items-center justify-between gap-3 cursor-pointer transition-shadow hover:shadow-[0_14px_30px_rgba(2,6,23,0.12)]"
-      onClick={() => navigate(`/remotes/${remote.id}`)}
+      onClick={() => navigate(`/remotes/${remote.id}`, { state: { from: '/remotes' } })}
       role="button"
       tabIndex={0}
     >

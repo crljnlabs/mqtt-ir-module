@@ -2,7 +2,8 @@
   "nav": {
     "home": "হোম",
     "remotes": "রিমোট",
-    "settings": "সেটিংস"
+    "settings": "সেটিংস",
+    "agents": "এজেন্ট"
   },
   "app": {
     "name": "Hub"
@@ -133,15 +134,20 @@
     "mqttPasswordHint": "বর্তমান সংরক্ষিত পাসওয়ার্ড রাখতে ফাঁকা রাখুন।",
     "mqttPasswordStoredHint": "বর্তমানে পাসওয়ার্ডটি ডাটাবেসে এনক্রিপ্টেড অবস্থায় সংরক্ষিত আছে।",
     "mqttBaseTopicLabel": "ইনস্ট্যান্স",
-    "mqttBaseTopicHint": "ঐচ্ছিক। একাধিক সার্ভিস একই ব্রোকার শেয়ার করলে তবেই ব্যবহার করুন। অনুমোদিত: অক্ষর, সংখ্যা, _ এবং -।",
+    "mqttBaseTopicHint": "ঐচ্ছিক। একই ব্রোকারে একাধিক হাব আলাদা করতে MQTT ব্রোকার এটি ব্যবহার করে। অনুমোদিত: অক্ষর, সংখ্যা, _ এবং -।",
     "mqttMasterKeyMissing": "SETTINGS_MASTER_KEY অনুপস্থিত। MQTT পাসওয়ার্ড সংরক্ষণ ব্লক করা হয়েছে।",
     "mqttSaved": "MQTT সেটিংস সংরক্ষিত হয়েছে।",
     "mqttSaveFailed": "MQTT সেটিংস সংরক্ষণ ব্যর্থ হয়েছে।",
-    "registeredAgentsTitle": "নিবন্ধিত এজেন্ট",
     "noAgentsRegistered": "কোনও এজেন্ট নিবন্ধিত নেই।",
     "openAgentPage": "এজেন্ট পেজ খুলুন",
     "homeassistantEnabledLabel": "Home Assistant সক্রিয়",
-    "homeassistantEnabledHint": "Home Assistant-এর জন্য MQTT Discovery প্রকাশ সক্রিয় করুন (শুধু Hub মোডে)।"
+    "homeassistantEnabledHint": "Home Assistant-এর জন্য MQTT Discovery প্রকাশ সক্রিয় করুন (শুধু Hub মোডে)।",
+    "mqttConnectionStatusLabel": "MQTT সংযোগ",
+    "mqttConnected": "সংযুক্ত",
+    "mqttDisconnected": "সংযোগ নেই",
+    "mqttNotConfigured": "কনফিগার করা হয়নি",
+    "mqttLastErrorLabel": "সর্বশেষ ত্রুটি",
+    "hubIsAgentReadonlyHint": "শুধু পড়ার জন্য। পরিবেশ ভেরিয়েবল LOCAL_AGENT_ENABLED দিয়ে নির্ধারিত।"
   },
   "wizard": {
     "title": "শেখার উইজার্ড",
@@ -188,7 +194,12 @@
     "summaryPress": "সংক্ষিপ্ত",
     "summaryHold": "দীর্ঘ",
     "summaryOk": "ঠিক আছে",
-    "summaryMissing": "-"
+    "summaryMissing": "-",
+    "noLearnCapableAgent": "IR সিগন্যাল শেখাতে সক্ষম কোনও এজেন্ট পাওয়া যায়নি।",
+    "assignAgentFirst": "লার্নিং শুরু করার আগে এই রিমোটের জন্য একটি নির্ধারিত এজেন্ট বেছে নিন।",
+    "assignedAgentMissing": "নির্ধারিত এজেন্ট নিবন্ধিত নয়।",
+    "assignedAgentOffline": "নির্ধারিত এজেন্ট অফলাইন।",
+    "assignedAgentCannotLearn": "নির্ধারিত এজেন্ট IR সিগন্যাল শিখতে পারে না।"
   },
   "errors": {
     "unauthorizedTitle": "লেখার অ্যাক্সেসের জন্য API কী প্রয়োজন",
@@ -298,6 +309,34 @@
     "configurationUrlAuto": "বর্তমান URL ব্যবহার করুন",
     "configurationUrlSaved": "কনফিগারেশন URL সংরক্ষণ করা হয়েছে।",
     "assignedRemotesTitle": "অ্যাসাইন করা রিমোট",
-    "assignedRemotesEmpty": "এই এজেন্টে কোনও রিমোট অ্যাসাইন করা নেই।"
+    "assignedRemotesEmpty": "এই এজেন্টে কোনও রিমোট অ্যাসাইন করা নেই।",
+    "assignExistingRemoteAction": "বিদ্যমান রিমোট অ্যাসাইন করুন",
+    "assignExistingRemoteTitle": "বিদ্যমান রিমোট অ্যাসাইন করুন",
+    "assignExistingRemoteDescription": "এই এজেন্টে একটি বিদ্যমান রিমোট অ্যাসাইন করুন। যেগুলো অ্যাসাইন করা নেই সেগুলো আগে দেখানো হয়।",
+    "assignExistingRemoteEmpty": "অ্যাসাইন করার জন্য কোনও রিমোট উপলব্ধ নেই।",
+    "assignExistingRemoteSuggestedTitle": "প্রস্তাবিত (অ্যাসাইন করা নেই)",
+    "assignExistingRemoteOtherTitle": "অন্য এজেন্টে অ্যাসাইন করা",
+    "assignExistingRemoteAssignedTo": "{{id}}-এ অ্যাসাইন করা",
+    "assignExistingRemoteAssignButton": "অ্যাসাইন করুন",
+    "assignExistingRemoteSuccess": "{{name}} অ্যাসাইন করা হয়েছে।",
+    "noAgentsRegistered": "কোনও এজেন্ট নিবন্ধিত নেই।",
+    "openAgentPage": "এজেন্ট পেজ খুলুন",
+    "pairingTitle": "এজেন্ট পেয়ারিং",
+    "pairingOpened": "পেয়ারিং মোড চালু হয়েছে।",
+    "pairingClosed": "পেয়ারিং মোড বন্ধ হয়েছে।",
+    "pairingRequiresMqtt": "MQTT কনফিগার না করা পর্যন্ত পেয়ারিং বন্ধ থাকবে।",
+    "pairingMqttDisconnected": "MQTT সংযুক্ত না হওয়া পর্যন্ত পেয়ারিং বন্ধ থাকবে।",
+    "pairingClosedState": "পেয়ারিং বর্তমানে বন্ধ।",
+    "pairingOpenState": "পেয়ারিং চালু আছে।",
+    "pairingOpenWithSeconds": "পেয়ারিং চালু আছে ({{seconds}} সেকেন্ড বাকি)।",
+    "pairingMqttHelp": "এখানে MQTT-এর মাধ্যমে এজেন্ট পেয়ারিং শুরু বা বন্ধ করুন।",
+    "pairingStatusOpen": "চালু",
+    "pairingStatusClosed": "বন্ধ",
+    "pairingDisabledHint": "পেয়ারিং শুরু করার আগে Settings-এ MQTT সংযুক্ত করুন।",
+    "openSettings": "সেটিংস খুলুন",
+    "startPairing": "পেয়ারিং শুরু করুন",
+    "stopPairing": "পেয়ারিং বন্ধ করুন",
+    "updateInProgressHint": "ফার্মওয়্যার ইনস্টল হচ্ছে। এজেন্ট রিস্টার্ট হওয়া পর্যন্ত এই পেজটি খোলা রাখুন।",
+    "updateTimeoutHint": "এখনও নিশ্চিতকরণ পাওয়া যায়নি। আপডেটটি এজেন্টে এখনও চলতে পারে।"
   }
 }

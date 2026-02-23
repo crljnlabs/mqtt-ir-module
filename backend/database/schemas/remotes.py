@@ -184,4 +184,21 @@ class Remotes(DatabaseBase):
         finally:
             if close:
                 c.close()
-                
+
+    def clear_assigned_agent(self, agent_id: str, conn: Optional[sqlite3.Connection] = None) -> int:
+        normalized_agent_id = str(agent_id or "").strip()
+        if not normalized_agent_id:
+            return 0
+
+        c, close = self._use_conn(conn)
+        try:
+            now = time.time()
+            result = c.execute(
+                "UPDATE remotes SET assigned_agent_id = NULL, updated_at = ? WHERE assigned_agent_id = ?",
+                (now, normalized_agent_id),
+            )
+            c.commit()
+            return int(result.rowcount or 0)
+        finally:
+            if close:
+                c.close()

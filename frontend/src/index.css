@@ -61,14 +61,30 @@
 }
 
 html,
-body {
+body,
+#root {
   height: 100%;
+  width: 100%;
+}
+
+html,
+body {
+  overflow-x: hidden;
 }
 
 body {
   margin: 0;
   background: rgb(var(--bg));
   color: rgb(var(--fg));
+}
+
+/* Prevent iOS Safari from auto-zooming focused form controls below 16px. */
+@supports (-webkit-touch-callout: none) {
+  input:not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+  textarea,
+  select {
+    font-size: max(16px, 1rem);
+  }
 }
 
 /* Ensure interactive elements show pointer and buttons have a visible hover cue. */

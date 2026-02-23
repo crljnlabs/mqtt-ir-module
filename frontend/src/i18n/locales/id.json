@@ -2,7 +2,8 @@
   "nav": {
     "home": "Beranda",
     "remotes": "Remote",
-    "settings": "Pengaturan"
+    "settings": "Pengaturan",
+    "agents": "Agen"
   },
   "app": {
     "name": "Hub"
@@ -133,15 +134,20 @@
     "mqttPasswordHint": "Biarkan kosong untuk mempertahankan kata sandi yang tersimpan saat ini.",
     "mqttPasswordStoredHint": "Saat ini kata sandi tersimpan dalam bentuk terenkripsi di database.",
     "mqttBaseTopicLabel": "Instance",
-    "mqttBaseTopicHint": "Opsional. Gunakan hanya ketika beberapa layanan berbagi broker yang sama. Diizinkan: huruf, angka, _ dan -.",
+    "mqttBaseTopicHint": "Opsional. Dipakai broker MQTT untuk membedakan beberapa hub yang berbagi broker yang sama. Diizinkan: huruf, angka, _ dan -.",
     "mqttMasterKeyMissing": "SETTINGS_MASTER_KEY tidak ada. Penyimpanan kata sandi MQTT diblokir.",
     "mqttSaved": "Pengaturan MQTT disimpan.",
     "mqttSaveFailed": "Gagal menyimpan pengaturan MQTT.",
-    "registeredAgentsTitle": "Agen terdaftar",
     "noAgentsRegistered": "Belum ada agen yang terdaftar.",
     "openAgentPage": "Buka halaman agen",
     "homeassistantEnabledLabel": "Home Assistant aktif",
-    "homeassistantEnabledHint": "Aktifkan publikasi MQTT Discovery untuk Home Assistant (hanya mode Hub)."
+    "homeassistantEnabledHint": "Aktifkan publikasi MQTT Discovery untuk Home Assistant (hanya mode Hub).",
+    "mqttConnectionStatusLabel": "Koneksi MQTT",
+    "mqttConnected": "Terhubung",
+    "mqttDisconnected": "Terputus",
+    "mqttNotConfigured": "Belum dikonfigurasi",
+    "mqttLastErrorLabel": "Error terakhir",
+    "hubIsAgentReadonlyHint": "Hanya-baca. Diatur melalui LOCAL_AGENT_ENABLED pada variabel lingkungan."
   },
   "wizard": {
     "title": "Wizard pembelajaran",
@@ -188,7 +194,12 @@
     "summaryPress": "Singkat",
     "summaryHold": "Lama",
     "summaryOk": "OK",
-    "summaryMissing": "-"
+    "summaryMissing": "-",
+    "noLearnCapableAgent": "Tidak ada agen tersedia yang dapat mempelajari sinyal IR.",
+    "assignAgentFirst": "Pilih dulu agen yang ditetapkan untuk remote ini sebelum belajar.",
+    "assignedAgentMissing": "Agen yang ditetapkan tidak terdaftar.",
+    "assignedAgentOffline": "Agen yang ditetapkan sedang offline.",
+    "assignedAgentCannotLearn": "Agen yang ditetapkan tidak bisa mempelajari sinyal IR."
   },
   "errors": {
     "unauthorizedTitle": "Akses tulis memerlukan kunci API",
@@ -298,6 +309,34 @@
     "configurationUrlAuto": "Gunakan URL saat ini",
     "configurationUrlSaved": "URL konfigurasi disimpan.",
     "assignedRemotesTitle": "Remote yang ditetapkan",
-    "assignedRemotesEmpty": "Tidak ada remote yang ditetapkan ke agen ini."
+    "assignedRemotesEmpty": "Tidak ada remote yang ditetapkan ke agen ini.",
+    "assignExistingRemoteAction": "Tetapkan remote yang sudah ada",
+    "assignExistingRemoteTitle": "Tetapkan remote yang sudah ada",
+    "assignExistingRemoteDescription": "Tetapkan remote yang sudah ada ke agen ini. Remote yang belum ditetapkan ditampilkan lebih dulu.",
+    "assignExistingRemoteEmpty": "Tidak ada remote yang tersedia untuk ditetapkan.",
+    "assignExistingRemoteSuggestedTitle": "Saran (belum ditetapkan)",
+    "assignExistingRemoteOtherTitle": "Sudah ditetapkan ke agen lain",
+    "assignExistingRemoteAssignedTo": "Ditetapkan ke {{id}}",
+    "assignExistingRemoteAssignButton": "Tetapkan",
+    "assignExistingRemoteSuccess": "{{name}} ditetapkan.",
+    "noAgentsRegistered": "Belum ada agen yang terdaftar.",
+    "openAgentPage": "Buka halaman agen",
+    "pairingTitle": "Pairing agen",
+    "pairingOpened": "Mode pairing dimulai.",
+    "pairingClosed": "Mode pairing dihentikan.",
+    "pairingRequiresMqtt": "Pairing dinonaktifkan sampai MQTT dikonfigurasi.",
+    "pairingMqttDisconnected": "Pairing dinonaktifkan sampai MQTT terhubung.",
+    "pairingClosedState": "Pairing saat ini tertutup.",
+    "pairingOpenState": "Pairing terbuka.",
+    "pairingOpenWithSeconds": "Pairing terbuka (tersisa {{seconds}} dtk).",
+    "pairingMqttHelp": "Mulai atau hentikan pairing agen melalui MQTT di sini.",
+    "pairingStatusOpen": "Terbuka",
+    "pairingStatusClosed": "Tertutup",
+    "pairingDisabledHint": "Hubungkan MQTT di Pengaturan sebelum memulai pairing.",
+    "openSettings": "Buka pengaturan",
+    "startPairing": "Mulai pairing",
+    "stopPairing": "Hentikan pairing",
+    "updateInProgressHint": "Firmware sedang diinstal. Tetap buka halaman ini sampai agen melakukan restart.",
+    "updateTimeoutHint": "Belum ada konfirmasi. Pembaruan mungkin masih berjalan di agen."
   }
 }

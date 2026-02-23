@@ -4,6 +4,7 @@ import threading
 from typing import Any, Dict, Optional
 
 from jmqtt import MQTTBuilderV3, MQTTConnectionV3, QualityOfService as QoS
+from jmqtt import client_identity as mqtt_client_identity
 
 from .mqtt_connection_model import MQTTConnectionModel, ConnectionRole
 
@@ -15,21 +16,15 @@ class MqttHandler:
         self._logger = logging.getLogger("mqtt_handler")
         self._connection: Optional[MQTTConnectionV3] = None
         self._active_model: Optional[MQTTConnectionModel] = None
+        self._active_client_id: Optional[str] = None
         self._last_error: Optional[str] = None
-
-    @property
-    def technical_name(self) -> str:
-        return f"ir-{self._role}"
-
-    @property
-    def readable_name(self) -> str:
-        return "IR Hub" if self._role == "hub" else "IR Agent"
 
     def start(self, model: MQTTConnectionModel) -> None:
         if not model.is_mqtt_configured:
             self.stop()
             with self._lock:
                 self._active_model = model
+                self._active_client_id = None
                 self._last_error = None
             return
 
@@ -43,14 +38,21 @@ class MqttHandler:
 
         self.stop()
         try:
+            self._logger.info(
+                f"Connecting MQTT role={self._role} host={model.host} port={model.port} "
+                f"app_name={model.app_name} node_id={model.node_id} base_topic={model.base_topic}"
+            )
             connection = self._connect(model)
             with self._lock:
                 self._connection = connection
                 self._active_model = model
+                self._active_client_id = str(connection.client_id or "")
                 self._last_error = None
+            self._logger.info(f"MQTT connected role={self._role} client_id={connection.client_id}")
         except Exception as exc:
             with self._lock:
                 self._active_model = model
+                self._active_client_id = None
                 self._last_error = str(exc)
             self._logger.warning(f"MQTT start failed: {exc}")
             raise
@@ -59,6 +61,7 @@ class MqttHandler:
         with self._lock:
             connection = self._connection
             self._connection = None
+            self._active_client_id = None
         if connection is None:
             return
         try:
@@ -73,40 +76,37 @@ class MqttHandler:
         with self._lock:
             self._last_error = str(message)
             if self._active_model is None:
-                self._active_model = MQTTConnectionModel(
-                    role=self._role,
-                    host="",
-                    port=1883,
-                    username="",
-                    password="",
-                    instance="",
-                    readable_name=self.readable_name,
-                )
+                self._active_model = self._fallback_model()
 
     def status(self) -> Dict[str, Any]:
         with self._lock:
             model = self._active_model
             connection = self._connection
+            active_client_id = self._active_client_id
             last_error = self._last_error
 
         if model is None:
-            base_topic = self.technical_name
-            instance = ""
-            app_name = self.technical_name
-            configured = False
-        else:
-            base_topic = model.base_topic
-            instance = model.instance
-            app_name = model.app_name
-            configured = model.is_mqtt_configured
+            model = self._fallback_model()
+
+        base_topic = model.base_topic
+        node_id = model.node_id
+        app_name = model.app_name
+        configured = model.is_mqtt_configured
+
+        client_id = ""
+        if connection is not None:
+            client_id = str(connection.client_id or "")
+        if not client_id:
+            client_id = str(active_client_id or "")
 
         return {
             "configured": configured,
             "connected": self._is_connected(connection),
             "role": self._role,
-            "instance": instance,
+            "node_id": node_id,
             "base_topic": base_topic,
             "app_name": app_name,
+            "client_id": client_id,
             "last_error": last_error,
         }
 
@@ -114,11 +114,21 @@ class MqttHandler:
         with self._lock:
             return self._connection
 
+    def client_id(self) -> str:
+        with self._lock:
+            connection = self._connection
+            active_client_id = self._active_client_id
+        if connection is not None and connection.client_id:
+            return str(connection.client_id)
+        return str(active_client_id or "")
+
     def topic(self, relative_topic: str) -> str:
         relative = self._normalize_topic_part(relative_topic)
         with self._lock:
             model = self._active_model
-        base_topic = model.base_topic if model is not None else self.technical_name
+        if model is None:
+            model = self._fallback_model()
+        base_topic = model.base_topic
         if not relative:
             return base_topic
         return f"{base_topic}/{relative}"
@@ -157,8 +167,8 @@ class MqttHandler:
 
     def _connect(self, model: MQTTConnectionModel) -> MQTTConnectionV3:
         builder = MQTTBuilderV3(host=model.host, app_name=model.app_name)
-        if model.instance:
-            builder.instance_id(model.instance)
+        if model.role == "hub" and model.node_id:
+            builder.instance_id(model.node_id.replace("_", "-"))
         builder.port(model.port)
         builder.keep_alive(60)
         builder.auto_reconnect(min_delay=1, max_delay=30)
@@ -174,3 +184,21 @@ class MqttHandler:
 
     def _normalize_topic_part(self, value: str) -> str:
         return str(value or "").strip().strip("/")
+
+    def _default_node_id(self) -> str:
+        app_name = MQTTConnectionModel.technical_name_for_role(self._role)
+        try:
+            return mqtt_client_identity.client_id.build_auto_client_id(app_name)
+        except Exception:
+            return f"{app_name}-node"
+
+    def _fallback_model(self) -> MQTTConnectionModel:
+        return MQTTConnectionModel(
+            role=self._role,
+            host="",
+            port=1883,
+            username="",
+            password="",
+            node_id=self._default_node_id(),
+            readable_name=MQTTConnectionModel.readable_name_for_role(self._role),
+        )

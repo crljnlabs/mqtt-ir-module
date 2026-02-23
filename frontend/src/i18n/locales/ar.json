@@ -2,7 +2,8 @@
   "nav": {
     "home": "الرئيسية",
     "remotes": "أجهزة التحكم",
-    "settings": "الإعدادات"
+    "settings": "الإعدادات",
+    "agents": "الوكلاء"
   },
   "app": {
     "name": "Hub"
@@ -133,15 +134,20 @@
     "mqttPasswordHint": "اتركه فارغًا للاحتفاظ بكلمة المرور المخزنة الحالية.",
     "mqttPasswordStoredHint": "توجد حاليًا كلمة مرور محفوظة بشكل مشفّر في قاعدة البيانات.",
     "mqttBaseTopicLabel": "المثيل",
-    "mqttBaseTopicHint": "اختياري. استخدمه فقط عندما تشترك عدة خدمات في نفس الوسيط. المسموح: أحرف، أرقام، _ و -.",
+    "mqttBaseTopicHint": "اختياري. يُستخدم من وسيط MQTT للتمييز بين عدة محاور تشترك في نفس الوسيط. المسموح: أحرف، أرقام، _ و -.",
     "mqttMasterKeyMissing": "المتغير SETTINGS_MASTER_KEY مفقود. تم حظر حفظ كلمات مرور MQTT.",
     "mqttSaved": "تم حفظ إعدادات MQTT.",
     "mqttSaveFailed": "فشل حفظ إعدادات MQTT.",
-    "registeredAgentsTitle": "الوكلاء المسجّلون",
     "noAgentsRegistered": "لا يوجد وكلاء مسجّلون.",
     "openAgentPage": "فتح صفحة الوكيل",
     "homeassistantEnabledLabel": "تفعيل Home Assistant",
-    "homeassistantEnabledHint": "تفعيل نشر MQTT Discovery لـ Home Assistant (في وضع Hub فقط)."
+    "homeassistantEnabledHint": "تفعيل نشر MQTT Discovery لـ Home Assistant (في وضع Hub فقط).",
+    "mqttConnectionStatusLabel": "اتصال MQTT",
+    "mqttConnected": "متصل",
+    "mqttDisconnected": "غير متصل",
+    "mqttNotConfigured": "غير مهيأ",
+    "mqttLastErrorLabel": "آخر خطأ",
+    "hubIsAgentReadonlyHint": "للقراءة فقط. يتم تحديده عبر LOCAL_AGENT_ENABLED في متغيرات البيئة."
   },
   "wizard": {
     "title": "معالج التعلّم",
@@ -188,7 +194,12 @@
     "summaryPress": "قصير",
     "summaryHold": "مطوّل",
     "summaryOk": "OK",
-    "summaryMissing": "-"
+    "summaryMissing": "-",
+    "noLearnCapableAgent": "لا يوجد وكيل متاح يمكنه تعلم إشارات IR.",
+    "assignAgentFirst": "حدّد وكيلًا معيّنًا لهذا الريموت قبل بدء التعلم.",
+    "assignedAgentMissing": "الوكيل المعيّن غير مسجّل.",
+    "assignedAgentOffline": "الوكيل المعيّن غير متصل.",
+    "assignedAgentCannotLearn": "الوكيل المعيّن لا يمكنه تعلم إشارات IR."
   },
   "errors": {
     "unauthorizedTitle": "يتطلب الوصول للكتابة مفتاح API",
@@ -298,6 +309,34 @@
     "configurationUrlAuto": "استخدام الرابط الحالي",
     "configurationUrlSaved": "تم حفظ رابط الإعداد.",
     "assignedRemotesTitle": "أجهزة التحكم المعيّنة",
-    "assignedRemotesEmpty": "لا توجد أجهزة تحكم معيّنة لهذا الوكيل."
+    "assignedRemotesEmpty": "لا توجد أجهزة تحكم معيّنة لهذا الوكيل.",
+    "assignExistingRemoteAction": "تعيين جهاز تحكم موجود",
+    "assignExistingRemoteTitle": "تعيين جهاز تحكم موجود",
+    "assignExistingRemoteDescription": "عيّن جهاز تحكم موجود لهذا الوكيل. تظهر أجهزة التحكم غير المعيّنة أولاً.",
+    "assignExistingRemoteEmpty": "لا توجد أجهزة تحكم متاحة للتعيين.",
+    "assignExistingRemoteSuggestedTitle": "اقتراحات (غير معيّنة)",
+    "assignExistingRemoteOtherTitle": "مُعيّنة لوكيل آخر",
+    "assignExistingRemoteAssignedTo": "مُعيّن إلى {{id}}",
+    "assignExistingRemoteAssignButton": "تعيين",
+    "assignExistingRemoteSuccess": "تم تعيين {{name}}.",
+    "noAgentsRegistered": "لا يوجد وكلاء مسجّلون.",
+    "openAgentPage": "فتح صفحة الوكيل",
+    "pairingTitle": "إقران الوكلاء",
+    "pairingOpened": "تم بدء وضع الإقران.",
+    "pairingClosed": "تم إيقاف وضع الإقران.",
+    "pairingRequiresMqtt": "الإقران معطل حتى يتم إعداد MQTT.",
+    "pairingMqttDisconnected": "الإقران معطل حتى يتم الاتصال بـ MQTT.",
+    "pairingClosedState": "الإقران مغلق حاليًا.",
+    "pairingOpenState": "الإقران مفتوح.",
+    "pairingOpenWithSeconds": "الإقران مفتوح (متبقي {{seconds}} ثانية).",
+    "pairingMqttHelp": "ابدأ أو أوقف إقران الوكلاء عبر MQTT من هنا.",
+    "pairingStatusOpen": "مفتوح",
+    "pairingStatusClosed": "مغلق",
+    "pairingDisabledHint": "اتصل بـ MQTT في الإعدادات قبل بدء الإقران.",
+    "openSettings": "فتح الإعدادات",
+    "startPairing": "بدء الإقران",
+    "stopPairing": "إيقاف الإقران",
+    "updateInProgressHint": "جارٍ تثبيت البرنامج الثابت. أبقِ هذه الصفحة مفتوحة حتى يعيد الوكيل التشغيل.",
+    "updateTimeoutHint": "لم يتم استلام تأكيد بعد. قد يستمر التحديث على الوكيل."
   }
 }

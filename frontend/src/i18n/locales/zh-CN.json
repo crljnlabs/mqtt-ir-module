@@ -2,7 +2,8 @@
   "nav": {
     "home": "首页",
     "remotes": "遥控器",
-    "settings": "设置"
+    "settings": "设置",
+    "agents": "代理"
   },
   "app": {
     "name": "Hub"
@@ -133,15 +134,20 @@
     "mqttPasswordHint": "留空则保留当前已存储的密码。",
     "mqttPasswordStoredHint": "当前已有密码以加密形式存储在数据库中。",
     "mqttBaseTopicLabel": "实例",
-    "mqttBaseTopicHint": "可选。仅当多个服务共享同一个代理时使用。允许字符：字母、数字、_ 和 -。",
+    "mqttBaseTopicHint": "可选。用于让 MQTT Broker 区分共享同一 Broker 的多个 Hub。允许字符：字母、数字、_ 和 -。",
     "mqttMasterKeyMissing": "缺少 SETTINGS_MASTER_KEY。已禁止保存 MQTT 密码。",
     "mqttSaved": "MQTT 设置已保存。",
     "mqttSaveFailed": "保存 MQTT 设置失败。",
-    "registeredAgentsTitle": "已注册代理",
     "noAgentsRegistered": "没有已注册的代理。",
     "openAgentPage": "打开代理页面",
     "homeassistantEnabledLabel": "启用 Home Assistant",
-    "homeassistantEnabledHint": "启用面向 Home Assistant 的 MQTT Discovery 发布（仅 Hub 模式）。"
+    "homeassistantEnabledHint": "启用面向 Home Assistant 的 MQTT Discovery 发布（仅 Hub 模式）。",
+    "mqttConnectionStatusLabel": "MQTT 连接",
+    "mqttConnected": "已连接",
+    "mqttDisconnected": "未连接",
+    "mqttNotConfigured": "未配置",
+    "mqttLastErrorLabel": "最近错误",
+    "hubIsAgentReadonlyHint": "只读。通过环境变量 LOCAL_AGENT_ENABLED 设置。"
   },
   "wizard": {
     "title": "学习向导",
@@ -188,7 +194,12 @@
     "summaryPress": "短按",
     "summaryHold": "长按",
     "summaryOk": "OK",
-    "summaryMissing": "-"
+    "summaryMissing": "-",
+    "noLearnCapableAgent": "没有可用于学习 IR 信号的代理。",
+    "assignAgentFirst": "学习前请先为该遥控器选择已分配代理。",
+    "assignedAgentMissing": "已分配的代理未注册。",
+    "assignedAgentOffline": "已分配的代理离线。",
+    "assignedAgentCannotLearn": "已分配的代理无法学习 IR 信号。"
   },
   "errors": {
     "unauthorizedTitle": "写入需要 API 密钥",
@@ -298,6 +309,34 @@
     "configurationUrlAuto": "使用当前 URL",
     "configurationUrlSaved": "配置 URL 已保存。",
     "assignedRemotesTitle": "已分配遥控器",
-    "assignedRemotesEmpty": "此代理未分配任何遥控器。"
+    "assignedRemotesEmpty": "此代理未分配任何遥控器。",
+    "assignExistingRemoteAction": "分配现有遥控器",
+    "assignExistingRemoteTitle": "分配现有遥控器",
+    "assignExistingRemoteDescription": "将现有遥控器分配给此代理。未分配的遥控器会优先显示。",
+    "assignExistingRemoteEmpty": "没有可分配的遥控器。",
+    "assignExistingRemoteSuggestedTitle": "建议（未分配）",
+    "assignExistingRemoteOtherTitle": "已分配给其他代理",
+    "assignExistingRemoteAssignedTo": "已分配给 {{id}}",
+    "assignExistingRemoteAssignButton": "分配",
+    "assignExistingRemoteSuccess": "已分配 {{name}}。",
+    "noAgentsRegistered": "没有已注册的代理。",
+    "openAgentPage": "打开代理页面",
+    "pairingTitle": "代理配对",
+    "pairingOpened": "已开启配对模式。",
+    "pairingClosed": "已关闭配对模式。",
+    "pairingRequiresMqtt": "在配置 MQTT 前，配对功能不可用。",
+    "pairingMqttDisconnected": "在 MQTT 连接前，配对功能不可用。",
+    "pairingClosedState": "配对当前已关闭。",
+    "pairingOpenState": "配对已开启。",
+    "pairingOpenWithSeconds": "配对已开启（剩余 {{seconds}} 秒）。",
+    "pairingMqttHelp": "在这里通过 MQTT 启动或停止代理配对。",
+    "pairingStatusOpen": "已开启",
+    "pairingStatusClosed": "已关闭",
+    "pairingDisabledHint": "请先在设置中连接 MQTT，再开始配对。",
+    "openSettings": "打开设置",
+    "startPairing": "开始配对",
+    "stopPairing": "停止配对",
+    "updateInProgressHint": "正在安装固件。请保持此页面打开，直到代理重启。",
+    "updateTimeoutHint": "尚未收到确认。更新可能仍在代理上运行。"
   }
 }

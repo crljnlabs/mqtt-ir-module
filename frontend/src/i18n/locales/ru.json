@@ -2,7 +2,8 @@
   "nav": {
     "home": "Главная",
     "remotes": "Пульты",
-    "settings": "Настройки"
+    "settings": "Настройки",
+    "agents": "Агенты"
   },
   "app": {
     "name": "Hub"
@@ -133,15 +134,20 @@
     "mqttPasswordHint": "Оставьте пустым, чтобы сохранить текущий пароль.",
     "mqttPasswordStoredHint": "Сейчас в базе данных сохранён зашифрованный пароль.",
     "mqttBaseTopicLabel": "Экземпляр",
-    "mqttBaseTopicHint": "Необязательно. Используйте только если несколько сервисов работают через один брокер. Разрешено: буквы, цифры, _ и -.",
+    "mqttBaseTopicHint": "Необязательно. Используется брокером MQTT для различения нескольких хабов на одном брокере. Разрешено: буквы, цифры, _ и -.",
     "mqttMasterKeyMissing": "Отсутствует SETTINGS_MASTER_KEY. Сохранение MQTT-паролей заблокировано.",
     "mqttSaved": "Настройки MQTT сохранены.",
     "mqttSaveFailed": "Не удалось сохранить настройки MQTT.",
-    "registeredAgentsTitle": "Зарегистрированные агенты",
     "noAgentsRegistered": "Нет зарегистрированных агентов.",
     "openAgentPage": "Открыть страницу агента",
     "homeassistantEnabledLabel": "Home Assistant включен",
-    "homeassistantEnabledHint": "Включает публикацию MQTT Discovery для Home Assistant (только режим Hub)."
+    "homeassistantEnabledHint": "Включает публикацию MQTT Discovery для Home Assistant (только режим Hub).",
+    "mqttConnectionStatusLabel": "Подключение MQTT",
+    "mqttConnected": "Подключено",
+    "mqttDisconnected": "Отключено",
+    "mqttNotConfigured": "Не настроено",
+    "mqttLastErrorLabel": "Последняя ошибка",
+    "hubIsAgentReadonlyHint": "Только чтение. Значение задается через LOCAL_AGENT_ENABLED в переменных окружения."
   },
   "wizard": {
     "title": "Мастер обучения",
@@ -188,7 +194,12 @@
     "summaryPress": "Короткое",
     "summaryHold": "Долгое",
     "summaryOk": "OK",
-    "summaryMissing": "-"
+    "summaryMissing": "-",
+    "noLearnCapableAgent": "Нет доступного агента, который может обучать ИК-сигналы.",
+    "assignAgentFirst": "Перед обучением сначала выберите назначенного агента для этого пульта.",
+    "assignedAgentMissing": "Назначенный агент не зарегистрирован.",
+    "assignedAgentOffline": "Назначенный агент не в сети.",
+    "assignedAgentCannotLearn": "Назначенный агент не может обучать ИК-сигналы."
   },
   "errors": {
     "unauthorizedTitle": "Для записи нужен ключ API",
@@ -298,6 +309,34 @@
     "configurationUrlAuto": "Использовать текущий URL",
     "configurationUrlSaved": "URL конфигурации сохранен.",
     "assignedRemotesTitle": "Назначенные пульты",
-    "assignedRemotesEmpty": "Этому агенту не назначены пульты."
+    "assignedRemotesEmpty": "Этому агенту не назначены пульты.",
+    "assignExistingRemoteAction": "Назначить существующий пульт",
+    "assignExistingRemoteTitle": "Назначить существующий пульт",
+    "assignExistingRemoteDescription": "Назначьте этому агенту существующий пульт. Сначала показываются неназначенные пульты.",
+    "assignExistingRemoteEmpty": "Нет доступных пультов для назначения.",
+    "assignExistingRemoteSuggestedTitle": "Рекомендуемые (неназначенные)",
+    "assignExistingRemoteOtherTitle": "Назначены другому агенту",
+    "assignExistingRemoteAssignedTo": "Назначен агенту {{id}}",
+    "assignExistingRemoteAssignButton": "Назначить",
+    "assignExistingRemoteSuccess": "{{name}} назначен.",
+    "noAgentsRegistered": "Нет зарегистрированных агентов.",
+    "openAgentPage": "Открыть страницу агента",
+    "pairingTitle": "Сопряжение агентов",
+    "pairingOpened": "Режим сопряжения запущен.",
+    "pairingClosed": "Режим сопряжения остановлен.",
+    "pairingRequiresMqtt": "Сопряжение отключено, пока MQTT не настроен.",
+    "pairingMqttDisconnected": "Сопряжение отключено, пока MQTT не подключен.",
+    "pairingClosedState": "Сопряжение сейчас закрыто.",
+    "pairingOpenState": "Сопряжение открыто.",
+    "pairingOpenWithSeconds": "Сопряжение открыто (осталось {{seconds}} с).",
+    "pairingMqttHelp": "Здесь можно запустить или остановить сопряжение агента через MQTT.",
+    "pairingStatusOpen": "Открыто",
+    "pairingStatusClosed": "Закрыто",
+    "pairingDisabledHint": "Сначала подключите MQTT в настройках перед запуском сопряжения.",
+    "openSettings": "Открыть настройки",
+    "startPairing": "Начать сопряжение",
+    "stopPairing": "Остановить сопряжение",
+    "updateInProgressHint": "Устанавливается прошивка. Оставьте эту страницу открытой, пока агент не перезагрузится.",
+    "updateTimeoutHint": "Подтверждение пока не получено. Обновление может всё ещё выполняться на агенте."
   }
 }

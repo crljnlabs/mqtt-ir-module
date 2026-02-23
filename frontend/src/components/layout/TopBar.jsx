@@ -8,6 +8,8 @@ import { getAppConfig } from '../../utils/appConfig.js'
 function getTitle(pathname, t) {
   if (pathname === '/' || pathname === '') return t('nav.home')
   if (pathname.startsWith('/remotes')) return t('nav.remotes')
+  if (pathname === '/agents') return t('nav.agents')
+  if (pathname.startsWith('/agent/')) return t('agents.pageTitle')
   if (pathname.startsWith('/settings')) return t('nav.settings')
   return t('app.name')
 }

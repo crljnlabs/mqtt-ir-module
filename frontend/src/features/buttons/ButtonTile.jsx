@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import Icon from '@mdi/react'
 import { useTranslation } from 'react-i18next'
-import { Badge } from '../../components/ui/Badge.jsx'
 import { Button } from '../../components/ui/Button.jsx'
 import { IconButton } from '../../components/ui/IconButton.jsx'
 import { findIconPath, DEFAULT_BUTTON_ICON } from '../../icons/iconRegistry.js'
@@ -37,10 +36,6 @@ export function ButtonTile({
 
         <div className="min-w-0">
           <div className="font-semibold truncate">{button.name}</div>
-          <div className="flex gap-2 mt-2">
-            {button.has_press ? <Badge variant="neutral">{t('button.press')}</Badge> : <Badge variant="warning">{t('button.press')}</Badge>}
-            {button.has_hold ? <Badge variant="neutral">{t('button.hold')}</Badge> : <Badge variant="neutral" className="opacity-50">{t('button.hold')}</Badge>}
-          </div>
         </div>
 
         <div className="mt-auto grid grid-cols-2 gap-2">

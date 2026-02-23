@@ -30,10 +30,10 @@ class MqttAgent:
         return self._transport.send(payload)
 
     def learn_start(self, session: Dict[str, Any]) -> Dict[str, Any]:
-        return self._transport.send({"action": "learn_start", "session": session})
+        return self._transport.learn_start(session)
 
     def learn_stop(self, session: Dict[str, Any]) -> Dict[str, Any]:
-        return self._transport.send({"action": "learn_stop", "session": session})
+        return self._transport.learn_stop(session)
 
     def learn_capture(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         return self._transport.learn_capture(payload)
@@ -43,7 +43,7 @@ class MqttAgent:
             "agent_id": self._agent_id,
             "name": self._name,
             "transport": self.transport,
-            "status": "offline",
+            "status": "online",
             "busy": {"learning": False, "sending": False},
             "capabilities": self.capabilities,
         }

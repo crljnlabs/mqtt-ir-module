@@ -2,7 +2,8 @@
   "nav": {
     "home": "Inicio",
     "remotes": "Mandos",
-    "settings": "Ajustes"
+    "settings": "Ajustes",
+    "agents": "Agentes"
   },
   "app": {
     "name": "Hub"
@@ -133,15 +134,20 @@
     "mqttPasswordHint": "Déjalo vacío para mantener la contraseña almacenada actual.",
     "mqttPasswordStoredHint": "Actualmente hay una contraseña almacenada cifrada en la base de datos.",
     "mqttBaseTopicLabel": "Instancia",
-    "mqttBaseTopicHint": "Opcional. Úsalo solo cuando varios servicios compartan el mismo broker. Permitido: letras, números, _ y -.",
+    "mqttBaseTopicHint": "Opcional. Sirve para que el broker MQTT distinga varios hubs que comparten el mismo broker. Permitido: letras, números, _ y -.",
     "mqttMasterKeyMissing": "Falta SETTINGS_MASTER_KEY. Se bloquea el guardado de contraseñas MQTT.",
     "mqttSaved": "Configuración MQTT guardada.",
     "mqttSaveFailed": "No se pudo guardar la configuración MQTT.",
-    "registeredAgentsTitle": "Agentes registrados",
     "noAgentsRegistered": "No hay agentes registrados.",
     "openAgentPage": "Abrir página del agente",
     "homeassistantEnabledLabel": "Home Assistant habilitado",
-    "homeassistantEnabledHint": "Activa la publicación de descubrimiento MQTT para Home Assistant (solo modo Hub)."
+    "homeassistantEnabledHint": "Activa la publicación de descubrimiento MQTT para Home Assistant (solo modo Hub).",
+    "mqttConnectionStatusLabel": "Conexión MQTT",
+    "mqttConnected": "Conectado",
+    "mqttDisconnected": "Desconectado",
+    "mqttNotConfigured": "Sin configurar",
+    "mqttLastErrorLabel": "Último error",
+    "hubIsAgentReadonlyHint": "Solo lectura. Se define mediante LOCAL_AGENT_ENABLED en variables de entorno."
   },
   "wizard": {
     "title": "Asistente de aprendizaje",
@@ -188,7 +194,12 @@
     "summaryPress": "Corta",
     "summaryHold": "Larga",
     "summaryOk": "OK",
-    "summaryMissing": "-"
+    "summaryMissing": "-",
+    "noLearnCapableAgent": "No hay ningún agente disponible que pueda aprender señales IR.",
+    "assignAgentFirst": "Selecciona primero un agente asignado para este mando antes de aprender.",
+    "assignedAgentMissing": "El agente asignado no está registrado.",
+    "assignedAgentOffline": "El agente asignado está desconectado.",
+    "assignedAgentCannotLearn": "El agente asignado no puede aprender señales IR."
   },
   "errors": {
     "unauthorizedTitle": "Se requiere clave API de escritura",
@@ -298,6 +309,34 @@
     "configurationUrlAuto": "Usar URL actual",
     "configurationUrlSaved": "URL de configuración guardada.",
     "assignedRemotesTitle": "Mandos asignados",
-    "assignedRemotesEmpty": "No hay mandos asignados a este agente."
+    "assignedRemotesEmpty": "No hay mandos asignados a este agente.",
+    "assignExistingRemoteAction": "Asignar mando existente",
+    "assignExistingRemoteTitle": "Asignar mando existente",
+    "assignExistingRemoteDescription": "Asigna un mando existente a este agente. Los mandos sin asignar se muestran primero.",
+    "assignExistingRemoteEmpty": "No hay mandos disponibles para asignar.",
+    "assignExistingRemoteSuggestedTitle": "Sugeridos (sin asignar)",
+    "assignExistingRemoteOtherTitle": "Asignados a otro agente",
+    "assignExistingRemoteAssignedTo": "Asignado a {{id}}",
+    "assignExistingRemoteAssignButton": "Asignar",
+    "assignExistingRemoteSuccess": "{{name}} asignado.",
+    "noAgentsRegistered": "No hay agentes registrados.",
+    "openAgentPage": "Abrir página del agente",
+    "pairingTitle": "Emparejamiento de agentes",
+    "pairingOpened": "Modo de emparejamiento iniciado.",
+    "pairingClosed": "Modo de emparejamiento detenido.",
+    "pairingRequiresMqtt": "El emparejamiento está desactivado hasta configurar MQTT.",
+    "pairingMqttDisconnected": "El emparejamiento está desactivado hasta conectar MQTT.",
+    "pairingClosedState": "El emparejamiento está cerrado.",
+    "pairingOpenState": "El emparejamiento está abierto.",
+    "pairingOpenWithSeconds": "Emparejamiento abierto (quedan {{seconds}} s).",
+    "pairingMqttHelp": "Inicia o detén aquí el emparejamiento de agentes por MQTT.",
+    "pairingStatusOpen": "Abierto",
+    "pairingStatusClosed": "Cerrado",
+    "pairingDisabledHint": "Conéctate a MQTT en Ajustes antes de iniciar el emparejamiento.",
+    "openSettings": "Abrir ajustes",
+    "startPairing": "Iniciar emparejamiento",
+    "stopPairing": "Detener emparejamiento",
+    "updateInProgressHint": "Instalando firmware. Mantén esta página abierta hasta que el agente se reinicie.",
+    "updateTimeoutHint": "Aún no se recibió confirmación. La actualización puede seguir ejecutándose en el agente."
   }
 }

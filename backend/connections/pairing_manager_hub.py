@@ -15,14 +15,17 @@ class PairingManagerHub:
     PAIRING_OPEN_TOPIC = "ir/pairing/open"
     PAIRING_OFFER_WILDCARD_TOPIC = "ir/pairing/offer/+/+"
     PAIRING_ACCEPT_TOPIC_PREFIX = "ir/pairing/accept"
+    PAIRING_UNPAIR_TOPIC_PREFIX = "ir/pairing/unpair"
+    PAIRING_UNPAIR_ACK_WILDCARD_TOPIC = "ir/pairing/unpair_ack/+"
     DEFAULT_WINDOW_SECONDS = 300
+    UNPAIR_ACK_TIMEOUT_SECONDS = 8.0
 
     def __init__(
         self,
         runtime_loader: RuntimeLoader,
         database: Database,
         sw_version: str,
-        auto_open: bool = True,
+        auto_open: bool = False,
     ) -> None:
         self._runtime_loader = runtime_loader
         self._database = database
@@ -32,11 +35,13 @@ class PairingManagerHub:
         self._logger = logging.getLogger("pairing_manager_hub")
         self._lock = threading.Lock()
         self._running = False
-        self._subscribed = False
+        self._subscribed_offers = False
+        self._subscribed_unpair_acks = False
         self._session_id: Optional[str] = None
         self._nonce: Optional[str] = None
         self._expires_at = 0.0
         self._close_timer: Optional[threading.Timer] = None
+        self._pending_unpair_acks: Dict[str, Dict[str, Any]] = {}
 
     def start(self) -> None:
         connection = self._runtime_loader.mqtt_connection()
@@ -49,8 +54,11 @@ class PairingManagerHub:
             self._running = True
 
         connection.subscribe(self.PAIRING_OFFER_WILDCARD_TOPIC, self._on_offer, qos=QoS.AtLeastOnce)
+        connection.subscribe(self.PAIRING_UNPAIR_ACK_WILDCARD_TOPIC, self._on_unpair_ack, qos=QoS.AtLeastOnce)
         with self._lock:
-            self._subscribed = True
+            self._subscribed_offers = True
+            self._subscribed_unpair_acks = True
+        self._database.agents.delete_pending()
 
         if self._auto_open:
             try:
@@ -64,14 +72,19 @@ class PairingManagerHub:
 
         with self._lock:
             self._running = False
-            subscribed = self._subscribed
-            self._subscribed = False
+            subscribed_offers = self._subscribed_offers
+            subscribed_unpair_acks = self._subscribed_unpair_acks
+            self._subscribed_offers = False
+            self._subscribed_unpair_acks = False
 
-        if connection is not None and subscribed:
+        if connection is not None:
             try:
-                connection.unsubscribe(self.PAIRING_OFFER_WILDCARD_TOPIC)
+                if subscribed_offers:
+                    connection.unsubscribe(self.PAIRING_OFFER_WILDCARD_TOPIC)
+                if subscribed_unpair_acks:
+                    connection.unsubscribe(self.PAIRING_UNPAIR_ACK_WILDCARD_TOPIC)
             except Exception as exc:
-                self._logger.warning(f"Failed to unsubscribe hub pairing wildcard topic: {exc}")
+                self._logger.warning(f"Failed to unsubscribe hub pairing topics: {exc}")
 
     def open_pairing(self, duration_seconds: int = DEFAULT_WINDOW_SECONDS) -> Dict[str, Any]:
         connection = self._runtime_loader.mqtt_connection()
@@ -90,7 +103,7 @@ class PairingManagerHub:
 
         mqtt_status = self._runtime_loader.status()
         hub_topic = str(mqtt_status.get("base_topic") or "")
-        hub_id = hub_topic or self._runtime_loader.technical_name
+        hub_id = str(mqtt_status.get("node_id") or "").strip() or self._runtime_loader.technical_name
 
         payload = {
             "session_id": session_id,
@@ -120,12 +133,14 @@ class PairingManagerHub:
             timer.start()
             self._close_timer = timer
 
+        self._database.agents.delete_pending()
         return self.status()
 
     def close_pairing(self) -> Dict[str, Any]:
         connection = self._runtime_loader.mqtt_connection()
 
         with self._lock:
+            previous_session = self._session_id
             self._session_id = None
             self._nonce = None
             self._expires_at = 0.0
@@ -134,6 +149,9 @@ class PairingManagerHub:
         if timer is not None:
             timer.cancel()
 
+        if previous_session:
+            self._database.agents.delete_pending(pairing_session_id=previous_session)
+
         if connection is not None:
             try:
                 connection.publish(self.PAIRING_OPEN_TOPIC, "", qos=QoS.AtLeastOnce, retain=True)
@@ -141,6 +159,84 @@ class PairingManagerHub:
                 self._logger.warning(f"Failed to clear retained pairing open topic: {exc}")
 
         return self.status()
+
+    def accept_offer(self, agent_id: str) -> Dict[str, Any]:
+        normalized_agent_id = str(agent_id or "").strip()
+        if not normalized_agent_id:
+            raise ValueError("agent_id must not be empty")
+
+        connection = self._runtime_loader.mqtt_connection()
+        if connection is None:
+            raise RuntimeError("mqtt_not_connected")
+
+        with self._lock:
+            active_session = self._session_id
+            active_nonce = self._nonce
+            expires_at = self._expires_at
+
+        now = time.time()
+        if not active_session or not active_nonce or now >= expires_at:
+            raise RuntimeError("pairing_closed")
+
+        agent = self._database.agents.get(normalized_agent_id)
+        if not agent or not bool(agent.get("pending")):
+            raise ValueError("Unknown pending agent_id")
+        pending_session = str(agent.get("pairing_session_id") or "").strip()
+        if pending_session != active_session:
+            raise RuntimeError("offer_session_mismatch")
+
+        hub_status = self._runtime_loader.status()
+        accept_payload = {
+            "session_id": active_session,
+            "nonce": active_nonce,
+            "agent_uid": normalized_agent_id,
+            "hub_id": hub_status.get("node_id") or self._runtime_loader.technical_name,
+            "hub_name": self._runtime_loader.readable_name,
+            "hub_topic": hub_status.get("base_topic"),
+            "sw_version": self._sw_version,
+            "accepted_at": now,
+        }
+        accept_topic = f"{self.PAIRING_ACCEPT_TOPIC_PREFIX}/{active_session}/{normalized_agent_id}"
+        connection.publish(
+            accept_topic,
+            json.dumps(accept_payload, separators=(",", ":")),
+            qos=QoS.AtLeastOnce,
+            retain=False,
+        )
+        updated = self._database.agents.set_pending_state(
+            agent_id=normalized_agent_id,
+            pending=False,
+            pairing_session_id=None,
+        )
+        return updated
+
+    def unpair_and_delete_agent(self, agent_id: str) -> Dict[str, Any]:
+        normalized_agent_id = str(agent_id or "").strip()
+        if not normalized_agent_id:
+            raise ValueError("agent_id must not be empty")
+
+        agent = self._database.agents.get(normalized_agent_id)
+        if not agent:
+            raise ValueError("Unknown agent_id")
+        if str(agent.get("transport") or "") != "mqtt":
+            raise ValueError("Only MQTT agents can be deleted")
+
+        pending = bool(agent.get("pending"))
+        unpair_acked = True
+        if not pending:
+            unpair_acked = self._send_unpair_command(normalized_agent_id, timeout_seconds=self.UNPAIR_ACK_TIMEOUT_SECONDS)
+            if not unpair_acked:
+                raise RuntimeError("unpair_ack_timeout")
+
+        unassigned_remotes = self._database.remotes.clear_assigned_agent(normalized_agent_id)
+        deleted = self._database.agents.delete(normalized_agent_id)
+        return {
+            "ok": True,
+            "agent_id": normalized_agent_id,
+            "unpair_acked": unpair_acked,
+            "unassigned_remotes": unassigned_remotes,
+            "deleted_agent": deleted,
+        }
 
     def status(self) -> Dict[str, Any]:
         with self._lock:
@@ -202,6 +298,7 @@ class PairingManagerHub:
         self._database.agents.upsert(
             agent_id=agent_uid,
             name=agent_name,
+            icon=None,
             transport="mqtt",
             status="online",
             can_send=bool(payload.get("can_send")),
@@ -209,26 +306,72 @@ class PairingManagerHub:
             sw_version=agent_sw_version,
             agent_topic=agent_topic,
             last_seen=now,
+            pending=True,
+            pairing_session_id=active_session,
         )
 
-        hub_status = self._runtime_loader.status()
-        accept_payload = {
-            "session_id": active_session,
-            "nonce": active_nonce,
-            "agent_uid": agent_uid,
-            "hub_id": hub_status.get("base_topic") or self._runtime_loader.technical_name,
-            "hub_name": self._runtime_loader.readable_name,
-            "hub_topic": hub_status.get("base_topic"),
-            "sw_version": self._sw_version,
-            "accepted_at": now,
+    def _send_unpair_command(self, agent_id: str, timeout_seconds: float) -> bool:
+        connection = self._runtime_loader.mqtt_connection()
+        if connection is None:
+            raise RuntimeError("mqtt_not_connected")
+
+        command_id = uuid.uuid4().hex
+        event = threading.Event()
+        with self._lock:
+            self._pending_unpair_acks[command_id] = {
+                "agent_id": agent_id,
+                "event": event,
+                "acked": False,
+            }
+
+        mqtt_status = self._runtime_loader.status()
+        payload = {
+            "command_id": command_id,
+            "agent_uid": agent_id,
+            "hub_id": mqtt_status.get("node_id") or self._runtime_loader.technical_name,
+            "hub_topic": mqtt_status.get("base_topic"),
+            "requested_at": time.time(),
         }
-        accept_topic = f"{self.PAIRING_ACCEPT_TOPIC_PREFIX}/{active_session}/{agent_uid}"
-        connection.publish(
-            accept_topic,
-            json.dumps(accept_payload, separators=(",", ":")),
-            qos=QoS.AtLeastOnce,
-            retain=False,
-        )
+        topic = f"{self.PAIRING_UNPAIR_TOPIC_PREFIX}/{agent_id}"
+        try:
+            connection.publish(
+                topic,
+                json.dumps(payload, separators=(",", ":")),
+                qos=QoS.AtLeastOnce,
+                retain=True,
+            )
+            event.wait(max(0.1, float(timeout_seconds)))
+            with self._lock:
+                state = self._pending_unpair_acks.get(command_id)
+                acked = bool(state and state.get("acked"))
+            return acked
+        finally:
+            with self._lock:
+                self._pending_unpair_acks.pop(command_id, None)
+
+    def _on_unpair_ack(self, connection: Any, client: Any, userdata: Any, message: MQTTMessage) -> None:
+        agent_uid_from_topic = self._parse_unpair_ack_topic(message.topic)
+        if not agent_uid_from_topic:
+            return
+        payload = self._parse_payload(message)
+        if payload is None:
+            return
+
+        command_id = str(payload.get("command_id") or "").strip()
+        if not command_id:
+            return
+
+        with self._lock:
+            state = self._pending_unpair_acks.get(command_id)
+            if not state:
+                return
+            expected_agent_id = str(state.get("agent_id") or "").strip()
+            if expected_agent_id != agent_uid_from_topic:
+                return
+            state["acked"] = True
+            event = state.get("event")
+        if isinstance(event, threading.Event):
+            event.set()
 
     def _parse_offer_topic(self, topic: str) -> tuple[str, str]:
         parts = str(topic or "").split("/")
@@ -237,6 +380,14 @@ class PairingManagerHub:
         if parts[0] != "ir" or parts[1] != "pairing" or parts[2] != "offer":
             return "", ""
         return parts[3].strip(), parts[4].strip()
+
+    def _parse_unpair_ack_topic(self, topic: str) -> str:
+        parts = str(topic or "").split("/")
+        if len(parts) != 4:
+            return ""
+        if parts[0] != "ir" or parts[1] != "pairing" or parts[2] != "unpair_ack":
+            return ""
+        return parts[3].strip()
 
     def _parse_payload(self, message: MQTTMessage) -> Optional[Dict[str, Any]]:
         value = message.json_value

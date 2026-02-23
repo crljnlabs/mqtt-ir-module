@@ -1,0 +1,9 @@
+# PlatformIO build/cache artifacts
+.pio/
+
+# Local editor/project metadata
+.vscode/
+.idea/
+
+# OS noise
+.DS_Store

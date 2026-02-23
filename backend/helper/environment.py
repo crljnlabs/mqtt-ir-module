@@ -8,6 +8,11 @@ class Environment:
         self.ir_rx_device = os.getenv("IR_RX_DEVICE", "/dev/lirc0").strip()
         self.ir_tx_device = os.getenv("IR_TX_DEVICE", "/dev/lirc1").strip()
         self.data_folder = os.getenv("DATA_DIR", "/data").strip()
+        self.firmware_dir = os.getenv("FIRMWARE_DIR", os.path.join(self.data_folder, "firmware")).strip()
+        self.mqtt_host = os.getenv("MQTT_HOST", "").strip()
+        self.mqtt_port = self._read_optional_int("MQTT_PORT", min_value=1, max_value=65535)
+        self.mqtt_username = os.getenv("MQTT_USERNAME", "").strip()
+        self.mqtt_password = os.getenv("MQTT_PASSWORD", "").strip()
 
         # Public base url for reverse-proxy sub-path hosting (e.g. /mqtt-ir-module/)
         self.public_base_url = self._normalize_base_url(os.getenv("PUBLIC_BASE_URL", "/"))
@@ -51,6 +56,20 @@ class Environment:
         if value in ("0", "false", "no", "n", "off"):
             return False
         return None
+
+    def _read_optional_int(self, name: str, min_value: Optional[int] = None, max_value: Optional[int] = None) -> Optional[int]:
+        raw = os.getenv(name)
+        if raw is None:
+            return None
+        try:
+            value = int(raw.strip())
+        except Exception:
+            return None
+        if min_value is not None and value < min_value:
+            return None
+        if max_value is not None and value > max_value:
+            return None
+        return value
 
     def _read_int(self, name: str, default: int, min_value: Optional[int] = None, max_value: Optional[int] = None) -> int:
         raw = os.getenv(name)
