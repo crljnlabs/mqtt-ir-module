@@ -11,6 +11,7 @@ import {
   installationBadgeLabel,
   installationBadgeVariant,
   isInstallationInProgress,
+  normalizeInstallationStatus,
 } from './installationStatus.js'
 
 function agentTypeLabel(agentType, t) {
@@ -32,7 +33,9 @@ export function AgentTile({ agent, onEdit, onDelete, onAccept, onUpdate, onReboo
   const rebootRequired = Boolean(runtime.reboot_required || ota.reboot_required)
   const installation = agent.installation || {}
   const installationInProgress = isInstallationInProgress(installation)
+  const installationStatus = normalizeInstallationStatus(installation)
   const installationLabel = installationBadgeLabel(installation)
+  const showUpdateAvailable = updateAvailable && installationStatus === 'idle'
 
   return (
     <div
@@ -60,7 +63,7 @@ export function AgentTile({ agent, onEdit, onDelete, onAccept, onUpdate, onReboo
             <Badge variant="neutral">{typeLabel}</Badge>
             {swVersion ? <Badge variant="neutral">v{swVersion}</Badge> : null}
             {installationLabel ? <Badge variant={installationBadgeVariant(installation)}>{installationLabel}</Badge> : null}
-            {updateAvailable ? <Badge variant="warning">{t('agents.updateAvailable')}</Badge> : null}
+            {showUpdateAvailable ? <Badge variant="warning">{t('agents.updateAvailable')}</Badge> : null}
             {rebootRequired ? <Badge variant="warning">{t('agents.rebootRequired')}</Badge> : null}
           </div>
         </div>
