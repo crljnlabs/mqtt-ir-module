@@ -45,6 +45,7 @@ export function AgentPage() {
   const remotesQuery = useQuery({ queryKey: ['remotes'], queryFn: listRemotes })
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteForce, setDeleteForce] = useState(false)
   const [createRemoteOpen, setCreateRemoteOpen] = useState(false)
   const [assignRemoteOpen, setAssignRemoteOpen] = useState(false)
   const [newRemoteName, setNewRemoteName] = useState('')
@@ -59,7 +60,7 @@ export function AgentPage() {
   }
 
   const deleteAgentMutation = useMutation({
-    mutationFn: () => deleteAgent(agentId),
+    mutationFn: ({ force }) => deleteAgent(agentId, { force }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agents'] })
       queryClient.invalidateQueries({ queryKey: ['remotes'] })
@@ -222,6 +223,7 @@ export function AgentPage() {
   const installation = agent.installation || {}
   const installationInProgress = isInstallationInProgress(installation)
   const installationLabel = installationBadgeLabel(installation)
+  const deleteRequiresForce = installationInProgress
   const agentType = String(runtime.agent_type || agent.agent_type || '').trim().toLowerCase()
   const swVersion = String(runtime.sw_version || agent.sw_version || '').trim()
   const typeLabel =
@@ -263,10 +265,16 @@ export function AgentPage() {
                 <Icon path={mdiRestart} size={1} />
               </IconButton>
             ) : null}
-            <IconButton label={t('common.edit')} onClick={() => setEditOpen(true)} disabled={installationInProgress}>
+            <IconButton label={t('common.edit')} onClick={() => setEditOpen(true)}>
               <Icon path={mdiPencilOutline} size={1} />
             </IconButton>
-            <IconButton label={t('common.delete')} onClick={() => setDeleteOpen(true)} disabled={installationInProgress}>
+            <IconButton
+              label={t('common.delete')}
+              onClick={() => {
+                setDeleteForce(false)
+                setDeleteOpen(true)
+              }}
+            >
               <Icon path={mdiTrashCanOutline} size={1} />
             </IconButton>
           </div>
@@ -352,14 +360,52 @@ export function AgentPage() {
       {editOpen ? <AgentEditorDrawer key={agent.agent_id} agent={agent} onClose={() => setEditOpen(false)} /> : null}
       <RemoteEditorDrawer open={Boolean(editRemote)} remote={editRemote} onClose={() => setEditRemote(null)} />
 
-      <ConfirmDialog
+      <Modal
         open={deleteOpen}
         title={t('common.delete')}
-        body={`${agentLabel} (${agent.agent_id})`}
-        confirmText={t('common.delete')}
-        onCancel={() => setDeleteOpen(false)}
-        onConfirm={() => deleteAgentMutation.mutate()}
-      />
+        onClose={() => {
+          setDeleteOpen(false)
+          setDeleteForce(false)
+        }}
+        footer={
+          <div className="flex gap-2 justify-end">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setDeleteOpen(false)
+                setDeleteForce(false)
+              }}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant="danger"
+              disabled={deleteAgentMutation.isPending || (deleteRequiresForce && !deleteForce)}
+              onClick={() => deleteAgentMutation.mutate({ force: deleteRequiresForce && deleteForce })}
+            >
+              {t('common.delete')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-[rgb(var(--muted))]">{`${agentLabel} (${agent.agent_id})`}</p>
+          {deleteRequiresForce ? (
+            <div className="space-y-2 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+              <div>{t('agents.deleteForceWarning')}</div>
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={deleteForce}
+                  onChange={(event) => setDeleteForce(event.target.checked)}
+                />
+                <span>{t('agents.deleteForceLabel')}</span>
+              </label>
+            </div>
+          ) : null}
+        </div>
+      </Modal>
 
       <ConfirmDialog
         open={Boolean(deleteRemoteTarget)}

@@ -303,6 +303,8 @@ def _decorate_agent_payload(agent: Dict[str, Any]) -> Dict[str, Any]:
         )
     ota_payload["reboot_required"] = reboot_required
 
+    if sw_version:
+        installation_state_hub.reconcile_with_runtime_version(agent_id=agent_id, current_version=sw_version)
     installation = installation_state_hub.get_state(agent_id) or {}
     if installation:
         installation.setdefault("current_version", sw_version)
@@ -627,6 +629,41 @@ def ota_update_agent(
     }
 
 
+@api.post("/agents/{agent_id}/ota/cancel")
+def ota_cancel_agent(
+    agent_id: str,
+    x_api_key: Optional[str] = Header(default=None),
+) -> Dict[str, Any]:
+    require_api_key(x_api_key)
+    agent = _require_mqtt_agent(agent_id)
+    decorated = _decorate_agent_payload(agent)
+    runtime = decorated.get("runtime") if isinstance(decorated.get("runtime"), dict) else {}
+    if str(runtime.get("agent_type") or "").strip().lower() != "esp32":
+        raise HTTPException(status_code=400, detail="OTA is supported only for esp32 agents")
+    if not bool(runtime.get("ota_supported")):
+        raise HTTPException(status_code=400, detail="Agent does not report OTA support")
+    result = command_client.runtime_ota_cancel(agent_id=agent_id)
+    agent_registry.mark_agent_activity(agent_id)
+    return {
+        "agent_id": str(agent.get("agent_id") or agent_id),
+        "result": result,
+    }
+
+
+@api.post("/agents/{agent_id}/installation/reset")
+def reset_agent_installation_state(
+    agent_id: str,
+    x_api_key: Optional[str] = Header(default=None),
+) -> Dict[str, Any]:
+    require_api_key(x_api_key)
+    agent = _require_mqtt_agent(agent_id)
+    reset = installation_state_hub.reset_state(str(agent.get("agent_id") or agent_id))
+    return {
+        "agent_id": str(agent.get("agent_id") or agent_id),
+        "reset": bool(reset),
+    }
+
+
 @api.get("/agents/{agent_id}/logs")
 def get_agent_logs(agent_id: str, limit: int = 100) -> Dict[str, Any]:
     agent = agent_registry.get_agent(agent_id)
@@ -680,14 +717,20 @@ def update_agent(
 
 
 @api.delete("/agents/{agent_id}")
-def delete_agent(agent_id: str, x_api_key: Optional[str] = Header(default=None)) -> Dict[str, Any]:
+def delete_agent(
+    agent_id: str,
+    force: bool = False,
+    x_api_key: Optional[str] = Header(default=None),
+) -> Dict[str, Any]:
     require_api_key(x_api_key)
-    _require_agent_not_installing(agent_id)
+    if not bool(force):
+        _require_agent_not_installing(agent_id)
     try:
-        result = pairing_manager.unpair_and_delete_agent(agent_id)
+        result = pairing_manager.unpair_and_delete_agent(agent_id, force=bool(force))
         agent_registry.unregister_agent(agent_id)
         agent_log_hub.clear_agent_logs(agent_id)
         runtime_state_hub.clear_state(agent_id)
+        installation_state_hub.reset_state(agent_id)
         return result
     except ValueError as e:
         message = str(e)

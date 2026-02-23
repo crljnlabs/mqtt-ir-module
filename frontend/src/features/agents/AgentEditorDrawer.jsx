@@ -11,13 +11,13 @@ import { NumberField } from '../../components/ui/NumberField.jsx'
 import { IconButton } from '../../components/ui/IconButton.jsx'
 import { SelectField } from '../../components/ui/SelectField.jsx'
 import { IconPicker } from '../../components/pickers/IconPicker.jsx'
-import { otaUpdateAgent, updateAgent, updateAgentRuntimeConfig } from '../../api/agentsApi.js'
+import { otaCancelAgent, otaUpdateAgent, resetAgentInstallation, updateAgent, updateAgentRuntimeConfig } from '../../api/agentsApi.js'
 import { getFirmwareCatalog } from '../../api/firmwareApi.js'
 import { useToast } from '../../components/ui/ToastProvider.jsx'
 import { ApiErrorMapper } from '../../utils/apiErrorMapper.js'
 import { DEFAULT_AGENT_ICON } from '../../icons/iconRegistry.js'
 import { getAppConfig } from '../../utils/appConfig.js'
-import { isInstallationInProgress } from './installationStatus.js'
+import { isInstallationInProgress, normalizeInstallationStatus } from './installationStatus.js'
 
 export function AgentEditorDrawer({ agent, onClose }) {
   const { t } = useTranslation()
@@ -40,6 +40,8 @@ export function AgentEditorDrawer({ agent, onClose }) {
   const isEsp32 = String(runtime.agent_type || '').trim().toLowerCase() === 'esp32' && String(agent?.transport || '').trim().toLowerCase() === 'mqtt'
   const otaSupported = isEsp32 && Boolean(runtime.ota_supported || ota.supported)
   const installationInProgress = isInstallationInProgress(installation)
+  const installationStatus = normalizeInstallationStatus(installation)
+  const hasInstallationState = installationStatus !== 'idle'
   const parsedRxPin = parsePinInput(irRxPin)
   const parsedTxPin = parsePinInput(irTxPin)
   const pinsValid = !isEsp32 || (parsedRxPin != null && parsedTxPin != null)
@@ -157,6 +159,30 @@ export function AgentEditorDrawer({ agent, onClose }) {
     },
   })
 
+  const otaCancelMutation = useMutation({
+    mutationFn: () => otaCancelAgent(agent.agent_id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agents'] })
+      queryClient.invalidateQueries({ queryKey: ['agent', agent.agent_id] })
+      toast.show({ title: t('agents.updateCancelAction'), message: t('agents.updateCancelRequested') })
+    },
+    onError: (error) => {
+      toast.show({ title: t('agents.updateCancelAction'), message: errorMapper.getMessage(error, 'common.failed') })
+    },
+  })
+
+  const resetInstallationMutation = useMutation({
+    mutationFn: () => resetAgentInstallation(agent.agent_id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agents'] })
+      queryClient.invalidateQueries({ queryKey: ['agent', agent.agent_id] })
+      toast.show({ title: t('agents.updateResetAction'), message: t('agents.updateResetDone') })
+    },
+    onError: (error) => {
+      toast.show({ title: t('agents.updateResetAction'), message: errorMapper.getMessage(error, 'common.failed') })
+    },
+  })
+
   if (!agent) return null
 
   return (
@@ -170,7 +196,17 @@ export function AgentEditorDrawer({ agent, onClose }) {
             <Button variant="secondary" onClick={onClose}>
               {t('common.cancel')}
             </Button>
-            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || otaMutation.isPending || !pinsValid || installationInProgress}>
+            <Button
+              onClick={() => saveMutation.mutate()}
+              disabled={
+                saveMutation.isPending ||
+                otaMutation.isPending ||
+                otaCancelMutation.isPending ||
+                resetInstallationMutation.isPending ||
+                !pinsValid ||
+                installationInProgress
+              }
+            >
               {t('common.save')}
             </Button>
           </div>
@@ -223,16 +259,21 @@ export function AgentEditorDrawer({ agent, onClose }) {
               {firmwareQuery.isError ? (
                 <div className="text-sm text-red-600">{errorMapper.getMessage(firmwareQuery.error, 'common.failed')}</div>
               ) : null}
+              {hasInstallationState ? (
+                <div className="text-sm text-[rgb(var(--muted))]">
+                  {installation.message || installationStatus.toUpperCase()}
+                </div>
+              ) : null}
               {!firmwareQuery.isLoading && !firmwareQuery.isError && installableFirmwareOptions.length === 0 ? (
                 <div className="text-sm text-red-600">{t('agents.updateNoFirmware')}</div>
               ) : null}
-              {!firmwareQuery.isLoading && !firmwareQuery.isError && installableFirmwareOptions.length > 0 ? (
+              {!installationInProgress && !firmwareQuery.isLoading && !firmwareQuery.isError && installableFirmwareOptions.length > 0 ? (
                 <div className="space-y-3">
                   <SelectField
                     label={t('agents.updateVersionLabel')}
                     value={otaVersion}
                     onChange={(event) => setOtaVersionOverride(event.target.value)}
-                    disabled={installationInProgress || otaMutation.isPending}
+                    disabled={otaMutation.isPending || otaCancelMutation.isPending || resetInstallationMutation.isPending}
                   >
                     {installableFirmwareOptions.map((entry) => (
                       <option key={entry.version} value={entry.version}>
@@ -243,12 +284,42 @@ export function AgentEditorDrawer({ agent, onClose }) {
                   <div className="flex justify-end">
                     <Button
                       size="sm"
-                      disabled={!otaVersion || installationInProgress || saveMutation.isPending || otaMutation.isPending}
+                      disabled={
+                        !otaVersion ||
+                        saveMutation.isPending ||
+                        otaMutation.isPending ||
+                        otaCancelMutation.isPending ||
+                        resetInstallationMutation.isPending
+                      }
                       onClick={() => otaMutation.mutate(otaVersion)}
                     >
                       {t('agents.updateAction')}
                     </Button>
                   </div>
+                </div>
+              ) : null}
+              {installationInProgress ? (
+                <div className="flex justify-end">
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    disabled={saveMutation.isPending || otaMutation.isPending || otaCancelMutation.isPending || resetInstallationMutation.isPending}
+                    onClick={() => otaCancelMutation.mutate()}
+                  >
+                    {t('agents.updateCancelAction')}
+                  </Button>
+                </div>
+              ) : null}
+              {hasInstallationState ? (
+                <div className="flex justify-end">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={saveMutation.isPending || otaMutation.isPending || otaCancelMutation.isPending || resetInstallationMutation.isPending}
+                    onClick={() => resetInstallationMutation.mutate()}
+                  >
+                    {t('agents.updateResetAction')}
+                  </Button>
                 </div>
               ) : null}
             </div>

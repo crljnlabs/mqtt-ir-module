@@ -7,5 +7,6 @@
 namespace agent {
 
 void handleCommand(const String& command, JsonObjectConst payload);
+void processBackgroundTasks();
 
 }  // namespace agent

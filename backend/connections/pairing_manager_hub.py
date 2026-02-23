@@ -210,7 +210,7 @@ class PairingManagerHub:
         )
         return updated
 
-    def unpair_and_delete_agent(self, agent_id: str) -> Dict[str, Any]:
+    def unpair_and_delete_agent(self, agent_id: str, force: bool = False) -> Dict[str, Any]:
         normalized_agent_id = str(agent_id or "").strip()
         if not normalized_agent_id:
             raise ValueError("agent_id must not be empty")
@@ -222,17 +222,37 @@ class PairingManagerHub:
             raise ValueError("Only MQTT agents can be deleted")
 
         pending = bool(agent.get("pending"))
+        force_delete = bool(force)
         unpair_acked = True
+        unpair_dispatched = False
         if not pending:
-            unpair_acked = self._send_unpair_command(normalized_agent_id, timeout_seconds=self.UNPAIR_ACK_TIMEOUT_SECONDS)
-            if not unpair_acked:
-                raise RuntimeError("unpair_ack_timeout")
+            if force_delete:
+                unpair_acked = False
+                try:
+                    unpair_dispatched = self._send_unpair_command(
+                        normalized_agent_id,
+                        timeout_seconds=self.UNPAIR_ACK_TIMEOUT_SECONDS,
+                        wait_for_ack=False,
+                    )
+                except RuntimeError as exc:
+                    self._logger.warning(f"Force delete could not dispatch unpair command for {normalized_agent_id}: {exc}")
+            else:
+                unpair_dispatched = True
+                unpair_acked = self._send_unpair_command(
+                    normalized_agent_id,
+                    timeout_seconds=self.UNPAIR_ACK_TIMEOUT_SECONDS,
+                    wait_for_ack=True,
+                )
+                if not unpair_acked:
+                    raise RuntimeError("unpair_ack_timeout")
 
         unassigned_remotes = self._database.remotes.clear_assigned_agent(normalized_agent_id)
         deleted = self._database.agents.delete(normalized_agent_id)
         return {
             "ok": True,
             "agent_id": normalized_agent_id,
+            "force": force_delete,
+            "unpair_dispatched": unpair_dispatched,
             "unpair_acked": unpair_acked,
             "unassigned_remotes": unassigned_remotes,
             "deleted_agent": deleted,
@@ -310,19 +330,21 @@ class PairingManagerHub:
             pairing_session_id=active_session,
         )
 
-    def _send_unpair_command(self, agent_id: str, timeout_seconds: float) -> bool:
+    def _send_unpair_command(self, agent_id: str, timeout_seconds: float, wait_for_ack: bool = True) -> bool:
         connection = self._runtime_loader.mqtt_connection()
         if connection is None:
             raise RuntimeError("mqtt_not_connected")
 
         command_id = uuid.uuid4().hex
-        event = threading.Event()
-        with self._lock:
-            self._pending_unpair_acks[command_id] = {
-                "agent_id": agent_id,
-                "event": event,
-                "acked": False,
-            }
+        event: Optional[threading.Event] = None
+        if wait_for_ack:
+            event = threading.Event()
+            with self._lock:
+                self._pending_unpair_acks[command_id] = {
+                    "agent_id": agent_id,
+                    "event": event,
+                    "acked": False,
+                }
 
         mqtt_status = self._runtime_loader.status()
         payload = {
@@ -340,14 +362,17 @@ class PairingManagerHub:
                 qos=QoS.AtLeastOnce,
                 retain=True,
             )
+            if not wait_for_ack:
+                return True
             event.wait(max(0.1, float(timeout_seconds)))
             with self._lock:
                 state = self._pending_unpair_acks.get(command_id)
                 acked = bool(state and state.get("acked"))
             return acked
         finally:
-            with self._lock:
-                self._pending_unpair_acks.pop(command_id, None)
+            if wait_for_ack:
+                with self._lock:
+                    self._pending_unpair_acks.pop(command_id, None)
 
     def _on_unpair_ack(self, connection: Any, client: Any, userdata: Any, message: MQTTMessage) -> None:
         agent_uid_from_topic = self._parse_unpair_ack_topic(message.topic)

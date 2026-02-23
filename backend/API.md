@@ -237,6 +237,24 @@ Body:
 
 If version is omitted, Hub uses latest installable catalog entry.
 
+#### Cancel OTA (ESP32)
+
+`POST /api/agents/{agent_id}/ota/cancel`
+
+Cancels a running OTA update (or cancels a queued OTA before download starts).
+
+#### Reset installation state
+
+`POST /api/agents/{agent_id}/installation/reset`
+
+Clears retained/local OTA installation status for this agent.
+
+#### Delete agent with force
+
+`DELETE /api/agents/{agent_id}?force=true`
+
+Force delete skips waiting for unpair acknowledgment. Hub still attempts to dispatch unpair over MQTT and then removes local records immediately.
+
 ### Firmware catalog
 
 #### List firmware entries

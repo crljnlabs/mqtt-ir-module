@@ -42,6 +42,7 @@ For first install on a blank device, use the merged `factory` image.
 
 | Version | Factory download | SHA-256 | Flash usage (`ESP32-WROOM-32D`, `esp32dev`) | RAM usage (`ESP32-WROOM-32D`, `esp32dev`) |
 | --- | --- | --- | --- | --- |
+| `v0.0.4` | [Download](https://github.com/Dev-CorliJoni/mqtt-ir-module/raw/refs/heads/main/backend/firmware_template/files/esp32-ir-client-v0.0.4.factory.bin) | `511eb511c9023f1b84e9e50e9484df4bb0a573701d24b15e96b3c24e1ad2291c` | `89.4%` (used `1171693` bytes from `1310720` bytes) | `15.1%` (used `49608` bytes from `327680` bytes) |
 | `v0.0.2` | [Download](https://github.com/Dev-CorliJoni/mqtt-ir-module/raw/refs/heads/main/backend/firmware_template/files/esp32-ir-client-v0.0.2.factory.bin) | `ed84c15bcf166263cefa1e3c3fef6ddaf9db5ed0d61b59e73f8a901cadb5c79f` | `88.4%` (used `1158525` bytes from `1310720` bytes) | `14.8%` (used `48440` bytes from `327680` bytes) |
 | `v0.0.1` | [Download](https://github.com/Dev-CorliJoni/mqtt-ir-module/raw/refs/heads/main/backend/firmware_template/files/esp32-ir-client-v0.0.1.factory.bin) | `1d55ed7db0ba9e269be3d572fdd9cd2773341e8cb8f9577f9487cf3486ad129b` | `88.3%` (used `1157841` bytes from `1310720` bytes) | `14.8%` (used `48432` bytes from `327680` bytes) |
 
@@ -166,6 +167,14 @@ pio run -e esp32dev
 Built binary location:
 
 `esp-agent/.pio/build/esp32dev/firmware.bin`
+
+### v4 resource usage reference (`0.0.4`)
+
+Build output baseline for firmware `0.0.4` on `ESP32-WROOM-32D` (`esp32dev`):
+
+- Advanced Memory Usage is available via `PlatformIO Home > Project Inspect`
+- RAM: `15.1%` (used `49608` bytes from `327680` bytes)
+- Flash: `89.4%` (used `1171693` bytes from `1310720` bytes)
 
 ### v2 resource usage reference (`0.0.2`)
 

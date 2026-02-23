@@ -337,6 +337,12 @@
     "startPairing": "Mulai pairing",
     "stopPairing": "Hentikan pairing",
     "updateInProgressHint": "Firmware sedang diinstal. Tetap buka halaman ini sampai agen melakukan restart.",
-    "updateTimeoutHint": "Belum ada konfirmasi. Pembaruan mungkin masih berjalan di agen."
+    "updateTimeoutHint": "Belum ada konfirmasi. Pembaruan mungkin masih berjalan di agen.",
+    "updateCancelAction": "Batalkan pembaruan",
+    "updateCancelRequested": "Perintah pembatalan dikirim.",
+    "updateResetAction": "Reset status pembaruan",
+    "updateResetDone": "Status pembaruan direset.",
+    "deleteForceWarning": "Agen ini sedang memasang firmware. Hapus paksa akan langsung menghapusnya tanpa menunggu konfirmasi dari agen.",
+    "deleteForceLabel": "Saya paham dan ingin menghapus paksa agen ini sekarang."
   }
 }

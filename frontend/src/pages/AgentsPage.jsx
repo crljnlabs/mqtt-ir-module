@@ -25,6 +25,7 @@ export function AgentsPage() {
   const errorMapper = new ApiErrorMapper(t)
   const [editTarget, setEditTarget] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleteForce, setDeleteForce] = useState(false)
   const [rebootTarget, setRebootTarget] = useState(null)
   const [otaTarget, setOtaTarget] = useState(null)
   const [otaVersion, setOtaVersion] = useState('')
@@ -101,12 +102,13 @@ export function AgentsPage() {
   })
 
   const deleteAgentMutation = useMutation({
-    mutationFn: (agentId) => deleteAgent(agentId),
+    mutationFn: ({ agentId, force }) => deleteAgent(agentId, { force }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agents'] })
       queryClient.invalidateQueries({ queryKey: ['remotes'] })
       toast.show({ title: t('common.delete'), message: t('common.deleted') })
       setDeleteTarget(null)
+      setDeleteForce(false)
     },
     onError: (error) => {
       toast.show({ title: t('common.delete'), message: errorMapper.getMessage(error, 'common.failed') })
@@ -207,6 +209,7 @@ export function AgentsPage() {
     acceptPairingMutation.isPending ||
     deleteAgentMutation.isPending ||
     rebootMutation.isPending
+  const deleteRequiresForce = isInstallationInProgress(deleteTarget?.installation)
 
   return (
     <div className="space-y-4">
@@ -258,7 +261,10 @@ export function AgentsPage() {
                 agent={agent}
                 onAccept={(target) => acceptPairingMutation.mutate(target.agent_id)}
                 onEdit={(target) => setEditTarget(target)}
-                onDelete={(target) => setDeleteTarget(target)}
+                onDelete={(target) => {
+                  setDeleteForce(false)
+                  setDeleteTarget(target)
+                }}
                 onUpdate={(target) => openOtaModal(target)}
                 onReboot={(target) => setRebootTarget(target)}
               />
@@ -269,17 +275,60 @@ export function AgentsPage() {
 
       {editTarget ? <AgentEditorDrawer key={editTarget.agent_id} agent={editTarget} onClose={() => setEditTarget(null)} /> : null}
 
-      <ConfirmDialog
+      <Modal
         open={Boolean(deleteTarget)}
         title={t('common.delete')}
-        body={deleteTarget ? `${deleteTarget.name || deleteTarget.agent_id} (${deleteTarget.agent_id})` : ''}
-        confirmText={t('common.delete')}
-        onCancel={() => setDeleteTarget(null)}
-        onConfirm={() => {
-          if (!deleteTarget) return
-          deleteAgentMutation.mutate(deleteTarget.agent_id)
+        onClose={() => {
+          setDeleteTarget(null)
+          setDeleteForce(false)
         }}
-      />
+        footer={
+          <div className="flex gap-2 justify-end">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setDeleteTarget(null)
+                setDeleteForce(false)
+              }}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant="danger"
+              disabled={deleteAgentMutation.isPending || (deleteRequiresForce && !deleteForce)}
+              onClick={() => {
+                if (!deleteTarget) return
+                deleteAgentMutation.mutate({
+                  agentId: deleteTarget.agent_id,
+                  force: deleteRequiresForce && deleteForce,
+                })
+              }}
+            >
+              {t('common.delete')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-[rgb(var(--muted))]">
+            {deleteTarget ? `${deleteTarget.name || deleteTarget.agent_id} (${deleteTarget.agent_id})` : ''}
+          </p>
+          {deleteRequiresForce ? (
+            <div className="space-y-2 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+              <div>{t('agents.deleteForceWarning')}</div>
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={deleteForce}
+                  onChange={(event) => setDeleteForce(event.target.checked)}
+                />
+                <span>{t('agents.deleteForceLabel')}</span>
+              </label>
+            </div>
+          ) : null}
+        </div>
+      </Modal>
 
       <ConfirmDialog
         open={Boolean(rebootTarget)}

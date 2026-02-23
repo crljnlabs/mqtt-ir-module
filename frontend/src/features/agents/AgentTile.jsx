@@ -76,10 +76,10 @@ export function AgentTile({ agent, onEdit, onDelete, onAccept, onUpdate, onReboo
           </IconButton>
         ) : (
           <>
-            <IconButton label={t('common.edit')} onClick={() => onEdit(agent)} disabled={installationInProgress}>
+            <IconButton label={t('common.edit')} onClick={() => onEdit(agent)}>
               <Icon path={mdiPencilOutline} size={1} />
             </IconButton>
-            <IconButton label={t('common.delete')} onClick={() => onDelete(agent)} disabled={installationInProgress}>
+            <IconButton label={t('common.delete')} onClick={() => onDelete(agent)}>
               <Icon path={mdiTrashCanOutline} size={1} />
             </IconButton>
             {updateAvailable && onUpdate ? (

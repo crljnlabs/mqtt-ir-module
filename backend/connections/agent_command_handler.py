@@ -83,6 +83,7 @@ class AgentCommandHandler:
             "runtime/config/set",
             "runtime/reboot",
             "runtime/ota/start",
+            "runtime/ota/cancel",
         ):
             return
 
@@ -256,6 +257,9 @@ class AgentCommandHandler:
             raise RuntimeError("runtime_reboot_not_supported")
 
         if command == "runtime/ota/start":
+            raise RuntimeError("runtime_ota_not_supported")
+
+        if command == "runtime/ota/cancel":
             raise RuntimeError("runtime_ota_not_supported")
 
         raise ValueError("Unknown command")

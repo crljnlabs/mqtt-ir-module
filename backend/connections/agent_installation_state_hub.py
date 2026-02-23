@@ -12,7 +12,9 @@ from .runtime_loader import RuntimeLoader
 class AgentInstallationStateHub:
     STATE_TOPIC_WILDCARD = "ir/agents/+/installation/state"
     IN_PROGRESS_STATUSES = {"started", "downloading", "installing"}
+    TERMINAL_CLEAR_STATUSES = {"finished", "cancelled"}
     FINISH_CLEAR_DELAY_SECONDS = 20.0
+    STALE_PROGRESS_TIMEOUT_SECONDS = 300.0
 
     def __init__(self, runtime_loader: RuntimeLoader) -> None:
         self._runtime_loader = runtime_loader
@@ -64,12 +66,12 @@ class AgentInstallationStateHub:
         normalized_agent_id = str(agent_id or "").strip()
         if not normalized_agent_id:
             return None
+        self._recover_stale_state(normalized_agent_id)
         with self._lock:
             state = self._states.get(normalized_agent_id)
         if not state:
             return None
-        payload = {k: v for k, v in state.items() if not str(k).startswith("_")}
-        return payload
+        return self._public_payload(state)
 
     def is_in_progress(self, agent_id: str) -> bool:
         state = self.get_state(agent_id)
@@ -82,6 +84,70 @@ class AgentInstallationStateHub:
         self._cancel_clear_timer(normalized_agent_id)
         with self._lock:
             self._states.pop(normalized_agent_id, None)
+
+    def reset_state(self, agent_id: str) -> bool:
+        normalized_agent_id = str(agent_id or "").strip()
+        if not normalized_agent_id:
+            return False
+        self._cancel_clear_timer(normalized_agent_id)
+        with self._lock:
+            existed = normalized_agent_id in self._states
+            self._states.pop(normalized_agent_id, None)
+        self._clear_retained(normalized_agent_id)
+        return existed
+
+    def reconcile_with_runtime_version(self, agent_id: str, current_version: str) -> Optional[Dict[str, Any]]:
+        normalized_agent_id = str(agent_id or "").strip()
+        normalized_version = str(current_version or "").strip()
+        if not normalized_agent_id or not normalized_version:
+            return None
+        should_publish = False
+        should_schedule_clear = False
+        payload: Optional[Dict[str, Any]] = None
+        now = time.time()
+        with self._lock:
+            state = self._states.get(normalized_agent_id)
+            if not state:
+                return None
+            updated = dict(state)
+            changed = False
+            reported_current_version = str(updated.get("current_version") or "").strip()
+
+            if reported_current_version != normalized_version:
+                updated["current_version"] = normalized_version
+                updated["_state_seen_at"] = now
+                changed = True
+
+            if bool(updated.get("in_progress")):
+                target_version = str(updated.get("target_version") or "").strip()
+                if (
+                    target_version
+                    and target_version == normalized_version
+                    and reported_current_version
+                    and reported_current_version != normalized_version
+                ):
+                    updated["status"] = "finished"
+                    updated["in_progress"] = False
+                    updated["progress_pct"] = 100
+                    updated["message"] = "OTA update completed"
+                    updated["error_code"] = ""
+                    updated["updated_at"] = now
+                    updated["_state_seen_at"] = now
+                    changed = True
+                    should_publish = True
+                    should_schedule_clear = True
+
+            if not changed:
+                return self._public_payload(state)
+
+            self._states[normalized_agent_id] = updated
+            payload = self._public_payload(updated)
+
+        if should_schedule_clear:
+            self._schedule_finished_clear(normalized_agent_id)
+        if should_publish and payload is not None:
+            self._publish_retained_state(normalized_agent_id, payload)
+        return payload
 
     def _on_state(self, connection: Any, client: Any, userdata: Any, message: MQTTMessage) -> None:
         del connection
@@ -103,7 +169,7 @@ class AgentInstallationStateHub:
 
         with self._lock:
             self._states[agent_id] = normalized
-        if str(normalized.get("status") or "") == "finished":
+        if str(normalized.get("status") or "") in self.TERMINAL_CLEAR_STATUSES:
             self._schedule_finished_clear(agent_id)
         else:
             self._cancel_clear_timer(agent_id)
@@ -131,11 +197,41 @@ class AgentInstallationStateHub:
         with self._lock:
             self._clear_timers.pop(agent_id, None)
             state = self._states.get(agent_id)
-            if isinstance(state, dict) and str(state.get("status") or "") == "finished":
+            status = str(state.get("status") or "") if isinstance(state, dict) else ""
+            if status in self.TERMINAL_CLEAR_STATUSES:
                 self._states.pop(agent_id, None)
                 should_clear = True
         if should_clear:
             self._clear_retained(agent_id)
+
+    def _recover_stale_state(self, agent_id: str) -> None:
+        now = time.time()
+        recovered_payload: Optional[Dict[str, Any]] = None
+        with self._lock:
+            state = self._states.get(agent_id)
+            if not isinstance(state, dict):
+                return
+            if not bool(state.get("in_progress")):
+                return
+            seen_at = self._parse_float(state.get("_state_seen_at"), default=now)
+            if (now - seen_at) < self.STALE_PROGRESS_TIMEOUT_SECONDS:
+                return
+
+            recovered = dict(state)
+            recovered["status"] = "failure"
+            recovered["in_progress"] = False
+            recovered["message"] = "Installation status timed out"
+            recovered["error_code"] = "ota_status_timeout"
+            recovered["updated_at"] = now
+            recovered["_state_seen_at"] = now
+            self._states[agent_id] = recovered
+            recovered_payload = self._public_payload(recovered)
+
+        self._cancel_clear_timer(agent_id)
+        if recovered_payload is None:
+            return
+        self._logger.warning(f"Recovered stale OTA installation state for {agent_id} as failure")
+        self._publish_retained_state(agent_id, recovered_payload)
 
     def _clear_retained(self, agent_id: str) -> None:
         connection = self._runtime_loader.mqtt_connection()
@@ -146,6 +242,21 @@ class AgentInstallationStateHub:
             connection.publish(topic, "", qos=QoS.AtLeastOnce, retain=True)
         except Exception as exc:
             self._logger.warning(f"Failed to clear retained installation state topic {topic}: {exc}")
+
+    def _publish_retained_state(self, agent_id: str, payload: Dict[str, Any]) -> None:
+        connection = self._runtime_loader.mqtt_connection()
+        if connection is None:
+            return
+        topic = f"ir/agents/{agent_id}/installation/state"
+        try:
+            connection.publish(
+                topic,
+                json.dumps(payload, separators=(",", ":")),
+                qos=QoS.AtLeastOnce,
+                retain=True,
+            )
+        except Exception as exc:
+            self._logger.warning(f"Failed to publish recovered installation state topic {topic}: {exc}")
 
     def _parse_agent_id(self, topic: str) -> str:
         parts = str(topic or "").split("/")
@@ -188,6 +299,7 @@ class AgentInstallationStateHub:
             "message": str(payload.get("message") or "").strip(),
             "error_code": str(payload.get("error_code") or "").strip(),
             "updated_at": self._parse_float(payload.get("updated_at"), default=time.time()),
+            "_state_seen_at": time.time(),
         }
 
         return normalized
@@ -205,3 +317,6 @@ class AgentInstallationStateHub:
             return int(value)
         except Exception:
             return None
+
+    def _public_payload(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        return {k: v for k, v in state.items() if not str(k).startswith("_")}

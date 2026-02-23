@@ -30,8 +30,9 @@ export function updateAgent(agentId, payload) {
   })
 }
 
-export function deleteAgent(agentId) {
-  return requestJson(`/agents/${agentId}`, {
+export function deleteAgent(agentId, { force = false } = {}) {
+  const query = `force=${encodeURIComponent(String(Boolean(force)))}`
+  return requestJson(`/agents/${agentId}?${query}`, {
     method: 'DELETE',
   })
 }
@@ -57,5 +58,17 @@ export function otaUpdateAgent(agentId, payload) {
   return requestJson(`/agents/${encodeURIComponent(agentId)}/ota`, {
     method: 'POST',
     body: payload,
+  })
+}
+
+export function otaCancelAgent(agentId) {
+  return requestJson(`/agents/${encodeURIComponent(agentId)}/ota/cancel`, {
+    method: 'POST',
+  })
+}
+
+export function resetAgentInstallation(agentId) {
+  return requestJson(`/agents/${encodeURIComponent(agentId)}/installation/reset`, {
+    method: 'POST',
   })
 }

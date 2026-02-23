@@ -1,6 +1,7 @@
 #include <Arduino.h>
 
 #include "agent_bootstrap.h"
+#include "agent_commands.h"
 #include "agent_ir.h"
 #include "agent_logs.h"
 #include "agent_mqtt.h"
@@ -50,6 +51,7 @@ void loop() {
     }
   }
 
+  agent::processBackgroundTasks();
   agent::applyPowerMode();
 
   if (agent::gPendingReboot && millis() >= agent::gRebootAtMs) {

@@ -47,6 +47,7 @@ void publishState() {
   commands.add("runtime/config/set");
   commands.add("runtime/reboot");
   commands.add("runtime/ota/start");
+  commands.add("runtime/ota/cancel");
   mqttPublishJson(topicState(), doc, true);
   gLastStatePublishMs = millis();
 }
