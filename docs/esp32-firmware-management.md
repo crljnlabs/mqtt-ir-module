@@ -42,7 +42,7 @@ For first install on a blank device, use the merged `factory` image.
 
 | Version | Factory download | SHA-256 | Flash usage (`ESP32-WROOM-32D`, `esp32dev`) | RAM usage (`ESP32-WROOM-32D`, `esp32dev`) |
 | --- | --- | --- | --- | --- |
-| `v0.0.1` | `http://<hub-host>/firmware/esp32-ir-client-v0.0.1.factory.bin` | `d9e11f0d1f4433e9072e96a3738704479ae36f62ac7f7a005de4315debfc3600` | `88.1%` (used `1155193` bytes from `1310720` bytes) | `14.8%` (used `48432` bytes from `327680` bytes) |
+| `v0.0.1` | `http://<hub-host>/firmware/esp32-ir-client-v0.0.1.factory.bin` | `d9e11f0d1f4433e9072e96a3738704479ae36f62ac7f7a005de4315debfc3600` | `88.3%` (used `1157841` bytes from `1310720` bytes) | `14.8%` (used `48432` bytes from `327680` bytes) |
 
 ## 2. USB driver selection and installation
 
@@ -144,7 +144,7 @@ Built binary location:
 Build output baseline for firmware `0.0.1` on `ESP32-WROOM-32D` (`esp32dev`):
 
 - RAM: `14.8%` (used `48432` bytes from `327680` bytes)
-- Flash: `88.1%` (used `1155193` bytes from `1310720` bytes)
+- Flash: `88.3%` (used `1157841` bytes from `1310720` bytes)
 
 Use this as a quick regression reference when updating dependencies or adding features.
 
