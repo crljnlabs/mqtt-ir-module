@@ -16,6 +16,7 @@ import { useToast } from '../components/ui/ToastProvider.jsx'
 import { ApiErrorMapper } from '../utils/apiErrorMapper.js'
 import { AgentTile } from '../features/agents/AgentTile.jsx'
 import { AgentEditorDrawer } from '../features/agents/AgentEditorDrawer.jsx'
+import { isInstallationInProgress } from '../features/agents/installationStatus.js'
 
 export function AgentsPage() {
   const { t } = useTranslation()
@@ -51,7 +52,11 @@ export function AgentsPage() {
   const agentsQuery = useQuery({
     queryKey: ['agents'],
     queryFn: listAgents,
-    refetchInterval: pairingOpenLive ? 1000 : 5000,
+    refetchInterval: (query) => {
+      const list = Array.isArray(query.state.data) ? query.state.data : []
+      const hasInstallingAgent = list.some((agent) => isInstallationInProgress(agent?.installation))
+      return pairingOpenLive || hasInstallingAgent ? 1000 : 5000
+    },
   })
   const firmwareQuery = useQuery({
     queryKey: ['firmware', 'esp32'],
@@ -122,13 +127,20 @@ export function AgentsPage() {
 
   const otaMutation = useMutation({
     mutationFn: ({ agentId, version }) => otaUpdateAgent(agentId, { version }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agents'] })
-      toast.show({ title: t('agents.updateAction'), message: t('agents.updateRequested') })
+    onMutate: () => {
       setOtaTarget(null)
       setOtaVersion('')
+      toast.show({ title: t('agents.updateAction'), message: t('agents.updateRequested') })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agents'] })
     },
     onError: (error) => {
+      if (isOtaTimeoutError(error)) {
+        queryClient.invalidateQueries({ queryKey: ['agents'] })
+        toast.show({ title: t('agents.updateAction'), message: t('agents.updateTimeoutHint') })
+        return
+      }
       toast.show({ title: t('agents.updateAction'), message: errorMapper.getMessage(error, 'common.failed') })
     },
   })
@@ -171,6 +183,9 @@ export function AgentsPage() {
   const latestInstallableVersion = String(firmwareQuery.data?.latest_installable_version || '').trim()
 
   const openOtaModal = (agent) => {
+    if (isInstallationInProgress(agent?.installation)) {
+      return
+    }
     const preferred = String(agent?.ota?.latest_version || '').trim()
     if (preferred && installableFirmwareOptions.some((entry) => String(entry.version) === preferred)) {
       setOtaVersion(preferred)
@@ -191,7 +206,6 @@ export function AgentsPage() {
     closePairingMutation.isPending ||
     acceptPairingMutation.isPending ||
     deleteAgentMutation.isPending ||
-    otaMutation.isPending ||
     rebootMutation.isPending
 
   return (
@@ -330,4 +344,10 @@ export function AgentsPage() {
       </Modal>
     </div>
   )
+}
+
+function isOtaTimeoutError(error) {
+  const details = error?.details
+  const code = typeof details?.code === 'string' ? details.code.trim().toLowerCase() : ''
+  return code === 'agent_timeout' || Number(error?.status) === 504
 }

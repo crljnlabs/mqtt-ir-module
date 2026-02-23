@@ -335,6 +335,8 @@
     "pairingDisabledHint": "Verbinde zuerst MQTT in den Einstellungen, bevor du die Kopplung startest.",
     "openSettings": "Einstellungen öffnen",
     "startPairing": "Kopplung starten",
-    "stopPairing": "Kopplung stoppen"
+    "stopPairing": "Kopplung stoppen",
+    "updateInProgressHint": "Firmware wird installiert. Lass diese Seite offen, bis der Agent neu startet.",
+    "updateTimeoutHint": "Noch keine Bestätigung vom Agenten. Das Update kann trotzdem noch laufen."
   }
 }

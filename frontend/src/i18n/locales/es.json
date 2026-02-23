@@ -335,6 +335,8 @@
     "pairingDisabledHint": "Conéctate a MQTT en Ajustes antes de iniciar el emparejamiento.",
     "openSettings": "Abrir ajustes",
     "startPairing": "Iniciar emparejamiento",
-    "stopPairing": "Detener emparejamiento"
+    "stopPairing": "Detener emparejamiento",
+    "updateInProgressHint": "Instalando firmware. Mantén esta página abierta hasta que el agente se reinicie.",
+    "updateTimeoutHint": "Aún no se recibió confirmación. La actualización puede seguir ejecutándose en el agente."
   }
 }

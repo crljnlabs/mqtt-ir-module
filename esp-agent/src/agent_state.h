@@ -70,6 +70,7 @@ String nowSecondsText();
 String topicState();
 String topicStatus();
 String topicCommands();
+String topicInstallationState();
 String topicPairingAccept();
 String topicPairingUnpair();
 String topicPairingUnpairAck();

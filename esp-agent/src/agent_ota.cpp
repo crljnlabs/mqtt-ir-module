@@ -27,7 +27,7 @@ String sha256ToHex(const uint8_t* digest, size_t length) {
 
 }  // namespace
 
-OtaResult performOta(const String& url, const String& expectedSha256) {
+OtaResult performOta(const String& url, const String& expectedSha256, const OtaProgressCallback& onProgress) {
   OtaResult result;
   result.ok = false;
 
@@ -47,6 +47,7 @@ OtaResult performOta(const String& url, const String& expectedSha256) {
   }
 
   int remaining = http.getSize();
+  const int totalBytes = remaining;
   WiFiClient* stream = http.getStreamPtr();
   if (!stream) {
     result.errorCode = "ota_stream_missing";
@@ -68,6 +69,28 @@ OtaResult performOta(const String& url, const String& expectedSha256) {
 
   uint8_t buffer[1024];
   unsigned long lastDataAtMs = millis();
+  unsigned long lastProgressAtMs = 0;
+  size_t downloadedBytes = 0;
+
+  auto emitProgress = [&](const String& status, int progressPct, const String& message, bool force) {
+    if (!onProgress) {
+      return;
+    }
+    int normalizedPct = progressPct;
+    if (normalizedPct >= 0) {
+      normalizedPct = std::max(0, std::min(100, normalizedPct));
+    }
+    const unsigned long nowMs = millis();
+    if (!force) {
+      if ((nowMs - lastProgressAtMs) < 1000UL) {
+        return;
+      }
+    }
+    lastProgressAtMs = nowMs;
+    onProgress(status, normalizedPct, message);
+  };
+
+  emitProgress("downloading", totalBytes > 0 ? 0 : -1, "Downloading firmware", true);
 
   while (http.connected() && (remaining > 0 || remaining == -1)) {
     const size_t available = stream->available();
@@ -102,12 +125,23 @@ OtaResult performOta(const String& url, const String& expectedSha256) {
       return result;
     }
     mbedtls_sha256_update_ret(&shaCtx, buffer, static_cast<size_t>(bytesRead));
+    downloadedBytes += static_cast<size_t>(bytesRead);
+
+    if (totalBytes > 0) {
+      const uint64_t numerator = static_cast<uint64_t>(downloadedBytes) * 100ULL;
+      const int progressPct = static_cast<int>(numerator / static_cast<uint64_t>(totalBytes));
+      emitProgress("downloading", progressPct, "Downloading firmware", false);
+    } else {
+      emitProgress("downloading", -1, "Downloading firmware", false);
+    }
 
     if (remaining > 0) {
       remaining -= bytesRead;
     }
     yield();
   }
+
+  emitProgress("installing", -1, "Installing firmware", true);
 
   uint8_t digest[32];
   mbedtls_sha256_finish_ret(&shaCtx, digest);

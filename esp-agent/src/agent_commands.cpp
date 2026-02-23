@@ -270,6 +270,27 @@ bool executeRuntimeConfigSet(
   return true;
 }
 
+void publishInstallationStatus(
+    const String& requestId,
+    const String& status,
+    int progressPct,
+    const String& targetVersion,
+    const String& message,
+    const String& errorCode) {
+  JsonDocument statusDoc;
+  statusDoc["request_id"] = requestId;
+  statusDoc["status"] = status;
+  if (progressPct >= 0) {
+    statusDoc["progress_pct"] = progressPct;
+  }
+  statusDoc["target_version"] = targetVersion;
+  statusDoc["current_version"] = kFirmwareVersion;
+  statusDoc["message"] = message;
+  statusDoc["error_code"] = errorCode;
+  statusDoc["updated_at"] = nowSecondsText();
+  mqttPublishJson(topicInstallationState(), statusDoc, true);
+}
+
 bool executeRuntimeOta(
     JsonObjectConst payload,
     JsonObject result,
@@ -293,9 +314,23 @@ bool executeRuntimeOta(
     return false;
   }
 
+  const String requestId = String(payload["request_id"] | "");
+  publishInstallationStatus(requestId, "started", 0, version, "OTA started", "");
   markActivity();
-  OtaResult ota = performOta(url, expectedSha);
+  OtaResult ota = performOta(
+      url,
+      expectedSha,
+      [&](const String& phase, int progressPct, const String& phaseMessage) {
+        publishInstallationStatus(requestId, phase, progressPct, version, phaseMessage, "");
+      });
   if (!ota.ok) {
+    publishInstallationStatus(
+        requestId,
+        "failure",
+        -1,
+        version,
+        ota.message.length() ? ota.message : "OTA update failed",
+        ota.errorCode.length() ? ota.errorCode : "runtime_error");
     errorCode = ota.errorCode.length() ? ota.errorCode : "runtime_error";
     errorMessage = ota.message.length() ? ota.message : "OTA update failed";
     statusCode = 409;
@@ -303,6 +338,7 @@ bool executeRuntimeOta(
   }
 
   saveRebootRequired(false);
+  publishInstallationStatus(requestId, "finished", 100, version, "OTA update completed", "");
   result["version"] = version;
   result["expected_sha256"] = expectedSha;
   result["actual_sha256"] = ota.actualSha256;

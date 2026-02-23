@@ -335,6 +335,8 @@
     "pairingDisabledHint": "请先在设置中连接 MQTT，再开始配对。",
     "openSettings": "打开设置",
     "startPairing": "开始配对",
-    "stopPairing": "停止配对"
+    "stopPairing": "停止配对",
+    "updateInProgressHint": "正在安装固件。请保持此页面打开，直到代理重启。",
+    "updateTimeoutHint": "尚未收到确认。更新可能仍在代理上运行。"
   }
 }

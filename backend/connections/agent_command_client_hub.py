@@ -137,7 +137,7 @@ class AgentCommandClientHub:
         self,
         agent_id: str,
         payload: Dict[str, Any],
-        timeout_seconds: float = 20.0,
+        timeout_seconds: float = 120.0,
     ) -> Dict[str, Any]:
         return self._request(
             agent_id=agent_id,

@@ -11,3 +11,4 @@ from .agent_command_client_hub import AgentCommandClientHub
 from .agent_log_hub import AgentLogHub
 from .agent_log_reporter import AgentLogReporter
 from .agent_runtime_state_hub import AgentRuntimeStateHub
+from .agent_installation_state_hub import AgentInstallationStateHub

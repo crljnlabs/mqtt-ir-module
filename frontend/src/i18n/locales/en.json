@@ -146,6 +146,8 @@
     "updateAvailable": "Update available",
     "updateAction": "Update",
     "updateRequested": "Update command sent.",
+    "updateInProgressHint": "Installing firmware. Keep this page open until the agent restarts.",
+    "updateTimeoutHint": "No confirmation received yet. The update may still be running on the agent.",
     "updateSelectVersionHint": "Select the firmware version to install on this ESP32 agent.",
     "updateNoFirmware": "No installable firmware found in the catalog.",
     "updateVersionLabel": "Firmware version",

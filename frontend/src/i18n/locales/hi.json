@@ -335,6 +335,8 @@
     "pairingDisabledHint": "पेयरिंग शुरू करने से पहले Settings में MQTT से कनेक्ट करें।",
     "openSettings": "सेटिंग्स खोलें",
     "startPairing": "पेयरिंग शुरू करें",
-    "stopPairing": "पेयरिंग रोकें"
+    "stopPairing": "पेयरिंग रोकें",
+    "updateInProgressHint": "फर्मवेयर इंस्टॉल हो रहा है। एजेंट रीस्टार्ट होने तक यह पेज खुला रखें।",
+    "updateTimeoutHint": "अभी पुष्टि नहीं मिली है। अपडेट अभी भी एजेंट पर चल रहा हो सकता है।"
   }
 }

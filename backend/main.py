@@ -44,6 +44,7 @@ from electronics.ir_signal_parser import IrSignalParser
 from electronics.status_communication import StatusCommunication
 from connections import (
     AgentCommandClientHub,
+    AgentInstallationStateHub,
     AgentLogHub,
     AgentLogReporter,
     AgentRuntimeStateHub,
@@ -97,6 +98,7 @@ pairing_manager = PairingManagerHub(
 )
 command_client = AgentCommandClientHub(runtime_loader=runtime_loader)
 runtime_state_hub = AgentRuntimeStateHub(runtime_loader=runtime_loader, database=database)
+installation_state_hub = AgentInstallationStateHub(runtime_loader=runtime_loader)
 
 learning_defaults = database.settings.get_learning_defaults()
 learning = IrLearningService(
@@ -259,6 +261,21 @@ def _decorate_agent_payload(agent: Dict[str, Any]) -> Dict[str, Any]:
         )
     ota_payload["reboot_required"] = reboot_required
 
+    installation = installation_state_hub.get_state(agent_id) or {}
+    if installation:
+        installation.setdefault("current_version", sw_version)
+    else:
+        installation = {
+            "status": "idle",
+            "in_progress": False,
+            "progress_pct": None,
+            "target_version": "",
+            "current_version": sw_version,
+            "message": "",
+            "error_code": "",
+            "updated_at": None,
+        }
+
     payload["can_send"] = can_send
     payload["can_learn"] = can_learn
     payload["sw_version"] = sw_version
@@ -273,7 +290,24 @@ def _decorate_agent_payload(agent: Dict[str, Any]) -> Dict[str, Any]:
         "protocol_version": protocol_version,
         "ota_supported": ota_supported,
     }
+    payload["installation"] = installation
     return payload
+
+
+def _require_agent_not_installing(agent_id: str) -> None:
+    installation = installation_state_hub.get_state(agent_id) or {}
+    if not bool(installation.get("in_progress")):
+        return
+    raise HTTPException(
+        status_code=409,
+        detail={
+            "code": "ota_in_progress",
+            "message": "OTA installation is in progress for this agent",
+            "status": str(installation.get("status") or ""),
+            "progress_pct": installation.get("progress_pct"),
+            "target_version": str(installation.get("target_version") or ""),
+        },
+    )
 
 
 @asynccontextmanager
@@ -291,6 +325,7 @@ async def lifespan(app: FastAPI):
     runtime_loader.start()
     agent_log_hub.start()
     runtime_state_hub.start()
+    installation_state_hub.start()
     command_client.start()
     register_external_mqtt_agents_from_db()
     pairing_manager.start()
@@ -304,6 +339,7 @@ async def lifespan(app: FastAPI):
     finally:
         pairing_manager.stop()
         command_client.stop()
+        installation_state_hub.stop()
         runtime_state_hub.stop()
         agent_log_hub.stop()
         runtime_loader.stop()
@@ -419,6 +455,7 @@ def update_agent_debug(
 ) -> Dict[str, Any]:
     require_api_key(x_api_key)
     agent = _require_mqtt_agent(agent_id)
+    _require_agent_not_installing(str(agent.get("agent_id") or agent_id))
     result = command_client.runtime_debug_set(agent_id=agent_id, debug=body.debug)
     return {
         "agent_id": str(agent.get("agent_id") or agent_id),
@@ -446,6 +483,7 @@ def update_agent_runtime_config(
 ) -> Dict[str, Any]:
     require_api_key(x_api_key)
     agent = _require_mqtt_agent(agent_id)
+    _require_agent_not_installing(str(agent.get("agent_id") or agent_id))
     decorated = _decorate_agent_payload(agent)
     runtime = decorated.get("runtime") if isinstance(decorated.get("runtime"), dict) else {}
     if str(runtime.get("agent_type") or "").strip().lower() != "esp32":
@@ -467,6 +505,7 @@ def update_agent_runtime_config(
 def reboot_agent(agent_id: str, x_api_key: Optional[str] = Header(default=None)) -> Dict[str, Any]:
     require_api_key(x_api_key)
     agent = _require_mqtt_agent(agent_id)
+    _require_agent_not_installing(str(agent.get("agent_id") or agent_id))
     result = command_client.runtime_reboot(agent_id=agent_id)
     return {
         "agent_id": str(agent.get("agent_id") or agent_id),
@@ -506,6 +545,7 @@ def ota_update_agent(
 ) -> Dict[str, Any]:
     require_api_key(x_api_key)
     agent = _require_mqtt_agent(agent_id)
+    _require_agent_not_installing(str(agent.get("agent_id") or agent_id))
     decorated = _decorate_agent_payload(agent)
     runtime = decorated.get("runtime") if isinstance(decorated.get("runtime"), dict) else {}
     if str(runtime.get("agent_type") or "").strip().lower() != "esp32":
@@ -580,6 +620,7 @@ def update_agent(
     x_api_key: Optional[str] = Header(default=None),
 ) -> Dict[str, Any]:
     require_api_key(x_api_key)
+    _require_agent_not_installing(agent_id)
     try:
         changes = body.model_dump(exclude_unset=True)
         updated = agent_registry.update_agent(
@@ -597,6 +638,7 @@ def update_agent(
 @api.delete("/agents/{agent_id}")
 def delete_agent(agent_id: str, x_api_key: Optional[str] = Header(default=None)) -> Dict[str, Any]:
     require_api_key(x_api_key)
+    _require_agent_not_installing(agent_id)
     try:
         result = pairing_manager.unpair_and_delete_agent(agent_id)
         agent_registry.unregister_agent(agent_id)

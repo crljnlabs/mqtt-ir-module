@@ -335,6 +335,8 @@
     "pairingDisabledHint": "Connectez-vous à MQTT dans les paramètres avant de démarrer l’appairage.",
     "openSettings": "Ouvrir les paramètres",
     "startPairing": "Démarrer l’appairage",
-    "stopPairing": "Arrêter l’appairage"
+    "stopPairing": "Arrêter l’appairage",
+    "updateInProgressHint": "Installation du firmware en cours. Gardez cette page ouverte jusqu’au redémarrage de l’agent.",
+    "updateTimeoutHint": "Aucune confirmation reçue pour l’instant. La mise à jour est peut-être encore en cours sur l’agent."
   }
 }

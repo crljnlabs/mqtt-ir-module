@@ -335,6 +335,8 @@
     "pairingDisabledHint": "Hubungkan MQTT di Pengaturan sebelum memulai pairing.",
     "openSettings": "Buka pengaturan",
     "startPairing": "Mulai pairing",
-    "stopPairing": "Hentikan pairing"
+    "stopPairing": "Hentikan pairing",
+    "updateInProgressHint": "Firmware sedang diinstal. Tetap buka halaman ini sampai agen melakukan restart.",
+    "updateTimeoutHint": "Belum ada konfirmasi. Pembaruan mungkin masih berjalan di agen."
   }
 }

@@ -73,6 +73,10 @@ String topicCommands() {
   return String("ir/agents/") + gAgentId + "/cmd/#";
 }
 
+String topicInstallationState() {
+  return String("ir/agents/") + gAgentId + "/installation/state";
+}
+
 String topicPairingAccept() {
   return String("ir/pairing/accept/+/") + gAgentId;
 }

@@ -20,6 +20,11 @@ import { ApiErrorMapper } from '../utils/apiErrorMapper.js'
 import { AgentEditorDrawer } from '../features/agents/AgentEditorDrawer.jsx'
 import { RemoteEditorDrawer } from '../features/remotes/RemoteEditorDrawer.jsx'
 import { DEFAULT_REMOTE_ICON, findIconPath } from '../icons/iconRegistry.js'
+import {
+  installationBadgeLabel,
+  installationBadgeVariant,
+  isInstallationInProgress,
+} from '../features/agents/installationStatus.js'
 
 export function AgentPage() {
   const { t } = useTranslation()
@@ -214,6 +219,9 @@ export function AgentPage() {
   const runtime = agent.runtime || {}
   const rebootRequired = Boolean(runtime.reboot_required || agent.ota?.reboot_required)
   const isOnline = String(agent.status || '').trim().toLowerCase() === 'online'
+  const installation = agent.installation || {}
+  const installationInProgress = isInstallationInProgress(installation)
+  const installationLabel = installationBadgeLabel(installation)
   const agentType = String(runtime.agent_type || agent.agent_type || '').trim().toLowerCase()
   const swVersion = String(runtime.sw_version || agent.sw_version || '').trim()
   const typeLabel =
@@ -247,14 +255,18 @@ export function AgentPage() {
               <Icon path={mdiTextBoxSearchOutline} size={1} />
             </IconButton>
             {rebootRequired ? (
-              <IconButton label={t('agents.rebootAction')} onClick={() => rebootMutation.mutate()} disabled={rebootMutation.isPending}>
+              <IconButton
+                label={t('agents.rebootAction')}
+                onClick={() => rebootMutation.mutate()}
+                disabled={rebootMutation.isPending || installationInProgress}
+              >
                 <Icon path={mdiRestart} size={1} />
               </IconButton>
             ) : null}
-            <IconButton label={t('common.edit')} onClick={() => setEditOpen(true)}>
+            <IconButton label={t('common.edit')} onClick={() => setEditOpen(true)} disabled={installationInProgress}>
               <Icon path={mdiPencilOutline} size={1} />
             </IconButton>
-            <IconButton label={t('common.delete')} onClick={() => setDeleteOpen(true)}>
+            <IconButton label={t('common.delete')} onClick={() => setDeleteOpen(true)} disabled={installationInProgress}>
               <Icon path={mdiTrashCanOutline} size={1} />
             </IconButton>
           </div>
@@ -271,7 +283,15 @@ export function AgentPage() {
             <Badge variant={isOnline ? 'success' : 'danger'}>
               {isOnline ? t('health.online') : t('health.offline')}
             </Badge>
+            {installationLabel ? (
+              <span className="ml-2">
+                <Badge variant={installationBadgeVariant(installation)}>{installationLabel}</Badge>
+              </span>
+            ) : null}
           </div>
+          {installationInProgress ? (
+            <div className="text-xs text-amber-600 mt-1">{installation.message || t('common.loading')}</div>
+          ) : null}
           {rebootRequired ? (
             <div className="text-xs text-amber-600 mt-1">{t('agents.rebootRequired')}</div>
           ) : null}

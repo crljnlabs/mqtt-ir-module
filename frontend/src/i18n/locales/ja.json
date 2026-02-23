@@ -335,6 +335,8 @@
     "pairingDisabledHint": "ペアリング開始前に設定で MQTT に接続してください。",
     "openSettings": "設定を開く",
     "startPairing": "ペアリング開始",
-    "stopPairing": "ペアリング停止"
+    "stopPairing": "ペアリング停止",
+    "updateInProgressHint": "ファームウェアをインストール中です。エージェントが再起動するまでこのページを開いたままにしてください。",
+    "updateTimeoutHint": "まだ確認応答がありません。更新はエージェント上で継続している可能性があります。"
   }
 }
