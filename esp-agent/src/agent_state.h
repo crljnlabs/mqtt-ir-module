@@ -71,6 +71,7 @@ String topicState();
 String topicStatus();
 String topicCommands();
 String topicInstallationState();
+String topicLogs();
 String topicPairingAccept();
 String topicPairingUnpair();
 String topicPairingUnpairAck();

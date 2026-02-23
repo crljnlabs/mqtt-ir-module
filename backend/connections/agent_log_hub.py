@@ -129,6 +129,17 @@ class AgentLogHub:
             return
         self._append_event(normalized_agent_id, normalized_event)
 
+    def record_system(self, agent_id: str, event: Dict[str, Any]) -> None:
+        normalized_agent_id = str(agent_id or "").strip()
+        if not normalized_agent_id:
+            return
+        if not self._is_tracked_mqtt_agent(normalized_agent_id) and not self._is_tracked_local_agent(normalized_agent_id):
+            return
+        normalized_event = self._normalize_event(event)
+        if not normalized_event:
+            return
+        self._append_event(normalized_agent_id, normalized_event)
+
     def _on_agent_log(self, connection: Any, client: Any, userdata: Any, message: MQTTMessage) -> None:
         agent_id = self._parse_agent_id(message.topic)
         if not agent_id:

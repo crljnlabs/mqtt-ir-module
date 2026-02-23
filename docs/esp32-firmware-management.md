@@ -42,8 +42,8 @@ For first install on a blank device, use the merged `factory` image.
 
 | Version | Factory download | SHA-256 | Flash usage (`ESP32-WROOM-32D`, `esp32dev`) | RAM usage (`ESP32-WROOM-32D`, `esp32dev`) |
 | --- | --- | --- | --- | --- |
-| `v0.0.2` | [Download `.factory.bin`](https://github.com/Dev-CorliJoni/mqtt-ir-module/raw/refs/heads/main/backend/firmware_template/files/esp32-ir-client-v0.0.2.factory.bin) | `ed84c15bcf166263cefa1e3c3fef6ddaf9db5ed0d61b59e73f8a901cadb5c79f` | `88.4%` (used `1158525` bytes from `1310720` bytes) | `14.8%` (used `48440` bytes from `327680` bytes) |
-| `v0.0.1` | [Download `.factory.bin`](https://github.com/Dev-CorliJoni/mqtt-ir-module/raw/refs/heads/main/backend/firmware_template/files/esp32-ir-client-v0.0.1.factory.bin) | `1d55ed7db0ba9e269be3d572fdd9cd2773341e8cb8f9577f9487cf3486ad129b` | `88.3%` (used `1157841` bytes from `1310720` bytes) | `14.8%` (used `48432` bytes from `327680` bytes) |
+| `v0.0.2` | [Download](https://github.com/Dev-CorliJoni/mqtt-ir-module/raw/refs/heads/main/backend/firmware_template/files/esp32-ir-client-v0.0.2.factory.bin) | `ed84c15bcf166263cefa1e3c3fef6ddaf9db5ed0d61b59e73f8a901cadb5c79f` | `88.4%` (used `1158525` bytes from `1310720` bytes) | `14.8%` (used `48440` bytes from `327680` bytes) |
+| `v0.0.1` | [Download](https://github.com/Dev-CorliJoni/mqtt-ir-module/raw/refs/heads/main/backend/firmware_template/files/esp32-ir-client-v0.0.1.factory.bin) | `1d55ed7db0ba9e269be3d572fdd9cd2773341e8cb8f9577f9487cf3486ad129b` | `88.3%` (used `1157841` bytes from `1310720` bytes) | `14.8%` (used `48432` bytes from `327680` bytes) |
 
 ## 2. USB driver selection and installation
 
@@ -90,6 +90,33 @@ If the browser only shows Bluetooth or debug console ports, the ESP USB serial i
 - Confirming serial communication works
 
 It does not flash firmware and does not change device state by itself.
+
+### Agent logs in Hub UI (MQTT stream)
+
+For runtime debugging after pairing, use `Agents -> <agent> -> Logs`.
+
+ESP32 agents publish runtime events to MQTT topic:
+
+- `ir/agents/<agent_id>/logs`
+
+Typical events include:
+
+- Boot/reset summary (`reset_reason`, heap snapshot)
+- MQTT connect failures/reconnect attempts
+- Pairing/authorization issues (for example commands ignored due to wrong `pairing_hub_id`)
+- Provisioning reset/reboot triggers
+
+Important:
+
+- Hard crashes can still interrupt log publishing at crash time.
+- After reboot, the next boot log includes reset reason so post-mortem debugging is still possible.
+- Runtime state (`/api/agents/<agent_id>`) also includes retained crash hints:
+  - `runtime.last_reset_reason`
+  - `runtime.last_reset_code`
+  - `runtime.last_reset_crash`
+  - `runtime.free_heap`
+
+If you need full panic backtrace details (function/line level), use serial console output from `Logs & Console` during the crash/reboot cycle.
 
 ## 4. OTA update flow (after first USB flash)
 

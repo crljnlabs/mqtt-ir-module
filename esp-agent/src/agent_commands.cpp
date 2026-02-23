@@ -1,6 +1,7 @@
 #include "agent_commands.h"
 
 #include "agent_ir.h"
+#include "agent_logs.h"
 #include "agent_ota.h"
 #include "agent_pairing.h"
 #include "agent_runtime_state.h"
@@ -353,9 +354,14 @@ void handleCommand(const String& command, JsonObjectConst payload) {
   const String requestId = String(payload["request_id"] | "");
   const String hubId = String(payload["hub_id"] | "");
   if (requestId.isEmpty() || hubId.isEmpty()) {
+    logWarn("runtime", "Ignoring command without request_id or hub_id", "command_invalid_envelope");
     return;
   }
   if (!isHubAuthorized(hubId)) {
+    logWarn(
+        "runtime",
+        String("Ignoring unauthorized command hub_id=") + hubId + " pairing_hub_id=" + gPairingHubId,
+        "hub_unauthorized");
     return;
   }
 
@@ -430,6 +436,18 @@ void handleCommand(const String& command, JsonObjectConst payload) {
       errorCode,
       errorMessage,
       statusCode);
+
+  if (commandOk) {
+    logDebug(
+        "runtime",
+        String("Command handled command=") + command + " request_id=" + requestId + " ok=true");
+  } else {
+    const String code = errorCode.length() ? errorCode : "runtime_error";
+    logWarn(
+        "runtime",
+        String("Command failed command=") + command + " request_id=" + requestId + " error=" + code,
+        code);
+  }
 
   if (commandOk && shouldReboot) {
     scheduleReboot(kRebootDelayMs);

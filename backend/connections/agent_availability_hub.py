@@ -1,20 +1,27 @@
 import logging
 import threading
 import time
-from typing import Any
+from typing import Any, Optional
 
 from jmqtt import MQTTMessage, QualityOfService as QoS
 
 from agents.agent_registry import AgentRegistry
+from .agent_log_hub import AgentLogHub
 from .runtime_loader import RuntimeLoader
 
 
 class AgentAvailabilityHub:
     STATUS_TOPIC_WILDCARD = "ir/agents/+/status"
 
-    def __init__(self, runtime_loader: RuntimeLoader, agent_registry: AgentRegistry) -> None:
+    def __init__(
+        self,
+        runtime_loader: RuntimeLoader,
+        agent_registry: AgentRegistry,
+        agent_log_hub: Optional[AgentLogHub] = None,
+    ) -> None:
         self._runtime_loader = runtime_loader
         self._agent_registry = agent_registry
+        self._agent_log_hub = agent_log_hub
         self._logger = logging.getLogger("agent_availability_hub")
         self._lock = threading.Lock()
         self._running = False
@@ -63,9 +70,24 @@ class AgentAvailabilityHub:
         seen_at = time.time()
         if status == "online":
             self._agent_registry.set_agent_online(agent_id=agent_id, last_seen=seen_at)
+            self._record_transition_log(
+                agent_id=agent_id,
+                seen_at=seen_at,
+                status=status,
+                level="info",
+                message="MQTT availability online",
+            )
             return
         if status == "offline":
             self._agent_registry.set_agent_offline(agent_id=agent_id, last_seen=seen_at)
+            self._record_transition_log(
+                agent_id=agent_id,
+                seen_at=seen_at,
+                status=status,
+                level="warn",
+                message="MQTT availability offline (LWT)",
+                error_code="agent_offline_lwt",
+            )
 
     def _parse_agent_id(self, topic: str) -> str:
         parts = str(topic or "").split("/")
@@ -80,3 +102,28 @@ class AgentAvailabilityHub:
         if text in ("online", "offline"):
             return text
         return ""
+
+    def _record_transition_log(
+        self,
+        agent_id: str,
+        seen_at: float,
+        status: str,
+        level: str,
+        message: str,
+        error_code: str = "",
+    ) -> None:
+        if self._agent_log_hub is None:
+            return
+        payload = {
+            "ts": float(seen_at),
+            "level": level,
+            "category": "transport",
+            "message": message,
+            "meta": {
+                "status": status,
+                "source": "mqtt_availability",
+            },
+        }
+        if error_code:
+            payload["error_code"] = error_code
+        self._agent_log_hub.record_system(agent_id=agent_id, event=payload)

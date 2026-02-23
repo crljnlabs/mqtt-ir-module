@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import asyncio
 import json
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -99,11 +100,15 @@ pairing_manager = PairingManagerHub(
 )
 command_client = AgentCommandClientHub(
     runtime_loader=runtime_loader,
-    on_agent_timeout=lambda agent_id: agent_registry.set_agent_offline(agent_id=agent_id),
+    on_agent_timeout=lambda agent_id: _handle_mqtt_agent_timeout(agent_id),
 )
 runtime_state_hub = AgentRuntimeStateHub(runtime_loader=runtime_loader, database=database)
 installation_state_hub = AgentInstallationStateHub(runtime_loader=runtime_loader)
-availability_hub = AgentAvailabilityHub(runtime_loader=runtime_loader, agent_registry=agent_registry)
+availability_hub = AgentAvailabilityHub(
+    runtime_loader=runtime_loader,
+    agent_registry=agent_registry,
+    agent_log_hub=agent_log_hub,
+)
 
 learning_defaults = database.settings.get_learning_defaults()
 learning = IrLearningService(
@@ -141,6 +146,27 @@ def apply_hub_agent_setting(enabled: bool) -> None:
     else:
         agent_registry.unregister_agent(local_agent.agent_id)
         agent_log_hub.clear_agent_logs(local_agent.agent_id)
+
+
+def _handle_mqtt_agent_timeout(agent_id: str) -> None:
+    normalized_agent_id = str(agent_id or "").strip()
+    if not normalized_agent_id:
+        return
+    seen_at = time.time()
+    agent_registry.set_agent_offline(agent_id=normalized_agent_id)
+    agent_log_hub.record_system(
+        agent_id=normalized_agent_id,
+        event={
+            "ts": seen_at,
+            "level": "warn",
+            "category": "transport",
+            "message": "Agent command timeout; marked offline",
+            "error_code": "agent_timeout",
+            "meta": {
+                "source": "command_client",
+            },
+        },
+    )
 
 
 def register_external_mqtt_agent(agent_data: Dict[str, Any], online: bool = True) -> None:
@@ -250,6 +276,10 @@ def _decorate_agent_payload(agent: Dict[str, Any]) -> Dict[str, Any]:
         "can_learn": can_learn,
         "ota_supported": ota_supported,
         "reboot_required": reboot_required,
+        "last_reset_reason": str(runtime_state.get("last_reset_reason") or "").strip().lower(),
+        "last_reset_code": runtime_state.get("last_reset_code"),
+        "last_reset_crash": bool(runtime_state.get("last_reset_crash")),
+        "free_heap": runtime_state.get("free_heap"),
         "ir_rx_pin": runtime_state.get("ir_rx_pin"),
         "ir_tx_pin": runtime_state.get("ir_tx_pin"),
         "power_mode": str(runtime_state.get("power_mode") or "").strip().lower(),

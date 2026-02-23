@@ -1,6 +1,7 @@
 #include "agent_runtime_state.h"
 
 #include "agent_ir.h"
+#include "agent_logs.h"
 #include "agent_state.h"
 
 #include <WiFi.h>
@@ -31,6 +32,10 @@ void publishState() {
   doc["can_learn"] = canLearn();
   doc["ota_supported"] = true;
   doc["reboot_required"] = gRebootRequired;
+  doc["last_reset_reason"] = currentResetReasonText();
+  doc["last_reset_code"] = currentResetReasonCode();
+  doc["last_reset_crash"] = currentResetIndicatesCrash();
+  doc["free_heap"] = ESP.getFreeHeap();
   doc["ir_tx_pin"] = gRuntimeConfig.irTxPin;
   doc["ir_rx_pin"] = gRuntimeConfig.irRxPin;
   doc["power_mode"] = gEcoMode ? "eco" : "active";

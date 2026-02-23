@@ -2,6 +2,7 @@
 
 #include "agent_bootstrap.h"
 #include "agent_ir.h"
+#include "agent_logs.h"
 #include "agent_mqtt.h"
 #include "agent_runtime_state.h"
 #include "agent_state.h"
@@ -13,6 +14,7 @@ void setup() {
   delay(100);
 
   agent::gAgentId = agent::buildAgentId();
+  agent::logInfo("system", String("Boot sequence started agent_id=") + agent::gAgentId);
   agent::loadPersistedState();
   agent::configureWifiAndRuntime();
   agent::initIrHardware();
@@ -21,6 +23,7 @@ void setup() {
   agent::gMqttClient.setCallback(agent::onMqttMessage);
   agent::gMqttClient.setBufferSize(agent::kMqttBufferSize);
 
+  agent::logBootSummary();
   agent::markActivity();
   agent::applyPowerMode();
 }
@@ -40,6 +43,7 @@ void loop() {
       }
     }
   } else {
+    agent::flushQueuedLogs();
     agent::gMqttClient.loop();
     if (millis() - agent::gLastStatePublishMs > agent::kStateHeartbeatMs) {
       agent::publishState();
