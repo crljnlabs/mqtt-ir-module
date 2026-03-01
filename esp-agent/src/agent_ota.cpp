@@ -117,7 +117,7 @@ OtaResult performOta(
         http.end();
         return result;
       }
-      if (millis() - lastDataAtMs > 15000UL) {
+      if (millis() - lastDataAtMs > 60000UL) {
         Update.abort();
         mbedtls_sha256_free(&shaCtx);
         result.errorCode = "ota_stream_timeout";

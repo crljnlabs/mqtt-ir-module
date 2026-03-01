@@ -400,7 +400,16 @@ void processPendingOtaRequest() {
 
   gPendingOtaRequest.running = true;
   markActivity();
+  const bool wasEcoMode = gEcoMode;
   applyPowerMode();  // Switch WiFi to active mode now — modem sleep stalls HTTP+MQTT during blocking OTA download.
+  if (wasEcoMode && !gEcoMode) {
+    // WiFi PS mode change is asynchronous — the radio needs time to fully wake up.
+    // Without this, the HTTP stream starts during the transition and drops partway through.
+    for (int i = 0; i < 10; i++) {
+      gMqttClient.loop();
+      delay(30);  // 300ms total
+    }
+  }
 
   const String requestId = gPendingOtaRequest.requestId;
   const String targetVersion = gPendingOtaRequest.targetVersion;
