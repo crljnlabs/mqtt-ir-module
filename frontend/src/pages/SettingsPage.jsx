@@ -240,23 +240,10 @@ export function SettingsPage() {
               <div className="text-xs text-[rgb(var(--muted))]">{t('settings.writeKeyRequired')}</div>
               <div className="font-semibold">{writeKeyRequiredLabel}</div>
             </div>
-          </div>
-        </CardBody>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('settings.agentTitle')}</CardTitle>
-        </CardHeader>
-        <CardBody>
-          <div className="text-sm text-[rgb(var(--muted))]">{t('settings.agentDescription')}</div>
-          <div className="mt-3 max-w-sm">
-            <TextField
-              label={t('settings.hubIsAgentLabel')}
-              hint={t('settings.hubIsAgentReadonlyHint')}
-              value={hubIsAgentReadonlyValue ? t('common.yes') : t('common.no')}
-              disabled
-            />
+            <div>
+              <div className="text-xs text-[rgb(var(--muted))]">{t('settings.hubIsAgentLabel')}</div>
+              <div className="font-semibold">{hubIsAgentReadonlyValue ? t('common.yes') : t('common.no')}</div>
+            </div>
           </div>
         </CardBody>
       </Card>
@@ -472,6 +459,10 @@ export function SettingsPage() {
           <div>
             <div className="font-semibold text-[rgb(var(--fg))]">{t('settings.helpReverseProxyTitle')}</div>
             <div>{t('settings.helpReverseProxyBody')}</div>
+          </div>
+          <div>
+            <div className="font-semibold text-[rgb(var(--fg))]">{t('settings.helpLocalAgentTitle')}</div>
+            <div>{t('settings.helpLocalAgentBody')}</div>
           </div>
         </div>
       </Modal>

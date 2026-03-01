@@ -147,7 +147,8 @@
     "openAgentPage": "Agent-Seite öffnen",
     "homeassistantEnabledLabel": "Home Assistant aktiviert",
     "homeassistantEnabledHint": "Aktiviert MQTT-Discovery-Veröffentlichung für Home Assistant (nur Hub-Modus).",
-    "hubIsAgentReadonlyHint": "Nur Lesen. Wird über LOCAL_AGENT_ENABLED in den Umgebungsvariablen gesetzt."
+    "helpLocalAgentTitle": "LOCAL_AGENT_ENABLED",
+    "helpLocalAgentBody": "Steuert, ob der Hub sich als lokalen Agenten für direkten IR-Hardware-Zugriff registriert. Standard: aktiviert."
   },
   "wizard": {
     "title": "Lern-Assistent",
