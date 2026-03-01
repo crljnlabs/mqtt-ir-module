@@ -51,8 +51,9 @@ python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 
 Store it as an environment variable and keep it stable. Changing it later prevents decrypting already stored MQTT passwords.
 
-MQTT settings for Hub are configured in UI and stored in DB:
+MQTT connection settings for Hub are configured in the UI (Settings page) and stored encrypted in the database. They are not configured via environment variables in this mode. `SETTINGS_MASTER_KEY` is required to store the MQTT password.
 
+Fields stored in DB:
 - `mqtt_host`
 - `mqtt_port`
 - `mqtt_username`
