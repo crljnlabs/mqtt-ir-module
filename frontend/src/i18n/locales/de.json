@@ -250,6 +250,10 @@
     "ur": "Urdu",
     "ja": "Japanisch"
   },
+  "update": {
+    "available": "Version {{version}} verfügbar",
+    "download": "Herunterladen"
+  },
   "icons": {
     "categories": {
       "all": "Alle",

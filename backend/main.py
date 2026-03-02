@@ -425,6 +425,11 @@ def health() -> Dict[str, Any]:
     return {"ok": True}
 
 
+@api.get("/version")
+def version() -> Dict[str, Any]:
+    return {"version": SOFTWARE_VERSION}
+
+
 @api.get("/status/electronics")
 def status_electronics() -> Dict[str, Any]:
     return {

@@ -337,6 +337,10 @@
     "ur": "Urdu",
     "ja": "Japanese"
   },
+  "update": {
+    "available": "Version {{version}} available",
+    "download": "Download"
+  },
   "icons": {
     "categories": {
       "all": "All",
