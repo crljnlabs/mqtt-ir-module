@@ -8,7 +8,7 @@ pipeline {
     }
 
     environment {
-        PROJECT_PREFIX = "mqtt-ir"        
+        PROJECT_PREFIX = "ir"        
     }
 
     parameters {
