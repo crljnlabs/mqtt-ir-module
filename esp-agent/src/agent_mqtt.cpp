@@ -2,6 +2,7 @@
 
 #include "agent_commands.h"
 #include "agent_ir.h"
+#include "agent_logs.h"
 #include "agent_pairing.h"
 #include "agent_runtime_state.h"
 #include "agent_state.h"
@@ -50,6 +51,10 @@ void onMqttMessage(char* topicChars, byte* payload, unsigned int length) {
     handlePairingUnpair(topic, payload, length);
     return;
   }
+  if (topic.startsWith("ir/pairing/reclaim/")) {
+    handlePairingReclaim(topic, payload, length);
+    return;
+  }
 
   String command;
   if (!parseCommandTopic(topic, command)) {
@@ -64,9 +69,15 @@ void onMqttMessage(char* topicChars, byte* payload, unsigned int length) {
 }
 
 bool connectMqtt() {
+  static bool warnedMissingHost = false;
   if (gRuntimeConfig.mqttHost.isEmpty()) {
+    if (!warnedMissingHost) {
+      logWarn("transport", "MQTT host is empty; skipping connection attempts", "mqtt_host_missing");
+      warnedMissingHost = true;
+    }
     return false;
   }
+  warnedMissingHost = false;
 
   gMqttClient.setServer(gRuntimeConfig.mqttHost.c_str(), gRuntimeConfig.mqttPort);
   gMqttClient.setBufferSize(kMqttBufferSize);
@@ -88,6 +99,11 @@ bool connectMqtt() {
   }
 
   if (!connected) {
+    logWarn(
+        "transport",
+        String("MQTT connect failed state=") + String(gMqttClient.state()) + " host=" + gRuntimeConfig.mqttHost
+            + ":" + String(gRuntimeConfig.mqttPort),
+        "mqtt_connect_failed");
     return false;
   }
 
@@ -98,8 +114,13 @@ bool connectMqtt() {
   gMqttClient.subscribe("ir/pairing/open");
   gMqttClient.subscribe(topicPairingAccept().c_str());
   gMqttClient.subscribe(topicPairingUnpair().c_str());
+  gMqttClient.subscribe(topicPairingReclaim().c_str());
   gMqttClient.subscribe(topicCommands().c_str());
   publishState();
+  flushQueuedLogs();
+  logInfo(
+      "transport",
+      String("MQTT connected host=") + gRuntimeConfig.mqttHost + ":" + String(gRuntimeConfig.mqttPort));
   markActivity();
   applyPowerMode();
   return true;

@@ -147,7 +147,8 @@
     "openAgentPage": "Agent-Seite öffnen",
     "homeassistantEnabledLabel": "Home Assistant aktiviert",
     "homeassistantEnabledHint": "Aktiviert MQTT-Discovery-Veröffentlichung für Home Assistant (nur Hub-Modus).",
-    "hubIsAgentReadonlyHint": "Nur Lesen. Wird über LOCAL_AGENT_ENABLED in den Umgebungsvariablen gesetzt."
+    "helpLocalAgentTitle": "LOCAL_AGENT_ENABLED",
+    "helpLocalAgentBody": "Steuert, ob der Hub sich als lokalen Agenten für direkten IR-Hardware-Zugriff registriert. Standard: aktiviert."
   },
   "wizard": {
     "title": "Lern-Assistent",
@@ -337,6 +338,13 @@
     "startPairing": "Kopplung starten",
     "stopPairing": "Kopplung stoppen",
     "updateInProgressHint": "Firmware wird installiert. Lass diese Seite offen, bis der Agent neu startet.",
-    "updateTimeoutHint": "Noch keine Bestätigung vom Agenten. Das Update kann trotzdem noch laufen."
+    "updateTimeoutHint": "Noch keine Bestätigung vom Agenten. Das Update kann trotzdem noch laufen.",
+    "updateCancelAction": "Update abbrechen",
+    "updateCancelRequested": "Abbruch-Befehl gesendet.",
+    "updateResetAction": "Update-Status zurücksetzen",
+    "updateResetDone": "Update-Status zurückgesetzt.",
+    "deleteForceWarning": "Dieser Agent installiert gerade Firmware. Beim erzwungenen Löschen wird sofort intern aufgeräumt, ohne auf eine Bestätigung des Agents zu warten.",
+    "deleteForceLabel": "Ich verstehe das und möchte diesen Agenten jetzt erzwungen löschen.",
+    "deleteForceOptionalInfo": "Erzwungenes Löschen entfernt den Agenten sofort, ohne auf dessen Bestätigung zu warten. Verwende dies, wenn der Agent nicht antwortet oder neu geflasht wurde."
   }
 }

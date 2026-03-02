@@ -26,6 +26,11 @@ const CODE_MAP = {
     titleKey: 'errors.conflictTitle',
     bodyKey: 'errors.conflictBody',
   },
+  ota_not_in_progress: {
+    kind: 'conflict',
+    titleKey: 'errors.conflictTitle',
+    bodyKey: 'errors.conflictBody',
+  },
   name_required: {
     kind: 'badRequest',
     titleKey: 'errors.badRequestTitle',

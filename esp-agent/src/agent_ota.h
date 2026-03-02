@@ -14,7 +14,12 @@ struct OtaResult {
 };
 
 using OtaProgressCallback = std::function<void(const String& status, int progressPct, const String& message)>;
+using OtaCancelCallback = std::function<bool()>;
 
-OtaResult performOta(const String& url, const String& expectedSha256, const OtaProgressCallback& onProgress);
+OtaResult performOta(
+    const String& url,
+    const String& expectedSha256,
+    const OtaProgressCallback& onProgress,
+    const OtaCancelCallback& shouldCancel);
 
 }  // namespace agent

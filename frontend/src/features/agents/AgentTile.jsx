@@ -11,6 +11,7 @@ import {
   installationBadgeLabel,
   installationBadgeVariant,
   isInstallationInProgress,
+  normalizeInstallationStatus,
 } from './installationStatus.js'
 
 function agentTypeLabel(agentType, t) {
@@ -32,7 +33,9 @@ export function AgentTile({ agent, onEdit, onDelete, onAccept, onUpdate, onReboo
   const rebootRequired = Boolean(runtime.reboot_required || ota.reboot_required)
   const installation = agent.installation || {}
   const installationInProgress = isInstallationInProgress(installation)
+  const installationStatus = normalizeInstallationStatus(installation)
   const installationLabel = installationBadgeLabel(installation)
+  const showUpdateAvailable = updateAvailable && installationStatus === 'idle'
 
   return (
     <div
@@ -60,7 +63,7 @@ export function AgentTile({ agent, onEdit, onDelete, onAccept, onUpdate, onReboo
             <Badge variant="neutral">{typeLabel}</Badge>
             {swVersion ? <Badge variant="neutral">v{swVersion}</Badge> : null}
             {installationLabel ? <Badge variant={installationBadgeVariant(installation)}>{installationLabel}</Badge> : null}
-            {updateAvailable ? <Badge variant="warning">{t('agents.updateAvailable')}</Badge> : null}
+            {showUpdateAvailable ? <Badge variant="warning">{t('agents.updateAvailable')}</Badge> : null}
             {rebootRequired ? <Badge variant="warning">{t('agents.rebootRequired')}</Badge> : null}
           </div>
         </div>
@@ -73,13 +76,13 @@ export function AgentTile({ agent, onEdit, onDelete, onAccept, onUpdate, onReboo
           </IconButton>
         ) : (
           <>
-            <IconButton label={t('common.edit')} onClick={() => onEdit(agent)} disabled={installationInProgress}>
+            <IconButton label={t('common.edit')} onClick={() => onEdit(agent)}>
               <Icon path={mdiPencilOutline} size={1} />
             </IconButton>
-            <IconButton label={t('common.delete')} onClick={() => onDelete(agent)} disabled={installationInProgress}>
+            <IconButton label={t('common.delete')} onClick={() => onDelete(agent)}>
               <Icon path={mdiTrashCanOutline} size={1} />
             </IconButton>
-            {!installationInProgress && updateAvailable ? (
+            {updateAvailable && onUpdate ? (
               <IconButton label={t('agents.updateAction')} onClick={() => onUpdate?.(agent)} disabled={installationInProgress}>
                 <Icon path={mdiUploadOutline} size={1} />
               </IconButton>

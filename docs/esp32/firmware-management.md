@@ -42,8 +42,12 @@ For first install on a blank device, use the merged `factory` image.
 
 | Version | Factory download | SHA-256 | Flash usage (`ESP32-WROOM-32D`, `esp32dev`) | RAM usage (`ESP32-WROOM-32D`, `esp32dev`) |
 | --- | --- | --- | --- | --- |
-| `v0.0.2` | [Download `.factory.bin`](https://github.com/Dev-CorliJoni/mqtt-ir-module/raw/refs/heads/main/backend/firmware_template/files/esp32-ir-client-v0.0.2.factory.bin) | `ed84c15bcf166263cefa1e3c3fef6ddaf9db5ed0d61b59e73f8a901cadb5c79f` | `88.4%` (used `1158525` bytes from `1310720` bytes) | `14.8%` (used `48440` bytes from `327680` bytes) |
-| `v0.0.1` | [Download `.factory.bin`](https://github.com/Dev-CorliJoni/mqtt-ir-module/raw/refs/heads/main/backend/firmware_template/files/esp32-ir-client-v0.0.1.factory.bin) | `1d55ed7db0ba9e269be3d572fdd9cd2773341e8cb8f9577f9487cf3486ad129b` | `88.3%` (used `1157841` bytes from `1310720` bytes) | `14.8%` (used `48432` bytes from `327680` bytes) |
+| `v0.0.6` | [Download](https://github.com/Dev-CorliJoni/mqtt-ir-module/raw/refs/heads/main/backend/firmware_template/files/esp32-ir-client-v0.0.6.factory.bin) | `b0ef9cbb60c9c508af1a2b5210cd3b0d1c6b86c03106350389c2e54b99b9fa41` | `89.5%` (used `1173213` bytes from `1310720` bytes) | `15.1%` (used `49608` bytes from `327680` bytes) |
+| `v0.0.5` | [Download](https://github.com/Dev-CorliJoni/mqtt-ir-module/raw/refs/heads/main/backend/firmware_template/files/esp32-ir-client-v0.0.5.factory.bin) | `1730fc39b75fd40e26a1920cc0c20aae318b0703e6b5d73896da5f8b5b6866e4` | `89.5%` (same binary size as v0.0.6) | `15.1%` (estimated) |
+| `v0.0.4` | [Download](https://github.com/Dev-CorliJoni/mqtt-ir-module/raw/refs/heads/main/backend/firmware_template/files/esp32-ir-client-v0.0.4.factory.bin) | `511eb511c9023f1b84e9e50e9484df4bb0a573701d24b15e96b3c24e1ad2291c` | `89.4%` (used `1171693` bytes from `1310720` bytes) | `15.1%` (used `49608` bytes from `327680` bytes) |
+| `v0.0.3` | [Download](https://github.com/Dev-CorliJoni/mqtt-ir-module/raw/refs/heads/main/backend/firmware_template/files/esp32-ir-client-v0.0.3.factory.bin) | `c6ead195e4219f0f6b7653c09929042673f0dd61dc3616c5e2b5fbe84f4958ba` | `~89.2%` (estimated from binary size) | — |
+| `v0.0.2` | [Download](https://github.com/Dev-CorliJoni/mqtt-ir-module/raw/refs/heads/main/backend/firmware_template/files/esp32-ir-client-v0.0.2.factory.bin) | `ed84c15bcf166263cefa1e3c3fef6ddaf9db5ed0d61b59e73f8a901cadb5c79f` | `88.4%` (used `1158525` bytes from `1310720` bytes) | `14.8%` (used `48440` bytes from `327680` bytes) |
+| `v0.0.1` | [Download](https://github.com/Dev-CorliJoni/mqtt-ir-module/raw/refs/heads/main/backend/firmware_template/files/esp32-ir-client-v0.0.1.factory.bin) | `1d55ed7db0ba9e269be3d572fdd9cd2773341e8cb8f9577f9487cf3486ad129b` | `88.3%` (used `1157841` bytes from `1310720` bytes) | `14.8%` (used `48432` bytes from `327680` bytes) |
 
 ## 2. USB driver selection and installation
 
@@ -91,6 +95,33 @@ If the browser only shows Bluetooth or debug console ports, the ESP USB serial i
 
 It does not flash firmware and does not change device state by itself.
 
+### Agent logs in Hub UI (MQTT stream)
+
+For runtime debugging after pairing, use `Agents -> <agent> -> Logs`.
+
+ESP32 agents publish runtime events to MQTT topic:
+
+- `ir/agents/<agent_id>/logs`
+
+Typical events include:
+
+- Boot/reset summary (`reset_reason`, heap snapshot)
+- MQTT connect failures/reconnect attempts
+- Pairing/authorization issues (for example commands ignored due to wrong `pairing_hub_id`)
+- Provisioning reset/reboot triggers
+
+Important:
+
+- Hard crashes can still interrupt log publishing at crash time.
+- After reboot, the next boot log includes reset reason so post-mortem debugging is still possible.
+- Runtime state (`/api/agents/<agent_id>`) also includes retained crash hints:
+  - `runtime.last_reset_reason`
+  - `runtime.last_reset_code`
+  - `runtime.last_reset_crash`
+  - `runtime.free_heap`
+
+If you need full panic backtrace details (function/line level), use serial console output from `Logs & Console` during the crash/reboot cycle.
+
 ## 4. OTA update flow (after first USB flash)
 
 After the first USB install, firmware updates can be done without USB:
@@ -107,7 +138,18 @@ Notes:
 - Downgrades are allowed from UI.
 - OTA is supported for ESP32 agents only.
 
-## 5. Build and publish firmware to the Hub catalog
+## 5. Default IR pins
+
+The firmware uses these GPIO pins by default:
+
+| Signal | Default GPIO |
+| --- | --- |
+| IR transmitter (TX) | GPIO 4 |
+| IR receiver (RX) | GPIO 34 |
+
+Pin configuration can be changed after pairing via the Hub UI (Agent detail → configuration). No reflash needed.
+
+## 6. Build and publish firmware to the Hub catalog
 
 Use this section when preparing a new firmware version for installation/OTA.
 
@@ -140,14 +182,19 @@ Built binary location:
 
 `esp-agent/.pio/build/esp32dev/firmware.bin`
 
-### v2 resource usage reference (`0.0.2`)
+## 7. Resource usage reference
 
-Build output baseline for firmware `0.0.2` on `ESP32-WROOM-32D` (`esp32dev`):
+See [FIRMWARE_CHANGELOG.md](FIRMWARE_CHANGELOG.md) for flash and RAM baselines per version.
 
-- RAM: `14.8%` (used `48440` bytes from `327680` bytes)
-- Flash: `88.4%` (used `1158525` bytes from `1310720` bytes)
+Quick check for current build (requires xtensa toolchain):
 
-Use this as a quick regression reference when updating dependencies or adding features.
+```bash
+~/.platformio/packages/toolchain-xtensa-esp32/bin/xtensa-esp32-elf-size -A \
+  esp-agent/.pio/build/esp32dev/firmware.elf
+```
+
+RAM = `.dram0.data` + `.dram0.bss`
+Flash = `.iram0.vectors` + `.iram0.text` + `.dram0.data` + `.flash.appdesc` + `.flash.rodata` + `.flash.text`
 
 Default runtime firmware layout in Hub container:
 
@@ -160,13 +207,13 @@ Container startup seeds firmware layout from `/opt/app/firmware_template`.
 Compute SHA-256:
 
 ```bash
-sha256sum /data/firmware/files/esp32-ir-client-v0.1.0.bin
+sha256sum /data/firmware/files/esp32-ir-client-v0.0.6.bin
 ```
 
 or
 
 ```bash
-shasum -a 256 /data/firmware/files/esp32-ir-client-v0.1.0.bin
+shasum -a 256 /data/firmware/files/esp32-ir-client-v0.0.6.bin
 ```
 
 Example catalog entry:
@@ -174,17 +221,17 @@ Example catalog entry:
 ```json
 {
   "agent_type": "esp32",
-  "version": "0.1.0",
+  "version": "0.0.6",
   "installable": true,
-  "ota_file": "esp32-ir-client-v0.1.0.bin",
-  "ota_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-  "factory_file": "esp32-ir-client-v0.1.0.factory.bin",
-  "factory_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-  "notes": "stable"
+  "ota_file": "esp32-ir-client-v0.0.6.bin",
+  "ota_sha256": "e00fc4d790de3437b168a3b7f4038adc95dfe11835df26e1d47b0e5e25f31677",
+  "factory_file": "esp32-ir-client-v0.0.6.factory.bin",
+  "factory_sha256": "b0ef9cbb60c9c508af1a2b5210cd3b0d1c6b86c03106350389c2e54b99b9fa41",
+  "notes": "generated by esp-agent/build_and_publish.sh"
 }
 ```
 
-## 6. Verify firmware catalog and Web Tools manifest
+## 8. Verify firmware catalog and Web Tools manifest
 
 Catalog API:
 

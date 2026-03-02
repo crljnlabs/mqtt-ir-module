@@ -77,6 +77,10 @@ String topicInstallationState() {
   return String("ir/agents/") + gAgentId + "/installation/state";
 }
 
+String topicLogs() {
+  return String("ir/agents/") + gAgentId + "/logs";
+}
+
 String topicPairingAccept() {
   return String("ir/pairing/accept/+/") + gAgentId;
 }
@@ -87,6 +91,10 @@ String topicPairingUnpair() {
 
 String topicPairingUnpairAck() {
   return String("ir/pairing/unpair_ack/") + gAgentId;
+}
+
+String topicPairingReclaim() {
+  return String("ir/pairing/reclaim/") + gAgentId;
 }
 
 String topicResponse(const String& hubId, const String& requestId) {

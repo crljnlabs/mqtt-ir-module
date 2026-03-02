@@ -57,7 +57,7 @@ python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 
 Store it as an environment variable and keep it stable. Changing it later prevents decrypting already stored MQTT passwords.
 
-MQTT settings for Hub are configured in UI and stored in DB (same as `ir-hub`).
+MQTT connection settings for Hub are configured in the UI (Settings page) and stored encrypted in the database — same as `ir-hub`. `SETTINGS_MASTER_KEY` is required to store the MQTT password. The internal local agent does not use MQTT; only external agents require a broker.
 
 ## Defaults in image
 

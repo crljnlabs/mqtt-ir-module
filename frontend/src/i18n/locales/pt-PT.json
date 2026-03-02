@@ -337,6 +337,13 @@
     "startPairing": "Iniciar emparelhamento",
     "stopPairing": "Parar emparelhamento",
     "updateInProgressHint": "A instalar firmware. Mantenha esta página aberta até o agente reiniciar.",
-    "updateTimeoutHint": "Ainda não foi recebida confirmação. A atualização pode ainda estar a decorrer no agente."
+    "updateTimeoutHint": "Ainda não foi recebida confirmação. A atualização pode ainda estar a decorrer no agente.",
+    "updateCancelAction": "Cancelar atualização",
+    "updateCancelRequested": "Comando de cancelamento enviado.",
+    "updateResetAction": "Repor estado da atualização",
+    "updateResetDone": "Estado da atualização reposto.",
+    "deleteForceWarning": "Este agente está a instalar firmware. A eliminação forçada remove-o de imediato sem esperar confirmação do agente.",
+    "deleteForceLabel": "Compreendo e quero forçar a eliminação deste agente agora.",
+    "deleteForceOptionalInfo": "A eliminação forçada remove este agente de imediato sem aguardar confirmação. Utilize isto se o agente não responder ou tiver sido reiniciado."
   }
 }

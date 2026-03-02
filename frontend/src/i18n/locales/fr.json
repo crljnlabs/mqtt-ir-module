@@ -337,6 +337,13 @@
     "startPairing": "Démarrer l’appairage",
     "stopPairing": "Arrêter l’appairage",
     "updateInProgressHint": "Installation du firmware en cours. Gardez cette page ouverte jusqu’au redémarrage de l’agent.",
-    "updateTimeoutHint": "Aucune confirmation reçue pour l’instant. La mise à jour est peut-être encore en cours sur l’agent."
+    "updateTimeoutHint": "Aucune confirmation reçue pour l’instant. La mise à jour est peut-être encore en cours sur l’agent.",
+    "updateCancelAction": "Annuler la mise à jour",
+    "updateCancelRequested": "Commande d’annulation envoyée.",
+    "updateResetAction": "Réinitialiser l’état de mise à jour",
+    "updateResetDone": "État de mise à jour réinitialisé.",
+    "deleteForceWarning": "Cet agent installe actuellement un firmware. La suppression forcée le retire immédiatement sans attendre la confirmation de l’agent.",
+    "deleteForceLabel": "Je comprends et je veux forcer la suppression de cet agent maintenant.",
+    "deleteForceOptionalInfo": "La suppression forcée retire cet agent immédiatement sans attendre la confirmation. Utilisez ceci si l'agent ne répond pas ou a été réinitialisé."
   }
 }

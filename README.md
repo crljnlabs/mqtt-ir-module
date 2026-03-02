@@ -1,106 +1,45 @@
 # mqtt-ir-module
 
-Local web UI and HTTP API to learn and transmit infrared (IR) remote codes using `ir-ctl` and `/dev/lirc*` devices.
+A system for learning and transmitting infrared (IR) remote codes over a local network. The **Hub** provides a browser UI and REST API. **Agents** are IR hardware nodes — either a Raspberry Pi with LIRC hardware or an ESP32 WiFi client — that receive and send IR signals on command.
 
-## What it does
-- Learn IR button presses from a receiver and store raw pulse timing.
-- Send stored codes through an IR transmitter.
-- Provide a browser UI and a REST API.
+## Choose your deployment mode
 
-## Requirements
-- Linux with IR devices at `/dev/lirc*`.
-- `ir-ctl` available (the Docker image includes `v4l-utils`).
-
-## Quick start (Docker)
-Build and run with a single IR device used for both receive and send:
-
-```bash
-docker build -t mqtt-ir-module .
-docker run --name mqtt-ir-module \
-  --restart unless-stopped \
-  --device /dev/lirc0:/dev/lirc0 \
-  -v "$PWD/data:/data" \
-  -e IR_RX_DEVICE=/dev/lirc0 \
-  -e IR_TX_DEVICE=/dev/lirc0 \
-  -p 8000:80 \
-  mqtt-ir-module
-```
-
-If RX and TX are separate devices, map both and set both env vars:
-
-```bash
-docker run --name mqtt-ir-module \
-  --restart unless-stopped \
-  --device /dev/lirc0:/dev/lirc0 \
-  --device /dev/lirc1:/dev/lirc1 \
-  -v "$PWD/data:/data" \
-  -e IR_RX_DEVICE=/dev/lirc1 \
-  -e IR_TX_DEVICE=/dev/lirc0 \
-  -p 8000:80 \
-  mqtt-ir-module
-```
-
-Open the UI:
-- `http://<host>:8000/`
-
-The API is always at `/api` (and also at `<PUBLIC_BASE_URL>/api` if you use a base path).
-If you set `PUBLIC_BASE_URL`, open the UI at that path (example: `http://<host>:8000/mqtt-ir-module/`).
-
-For a docker-compose example, see:
-[`docker-setup.md`](docker-setup.md)
-
-## Configuration
-All configuration is via environment variables:
-
-| Variable | Default | Meaning |
+| Mode | Use case | Guide |
 | --- | --- | --- |
-| `IR_RX_DEVICE` | `/dev/lirc0` | Device used for receiving IR. |
-| `IR_TX_DEVICE` | `IR_RX_DEVICE` | Device used for sending IR. |
-| `IR_DEVICE` | `/dev/lirc0` | Legacy fallback for `IR_RX_DEVICE`. |
-| `IR_WIDEBAND` | `false` | Adds `--wideband` to `ir-ctl` receive. |
-| `DATA_DIR` | `/data` | Storage directory (SQLite DB at `ir.db`). |
-| `DEBUG` | `false` | If true, stores raw capture takes. |
-| `API_KEY` | empty | If set, write endpoints require `X-API-Key`. |
-| `PUBLIC_API_KEY` | empty | Injects API key into the UI (exposes it to browsers). |
-| `PUBLIC_BASE_URL` | `/` | Base path for hosting under a sub-path. |
+| **Hub + local agent** | Hub UI + IR hardware on the same host (most common single-device setup) | [docs/deployment/agent-hub.md](docs/deployment/agent-hub.md) |
+| **Hub only** | Hub UI without local IR hardware; external agents connect via MQTT | [docs/deployment/hub.md](docs/deployment/hub.md) |
+| **Standalone agent** | No UI, MQTT-only IR agent for a Raspberry Pi | [docs/deployment/agent.md](docs/deployment/agent.md) |
 
-## Agent ID persistence
-The Hub local agent persists its agent ID at `${DATA_DIR}/agent/agent_id`.
-Keep the `/data` volume between updates to retain the same ID; removing the volume generates a new ID on next start.
+Environment variable reference for all modes: [docs/deployment/docker-setup.md](docs/deployment/docker-setup.md)
 
-If you set `API_KEY`, the UI will not be able to write unless you also set `PUBLIC_API_KEY` or inject `X-API-Key` via a reverse proxy.
+## ESP32 client
 
-## Hardware and OS setup
-You need Linux IR devices at `/dev/lirc*`. For Raspberry Pi wiring and overlays, see:
-[`raspberrypi-ir-setup.md`](raspberrypi-ir-setup.md)
+An ESP32 with an IR LED and receiver can act as a WiFi-based IR agent. It pairs with the Hub over MQTT and supports OTA firmware updates from the Hub UI. No USB cable required after initial flash.
 
-Quick check on the host:
-```bash
-ls -l /dev/lirc*
-```
+Guide: [docs/esp32/firmware-management.md](docs/esp32/firmware-management.md)
 
-## Using the UI
-1. Open the UI and check the Health card for RX/TX device paths.
-2. Create a remote.
-3. Start the learning wizard and capture a press (and optional hold).
-4. Use the remote page to send press/hold.
+## Raspberry Pi hardware setup
 
-Note: Sending is blocked while a learning session is active.
+LIRC kernel overlay wiring, device detection, and Docker device mapping:
+[docs/hardware/](docs/hardware/)
+
+## Reverse proxy
+
+Hosting under a sub-path or injecting `X-API-Key` via proxy:
+[docs/deployment/reverse-proxy.md](docs/deployment/reverse-proxy.md)
+
+## UI guide
+
+Pages, learning wizard, and agent management:
+[docs/ui/website.md](docs/ui/website.md)
 
 ## API reference
-Swagger UI is available at:
-- `/api/docs`
 
-OpenAPI schema:
-- `/api/openapi.json`
+Swagger UI: `/api/docs`
+OpenAPI schema: `/api/openapi.json`
+Full endpoint reference: [backend/API.md](backend/API.md)
 
-Full endpoint details:
-[`backend/API.md`](backend/API.md)
+## For developers
 
-## Reverse proxy (optional)
-If you host under a sub-path or need to inject `X-API-Key`, see:
-[`reverse-proxy.md`](reverse-proxy.md)
-
-## UI notes
-UI overview and learning flow:
-[`website.md`](website.md)
+Architecture, repository layout, coding rules, and implementation specs:
+[docs/DEVELOPER_README.md](docs/DEVELOPER_README.md)

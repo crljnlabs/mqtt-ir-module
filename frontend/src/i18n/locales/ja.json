@@ -337,6 +337,13 @@
     "startPairing": "ペアリング開始",
     "stopPairing": "ペアリング停止",
     "updateInProgressHint": "ファームウェアをインストール中です。エージェントが再起動するまでこのページを開いたままにしてください。",
-    "updateTimeoutHint": "まだ確認応答がありません。更新はエージェント上で継続している可能性があります。"
+    "updateTimeoutHint": "まだ確認応答がありません。更新はエージェント上で継続している可能性があります。",
+    "updateCancelAction": "更新をキャンセル",
+    "updateCancelRequested": "キャンセルコマンドを送信しました。",
+    "updateResetAction": "更新状態をリセット",
+    "updateResetDone": "更新状態をリセットしました。",
+    "deleteForceWarning": "このエージェントは現在ファームウェアをインストール中です。強制削除すると、エージェントの確認を待たずに即時に削除されます。",
+    "deleteForceLabel": "内容を理解し、このエージェントを今すぐ強制削除します。",
+    "deleteForceOptionalInfo": "強制削除はエージェントの確認を待たずに即座に削除します。エージェントが応答しない場合やリセットされた場合に使用してください。"
   }
 }

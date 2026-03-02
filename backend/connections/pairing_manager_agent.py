@@ -17,6 +17,7 @@ class PairingManagerAgent:
     PAIRING_ACCEPT_TOPIC_PREFIX = "ir/pairing/accept"
     PAIRING_UNPAIR_TOPIC_PREFIX = "ir/pairing/unpair"
     PAIRING_UNPAIR_ACK_TOPIC_PREFIX = "ir/pairing/unpair_ack"
+    PAIRING_RECLAIM_TOPIC_PREFIX = "ir/pairing/reclaim"
 
     def __init__(
         self,
@@ -55,6 +56,7 @@ class PairingManagerAgent:
         self._subscribed_open = False
         self._subscribed_accept = False
         self._subscribed_unpair = False
+        self._subscribed_reclaim = False
         self._active_session_id = ""
         self._active_nonce = ""
         self._active_expires_at = 0.0
@@ -81,6 +83,15 @@ class PairingManagerAgent:
         with self._lock:
             self._subscribed_unpair = True
 
+        reclaim_topic = self._reclaim_topic()
+        if reclaim_topic:
+            try:
+                connection.subscribe(reclaim_topic, self._on_reclaim_command, qos=QoS.AtLeastOnce)
+                with self._lock:
+                    self._subscribed_reclaim = True
+            except Exception as exc:
+                self._logger.warning(f"Failed to subscribe reclaim topic {reclaim_topic}: {exc}")
+
         if self._is_bound():
             self._log_reporter.info(category="pairing", message="Agent is already paired; pairing listeners are paused")
             return
@@ -95,9 +106,11 @@ class PairingManagerAgent:
             subscribed_open = self._subscribed_open
             subscribed_accept = self._subscribed_accept
             subscribed_unpair = self._subscribed_unpair
+            subscribed_reclaim = self._subscribed_reclaim
             self._subscribed_open = False
             self._subscribed_accept = False
             self._subscribed_unpair = False
+            self._subscribed_reclaim = False
             self._clear_open_context_locked()
 
         if connection is None:
@@ -110,6 +123,10 @@ class PairingManagerAgent:
                 connection.unsubscribe(self._accept_topic_wildcard())
             if subscribed_unpair:
                 connection.unsubscribe(self._unpair_topic_wildcard())
+            if subscribed_reclaim:
+                reclaim_topic = self._reclaim_topic()
+                if reclaim_topic:
+                    connection.unsubscribe(reclaim_topic)
             self._log_reporter.info(category="pairing", message="Pairing manager stopped")
         except Exception as exc:
             self._log_reporter.warn(
@@ -303,6 +320,42 @@ class PairingManagerAgent:
             )
             self._logger.warning(f"Failed to acknowledge unpair command: {exc}")
 
+    def _on_reclaim_command(self, connection: Any, client: Any, userdata: Any, message: MQTTMessage) -> None:
+        if self._is_bound():
+            return
+
+        expected_agent_uid = self._agent_uid()
+        agent_uid_from_topic = self._parse_reclaim_topic(message.topic)
+        if not expected_agent_uid or not agent_uid_from_topic or agent_uid_from_topic != expected_agent_uid:
+            return
+
+        payload = self._parse_payload(message)
+        if payload is None:
+            return
+
+        hub_id = str(payload.get("hub_id") or "").strip()
+        if not hub_id:
+            return
+
+        hub_topic = str(payload.get("hub_topic") or "")
+        hub_name = str(payload.get("hub_name") or "")
+        accepted_at = payload.get("reclaimed_at")
+
+        self._binding_store.set_binding(
+            hub_id=hub_id,
+            hub_topic=hub_topic,
+            hub_name=hub_name,
+            session_id="reclaim",
+            nonce="",
+            accepted_at=accepted_at,
+        )
+        self._log_reporter.info(
+            category="pairing",
+            message="Reclaim accepted",
+            meta={"hub_id": hub_id},
+        )
+        self._stop_pairing_listeners(connection)
+
     def _start_pairing_listeners(self, connection: Any) -> None:
         with self._lock:
             if self._subscribed_open and self._subscribed_accept:
@@ -342,6 +395,12 @@ class PairingManagerAgent:
         except Exception as exc:
             self._logger.warning(f"Failed to stop pairing listeners: {exc}")
 
+    def _reclaim_topic(self) -> str:
+        agent_uid = self._agent_uid()
+        if not agent_uid:
+            return ""
+        return f"{self.PAIRING_RECLAIM_TOPIC_PREFIX}/{agent_uid}"
+
     def _accept_topic_wildcard(self) -> str:
         agent_uid = self._agent_uid()
         if not agent_uid:
@@ -358,6 +417,14 @@ class PairingManagerAgent:
         if parts[0] != "ir" or parts[1] != "pairing" or parts[2] != "accept":
             return "", ""
         return parts[3].strip(), parts[4].strip()
+
+    def _parse_reclaim_topic(self, topic: str) -> str:
+        parts = str(topic or "").split("/")
+        if len(parts) != 4:
+            return ""
+        if parts[0] != "ir" or parts[1] != "pairing" or parts[2] != "reclaim":
+            return ""
+        return parts[3].strip()
 
     def _parse_unpair_topic(self, topic: str) -> str:
         parts = str(topic or "").split("/")

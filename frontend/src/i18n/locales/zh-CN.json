@@ -337,6 +337,13 @@
     "startPairing": "开始配对",
     "stopPairing": "停止配对",
     "updateInProgressHint": "正在安装固件。请保持此页面打开，直到代理重启。",
-    "updateTimeoutHint": "尚未收到确认。更新可能仍在代理上运行。"
+    "updateTimeoutHint": "尚未收到确认。更新可能仍在代理上运行。",
+    "updateCancelAction": "取消更新",
+    "updateCancelRequested": "已发送取消命令。",
+    "updateResetAction": "重置更新状态",
+    "updateResetDone": "已重置更新状态。",
+    "deleteForceWarning": "该代理当前正在安装固件。强制删除会立即移除它，而不会等待代理确认。",
+    "deleteForceLabel": "我已了解，并希望现在强制删除该代理。",
+    "deleteForceOptionalInfo": "强制删除会立即移除此代理，无需等待代理确认。若代理无响应或已被重置，请使用此选项。"
   }
 }

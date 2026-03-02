@@ -27,7 +27,11 @@ String sha256ToHex(const uint8_t* digest, size_t length) {
 
 }  // namespace
 
-OtaResult performOta(const String& url, const String& expectedSha256, const OtaProgressCallback& onProgress) {
+OtaResult performOta(
+    const String& url,
+    const String& expectedSha256,
+    const OtaProgressCallback& onProgress,
+    const OtaCancelCallback& shouldCancel) {
   OtaResult result;
   result.ok = false;
 
@@ -93,9 +97,27 @@ OtaResult performOta(const String& url, const String& expectedSha256, const OtaP
   emitProgress("downloading", totalBytes > 0 ? 0 : -1, "Downloading firmware", true);
 
   while (http.connected() && (remaining > 0 || remaining == -1)) {
+    gMqttClient.loop();
+    if (shouldCancel && shouldCancel()) {
+      Update.abort();
+      mbedtls_sha256_free(&shaCtx);
+      result.errorCode = "ota_cancelled";
+      result.message = "OTA update cancelled";
+      http.end();
+      return result;
+    }
+
     const size_t available = stream->available();
     if (available == 0) {
-      if (millis() - lastDataAtMs > 15000UL) {
+      if (shouldCancel && shouldCancel()) {
+        Update.abort();
+        mbedtls_sha256_free(&shaCtx);
+        result.errorCode = "ota_cancelled";
+        result.message = "OTA update cancelled";
+        http.end();
+        return result;
+      }
+      if (millis() - lastDataAtMs > 60000UL) {
         Update.abort();
         mbedtls_sha256_free(&shaCtx);
         result.errorCode = "ota_stream_timeout";
@@ -112,6 +134,14 @@ OtaResult performOta(const String& url, const String& expectedSha256, const OtaP
     if (bytesRead <= 0) {
       delay(1);
       continue;
+    }
+    if (shouldCancel && shouldCancel()) {
+      Update.abort();
+      mbedtls_sha256_free(&shaCtx);
+      result.errorCode = "ota_cancelled";
+      result.message = "OTA update cancelled";
+      http.end();
+      return result;
     }
 
     lastDataAtMs = millis();
@@ -141,6 +171,15 @@ OtaResult performOta(const String& url, const String& expectedSha256, const OtaP
     yield();
   }
 
+  if (shouldCancel && shouldCancel()) {
+    Update.abort();
+    mbedtls_sha256_free(&shaCtx);
+    result.errorCode = "ota_cancelled";
+    result.message = "OTA update cancelled";
+    http.end();
+    return result;
+  }
+
   emitProgress("installing", -1, "Installing firmware", true);
 
   uint8_t digest[32];
@@ -153,6 +192,14 @@ OtaResult performOta(const String& url, const String& expectedSha256, const OtaP
     Update.abort();
     result.errorCode = "ota_checksum_mismatch";
     result.message = "Firmware checksum mismatch";
+    http.end();
+    return result;
+  }
+
+  if (shouldCancel && shouldCancel()) {
+    Update.abort();
+    result.errorCode = "ota_cancelled";
+    result.message = "OTA update cancelled";
     http.end();
     return result;
   }

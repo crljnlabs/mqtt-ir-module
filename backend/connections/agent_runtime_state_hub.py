@@ -2,25 +2,35 @@ import json
 import logging
 import threading
 import time
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional, Set
 
 from jmqtt import MQTTMessage, QualityOfService as QoS
 
 from database import Database
 from .runtime_loader import RuntimeLoader
 
+if TYPE_CHECKING:
+    from .pairing_manager_hub import PairingManagerHub
+
 
 class AgentRuntimeStateHub:
     STATE_TOPIC_WILDCARD = "ir/agents/+/state"
 
-    def __init__(self, runtime_loader: RuntimeLoader, database: Database) -> None:
+    def __init__(
+        self,
+        runtime_loader: RuntimeLoader,
+        database: Database,
+        pairing_manager: "Optional[PairingManagerHub]" = None,
+    ) -> None:
         self._runtime_loader = runtime_loader
         self._database = database
+        self._pairing_manager = pairing_manager
         self._logger = logging.getLogger("agent_runtime_state_hub")
         self._lock = threading.Lock()
         self._running = False
         self._subscribed = False
         self._states: Dict[str, Dict[str, Any]] = {}
+        self._reclaim_sent: Set[str] = set()
 
     def start(self) -> None:
         connection = self._runtime_loader.mqtt_connection()
@@ -67,6 +77,7 @@ class AgentRuntimeStateHub:
             return
         with self._lock:
             self._states.pop(normalized_agent_id, None)
+            self._reclaim_sent.discard(normalized_agent_id)
 
     def _on_state(self, connection: Any, client: Any, userdata: Any, message: MQTTMessage) -> None:
         del connection
@@ -84,6 +95,7 @@ class AgentRuntimeStateHub:
         with self._lock:
             self._states[agent_id] = normalized
         self._sync_agent_capabilities(agent_id, normalized)
+        self._maybe_reclaim_agent(agent_id, normalized)
 
     def _sync_agent_capabilities(self, agent_id: str, state: Dict[str, Any]) -> None:
         agent = self._database.agents.get(agent_id)
@@ -110,6 +122,29 @@ class AgentRuntimeStateHub:
             )
         except Exception as exc:
             self._logger.warning(f"Failed to sync runtime state into agent cache for {agent_id}: {exc}")
+
+    def _maybe_reclaim_agent(self, agent_id: str, state: Dict[str, Any]) -> None:
+        if self._pairing_manager is None:
+            return
+        pairing_hub_id = str(state.get("pairing_hub_id") or "").strip()
+        if pairing_hub_id:
+            with self._lock:
+                self._reclaim_sent.discard(agent_id)
+            return
+        with self._lock:
+            if agent_id in self._reclaim_sent:
+                return
+        agent = self._database.agents.get(agent_id)
+        if not agent or bool(agent.get("pending")):
+            return
+        with self._lock:
+            self._reclaim_sent.add(agent_id)
+        try:
+            self._pairing_manager.reclaim_agent(agent_id)
+        except Exception as exc:
+            self._logger.warning(f"Failed to reclaim agent {agent_id}: {exc}")
+            with self._lock:
+                self._reclaim_sent.discard(agent_id)
 
     def _parse_agent_id(self, topic: str) -> str:
         parts = str(topic or "").split("/")
@@ -145,6 +180,10 @@ class AgentRuntimeStateHub:
         normalized["can_learn"] = self._parse_bool(payload.get("can_learn"), default=False)
         normalized["ota_supported"] = self._parse_bool(payload.get("ota_supported"), default=False)
         normalized["reboot_required"] = self._parse_bool(payload.get("reboot_required"), default=False)
+        normalized["last_reset_reason"] = str(payload.get("last_reset_reason") or "").strip().lower()
+        normalized["last_reset_code"] = self._parse_int(payload.get("last_reset_code"))
+        normalized["last_reset_crash"] = self._parse_bool(payload.get("last_reset_crash"), default=False)
+        normalized["free_heap"] = self._parse_int(payload.get("free_heap"))
         normalized["power_mode"] = str(payload.get("power_mode") or "").strip().lower()
         normalized["ir_rx_pin"] = self._parse_int(payload.get("ir_rx_pin"))
         normalized["ir_tx_pin"] = self._parse_int(payload.get("ir_tx_pin"))

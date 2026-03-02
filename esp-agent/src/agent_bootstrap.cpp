@@ -1,5 +1,6 @@
 #include "agent_bootstrap.h"
 
+#include "agent_logs.h"
 #include "agent_state.h"
 
 #include <WiFi.h>
@@ -30,6 +31,7 @@ void clearNetworkProvisioningState() {
 
   gMqttClient.disconnect();
   WiFi.disconnect(true, true);
+  logWarn("system", "Wi-Fi and MQTT provisioning reset triggered", "provisioning_reset");
 }
 
 bool shouldForceConfigPortal() {
@@ -81,6 +83,7 @@ void configureWifiAndRuntime() {
   const String apSsid = String("ESP32-IR-Setup-") + gAgentId.substring(idSuffixStart);
   const bool wifiOk = forceConfigPortal ? wm.startConfigPortal(apSsid.c_str()) : wm.autoConnect(apSsid.c_str());
   if (!wifiOk) {
+    logError("transport", "Wi-Fi setup failed or timed out; restarting", "wifi_setup_failed");
     delay(1000);
     ESP.restart();
     return;
@@ -119,6 +122,7 @@ void pollSetupButton() {
   gSetupResetTriggered = true;
   Serial.println("Setup trigger accepted in runtime (BOOT held for 5s). Resetting Wi-Fi and MQTT settings.");
   clearNetworkProvisioningState();
+  logWarn("system", "Restarting after setup-button provisioning reset", "provisioning_reset");
   delay(100);
   ESP.restart();
 }

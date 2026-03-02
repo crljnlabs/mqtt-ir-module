@@ -1,6 +1,7 @@
 #include "agent_commands.h"
 
 #include "agent_ir.h"
+#include "agent_logs.h"
 #include "agent_ota.h"
 #include "agent_pairing.h"
 #include "agent_runtime_state.h"
@@ -13,6 +14,18 @@
 namespace agent {
 
 namespace {
+
+struct PendingOtaRequest {
+  bool active = false;
+  bool running = false;
+  bool cancelRequested = false;
+  String requestId;
+  String targetVersion;
+  String url;
+  String expectedSha256;
+};
+
+PendingOtaRequest gPendingOtaRequest;
 
 void sendCommandResponse(
     const String& hubId,
@@ -291,16 +304,39 @@ void publishInstallationStatus(
   mqttPublishJson(topicInstallationState(), statusDoc, true);
 }
 
-bool executeRuntimeOta(
+void clearPendingOtaRequest() {
+  gPendingOtaRequest.active = false;
+  gPendingOtaRequest.running = false;
+  gPendingOtaRequest.cancelRequested = false;
+  gPendingOtaRequest.requestId = "";
+  gPendingOtaRequest.targetVersion = "";
+  gPendingOtaRequest.url = "";
+  gPendingOtaRequest.expectedSha256 = "";
+}
+
+bool executeRuntimeOtaStart(
     JsonObjectConst payload,
     JsonObject result,
-    bool& shouldReboot,
     String& errorCode,
     String& errorMessage,
     int& statusCode) {
+  if (gPendingOtaRequest.active) {
+    errorCode = "ota_in_progress";
+    errorMessage = "OTA update is already in progress";
+    statusCode = 409;
+    return false;
+  }
+
   const String url = String(payload["url"] | "");
   const String version = String(payload["version"] | "");
   const String expectedSha = normalizeSha256(String(payload["sha256"] | ""));
+  const String requestId = String(payload["request_id"] | "");
+  if (requestId.isEmpty()) {
+    errorCode = "validation_error";
+    errorMessage = "request_id is required";
+    statusCode = 400;
+    return false;
+  }
   if (url.isEmpty() || version.isEmpty()) {
     errorCode = "validation_error";
     errorMessage = "url and version are required";
@@ -314,37 +350,105 @@ bool executeRuntimeOta(
     return false;
   }
 
-  const String requestId = String(payload["request_id"] | "");
+  gPendingOtaRequest.active = true;
+  gPendingOtaRequest.running = false;
+  gPendingOtaRequest.cancelRequested = false;
+  gPendingOtaRequest.requestId = requestId;
+  gPendingOtaRequest.targetVersion = version;
+  gPendingOtaRequest.url = url;
+  gPendingOtaRequest.expectedSha256 = expectedSha;
+
   publishInstallationStatus(requestId, "started", 0, version, "OTA started", "");
-  markActivity();
-  OtaResult ota = performOta(
-      url,
-      expectedSha,
-      [&](const String& phase, int progressPct, const String& phaseMessage) {
-        publishInstallationStatus(requestId, phase, progressPct, version, phaseMessage, "");
-      });
-  if (!ota.ok) {
-    publishInstallationStatus(
-        requestId,
-        "failure",
-        -1,
-        version,
-        ota.message.length() ? ota.message : "OTA update failed",
-        ota.errorCode.length() ? ota.errorCode : "runtime_error");
-    errorCode = ota.errorCode.length() ? ota.errorCode : "runtime_error";
-    errorMessage = ota.message.length() ? ota.message : "OTA update failed";
+  result["accepted"] = true;
+  result["request_id"] = requestId;
+  result["target_version"] = version;
+  return true;
+}
+
+bool executeRuntimeOtaCancel(
+    JsonObject result,
+    String& errorCode,
+    String& errorMessage,
+    int& statusCode) {
+  if (!gPendingOtaRequest.active) {
+    errorCode = "ota_not_in_progress";
+    errorMessage = "No OTA update is in progress";
     statusCode = 409;
     return false;
   }
 
-  saveRebootRequired(false);
-  publishInstallationStatus(requestId, "finished", 100, version, "OTA update completed", "");
-  result["version"] = version;
-  result["expected_sha256"] = expectedSha;
-  result["actual_sha256"] = ota.actualSha256;
-  result["rebooting"] = true;
-  shouldReboot = true;
+  if (!gPendingOtaRequest.running) {
+    const String requestId = gPendingOtaRequest.requestId;
+    const String targetVersion = gPendingOtaRequest.targetVersion;
+    clearPendingOtaRequest();
+    publishInstallationStatus(requestId, "cancelled", -1, targetVersion, "OTA update cancelled", "ota_cancelled");
+    result["cancel_requested"] = true;
+    result["running"] = false;
+    return true;
+  }
+
+  gPendingOtaRequest.cancelRequested = true;
+  result["cancel_requested"] = true;
+  result["running"] = true;
   return true;
+}
+
+void processPendingOtaRequest() {
+  if (!gPendingOtaRequest.active || gPendingOtaRequest.running) {
+    return;
+  }
+
+  gPendingOtaRequest.running = true;
+  markActivity();
+  const bool wasEcoMode = gEcoMode;
+  applyPowerMode();  // Switch WiFi to active mode now — modem sleep stalls HTTP+MQTT during blocking OTA download.
+  if (wasEcoMode && !gEcoMode) {
+    // WiFi PS mode change is asynchronous — the radio needs time to fully wake up.
+    // Without this, the HTTP stream starts during the transition and drops partway through.
+    for (int i = 0; i < 10; i++) {
+      gMqttClient.loop();
+      delay(30);  // 300ms total
+    }
+  }
+
+  const String requestId = gPendingOtaRequest.requestId;
+  const String targetVersion = gPendingOtaRequest.targetVersion;
+  const String url = gPendingOtaRequest.url;
+  const String expectedSha256 = gPendingOtaRequest.expectedSha256;
+  OtaResult ota = performOta(
+      url,
+      expectedSha256,
+      [&](const String& phase, int progressPct, const String& phaseMessage) {
+        publishInstallationStatus(requestId, phase, progressPct, targetVersion, phaseMessage, "");
+      },
+      [&]() {
+        return gPendingOtaRequest.cancelRequested;
+      });
+
+  if (!ota.ok) {
+    if (ota.errorCode == "ota_cancelled") {
+      publishInstallationStatus(requestId, "cancelled", -1, targetVersion, "OTA update cancelled", "ota_cancelled");
+      logWarn("runtime", String("OTA cancelled request_id=") + requestId, "ota_cancelled");
+    } else {
+      const String code = ota.errorCode.length() ? ota.errorCode : "runtime_error";
+      const String message = ota.message.length() ? ota.message : "OTA update failed";
+      publishInstallationStatus(requestId, "failure", -1, targetVersion, message, code);
+      logWarn(
+          "runtime",
+          String("OTA failed request_id=") + requestId + " error=" + code + " message=" + message,
+          code);
+    }
+    clearPendingOtaRequest();
+    return;
+  }
+
+  saveRebootRequired(false);
+  publishInstallationStatus(requestId, "finished", 100, targetVersion, "OTA update completed", "");
+  logInfo(
+      "runtime",
+      String("OTA update completed request_id=") + requestId + " target_version=" + targetVersion);
+  clearPendingOtaRequest();
+  scheduleReboot(kRebootDelayMs);
 }
 
 }  // namespace
@@ -353,9 +457,14 @@ void handleCommand(const String& command, JsonObjectConst payload) {
   const String requestId = String(payload["request_id"] | "");
   const String hubId = String(payload["hub_id"] | "");
   if (requestId.isEmpty() || hubId.isEmpty()) {
+    logWarn("runtime", "Ignoring command without request_id or hub_id", "command_invalid_envelope");
     return;
   }
   if (!isHubAuthorized(hubId)) {
+    logWarn(
+        "runtime",
+        String("Ignoring unauthorized command hub_id=") + hubId + " pairing_hub_id=" + gPairingHubId,
+        "hub_unauthorized");
     return;
   }
 
@@ -412,7 +521,9 @@ void handleCommand(const String& command, JsonObjectConst payload) {
     shouldReboot = true;
     commandOk = true;
   } else if (command == "runtime/ota/start") {
-    commandOk = executeRuntimeOta(payload, result, shouldReboot, errorCode, errorMessage, statusCode);
+    commandOk = executeRuntimeOtaStart(payload, result, errorCode, errorMessage, statusCode);
+  } else if (command == "runtime/ota/cancel") {
+    commandOk = executeRuntimeOtaCancel(result, errorCode, errorMessage, statusCode);
   } else {
     commandOk = false;
     errorCode = "validation_error";
@@ -431,9 +542,25 @@ void handleCommand(const String& command, JsonObjectConst payload) {
       errorMessage,
       statusCode);
 
+  if (commandOk) {
+    logDebug(
+        "runtime",
+        String("Command handled command=") + command + " request_id=" + requestId + " ok=true");
+  } else {
+    const String code = errorCode.length() ? errorCode : "runtime_error";
+    logWarn(
+        "runtime",
+        String("Command failed command=") + command + " request_id=" + requestId + " error=" + code,
+        code);
+  }
+
   if (commandOk && shouldReboot) {
     scheduleReboot(kRebootDelayMs);
   }
+}
+
+void processBackgroundTasks() {
+  processPendingOtaRequest();
 }
 
 }  // namespace agent
