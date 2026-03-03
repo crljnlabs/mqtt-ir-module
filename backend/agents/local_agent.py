@@ -22,6 +22,7 @@ class LocalAgent:
             "canLearn": True,
             "formatRaw": True,
             "maxPayloadBytes": 65536,
+            "can_learn_hold_batch": True,
         }
 
     @property
@@ -149,6 +150,62 @@ class LocalAgent:
                 message=f"Learn capture failed: {exc}",
                 error_code="capture_failed",
                 meta={"mode": mode, "timeout_ms": timeout_ms},
+            )
+            raise
+
+    def learn_hold_capture(self, session: Dict[str, Any]) -> Dict[str, Any]:
+        total_timeout_ms = int(session.get("total_timeout_ms") or 0)
+        idle_timeout_ms = int(session.get("idle_timeout_ms") or 300)
+        if total_timeout_ms <= 0:
+            self._log(
+                level="warn",
+                category="learn",
+                message="Hold batch capture rejected because total_timeout_ms is invalid",
+                error_code="validation_error",
+            )
+            raise ValueError("total_timeout_ms must be > 0")
+        with self._lock:
+            learning_active = self._learning_active
+        if not learning_active:
+            self._log(
+                level="warn",
+                category="learn",
+                message="Hold batch capture rejected because session is not active",
+                error_code="learning_not_running",
+            )
+            raise RuntimeError("Learning session is not running")
+        self._log(
+            level="info",
+            category="learn",
+            message="Hold batch capture started",
+            meta={"total_timeout_ms": total_timeout_ms, "idle_timeout_ms": idle_timeout_ms},
+        )
+        try:
+            result = self._transport.learn_hold_capture(total_timeout_ms, idle_timeout_ms)
+            frame_count = len(result.get("frames") or [])
+            self._log(
+                level="info",
+                category="learn",
+                message="Hold batch capture finished",
+                meta={"total_timeout_ms": total_timeout_ms, "frame_count": frame_count},
+            )
+            return result
+        except TimeoutError as exc:
+            self._log(
+                level="warn",
+                category="learn",
+                message=f"Hold batch capture timed out: {exc}",
+                error_code="timeout",
+                meta={"total_timeout_ms": total_timeout_ms},
+            )
+            raise
+        except Exception as exc:
+            self._log(
+                level="error",
+                category="learn",
+                message=f"Hold batch capture failed: {exc}",
+                error_code="capture_failed",
+                meta={"total_timeout_ms": total_timeout_ms},
             )
             raise
 

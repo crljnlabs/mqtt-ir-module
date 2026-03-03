@@ -193,6 +193,8 @@ def register_external_mqtt_agent(agent_data: Dict[str, Any], online: bool = True
     if protocol_version:
         capabilities["protocol_version"] = protocol_version
     capabilities["ota_supported"] = bool(runtime_state.get("ota_supported"))
+    if runtime_state.get("can_learn_hold_batch"):
+        capabilities["can_learn_hold_batch"] = True
 
     transport = MqttTransport(command_client=command_client, agent_id=agent_id)
     agent = MqttAgent(

@@ -77,6 +77,7 @@ class AgentCommandHandler:
             "learn/start",
             "learn/capture",
             "learn/stop",
+            "learn/hold_capture",
             "runtime/debug/get",
             "runtime/debug/set",
             "runtime/config/get",
@@ -222,6 +223,9 @@ class AgentCommandHandler:
 
         if command == "learn/capture":
             return self._local_agent.learn_capture(payload)
+
+        if command == "learn/hold_capture":
+            return self._local_agent.learn_hold_capture(payload)
 
         if command == "learn/stop":
             session = payload.get("session")

@@ -93,6 +93,14 @@ class AgentCommandClientHub:
             timeout_seconds=timeout_seconds,
         )
 
+    def learn_hold_capture(self, agent_id: str, session: Dict[str, Any], timeout_seconds: float = 30.0) -> Dict[str, Any]:
+        return self._request(
+            agent_id=agent_id,
+            command="learn/hold_capture",
+            payload=dict(session or {}),
+            timeout_seconds=timeout_seconds,
+        )
+
     def runtime_debug_get(self, agent_id: str, timeout_seconds: float = 8.0) -> Dict[str, Any]:
         return self._request(
             agent_id=agent_id,

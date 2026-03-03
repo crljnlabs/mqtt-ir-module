@@ -73,7 +73,8 @@ pipeline {
 
                     env.IS_TAG = isTagged.toString()
                     env.TAG_DESC = desc
-                    echo "Using BUILD_TAG=${env.BUILD_TAG}, IS_TAG=${env.IS_TAG}, BRANCH=${env.BRANCH}"
+                    env.DOCKER_TAG = (env.BRANCH == 'main') ? 'main' : 'dev'
+                    echo "Using BUILD_TAG=${env.BUILD_TAG}, IS_TAG=${env.IS_TAG}, BRANCH=${env.BRANCH}, DOCKER_TAG=${env.DOCKER_TAG}"
                 }
             }
         }
@@ -98,17 +99,17 @@ pipeline {
                                 sh 'echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin'
                                 sh """
                                     IMAGE_PREFIX=\$DOCKER_USERNAME/${PROJECT_PREFIX} \\
-                                    BRANCH=${env.BRANCH} \\
+                                    BRANCH=${env.DOCKER_TAG} \\
                                     SUFFIX=${ARCH_SUFFIX} \\
                                     docker-compose -f docker-compose.yml build
                                 """
                                 sh """
                                     IMAGE_PREFIX=\$DOCKER_USERNAME/${PROJECT_PREFIX} \\
-                                    BRANCH=${env.BRANCH} \\
+                                    BRANCH=${env.DOCKER_TAG} \\
                                     SUFFIX=${ARCH_SUFFIX} \\
                                     docker-compose -f docker-compose.yml push
                                 """
-                                
+
                                 script {
                                     def images = [
                                         "\$DOCKER_USERNAME/${PROJECT_PREFIX}-hub",
@@ -117,7 +118,7 @@ pipeline {
                                     ]
 
                                     images.each { image ->
-                                        echo "Published ${image}:${env.BRANCH}-${ARCH_SUFFIX}"
+                                        echo "Published ${image}:${env.DOCKER_TAG}-${ARCH_SUFFIX}"
                                     }
                                 }
                                 sh 'docker logout'
@@ -144,7 +145,7 @@ pipeline {
                             "\$DOCKER_USERNAME/${PROJECT_PREFIX}-agent-hub",
                             "\$DOCKER_USERNAME/${PROJECT_PREFIX}-agent",
                         ]
-                        def branch = env.BRANCH
+                        def branch = env.DOCKER_TAG
                         def tag = env.BUILD_TAG
 
                         images.each { image ->

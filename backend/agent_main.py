@@ -47,6 +47,7 @@ state_store = AgentRuntimeStateStore(
         "sw_version": SOFTWARE_VERSION,
         "can_send": True,
         "can_learn": True,
+        "can_learn_hold_batch": True,
         "ota_supported": False,
         "reboot_required": False,
         "runtime_commands": [

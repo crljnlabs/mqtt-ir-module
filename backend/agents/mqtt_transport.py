@@ -33,6 +33,15 @@ class MqttTransport:
     def learn_stop(self, session: Dict[str, Any]) -> Dict[str, Any]:
         return self._command_client.learn_stop(agent_id=self._agent_id, session=session)
 
+    def learn_hold_capture(self, session: Dict[str, Any]) -> Dict[str, Any]:
+        total_timeout_ms = int(session.get("total_timeout_ms") or 0)
+        timeout_seconds = max(5.0, (total_timeout_ms / 1000.0) + 5.0)
+        return self._command_client.learn_hold_capture(
+            agent_id=self._agent_id,
+            session=session,
+            timeout_seconds=timeout_seconds,
+        )
+
     def send(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         timeout_seconds = 12.0
         try:

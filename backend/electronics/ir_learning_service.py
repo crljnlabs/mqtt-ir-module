@@ -285,6 +285,86 @@ class IrLearningService:
         button_name: Optional[str],
     ) -> Dict[str, Any]:
         agent = self._get_agent_or_raise(session)
+
+        # Use batch hold capture when the agent supports it to avoid MQTT
+        # round-trip latency inflating the hold_gap_us timing estimate.
+        if agent.capabilities.get("can_learn_hold_batch"):
+            return self._capture_hold_batch(agent, session, timeout_ms, overwrite, button_name)
+
+        return self._capture_hold_sequential(agent, session, timeout_ms, overwrite, button_name)
+
+    def _capture_hold_batch(
+        self,
+        agent: Any,
+        session: LearningSession,
+        timeout_ms: int,
+        overwrite: bool,
+        button_name: Optional[str],
+    ) -> Dict[str, Any]:
+        """Capture all hold frames in one agent-side operation.
+
+        All ir-ctl calls happen on the agent without inter-frame MQTT round-trips,
+        so the captured_at_us timestamps reflect real IR timing.
+        """
+        button = self._resolve_hold_button(session, button_name)
+        button_id = int(button["id"])
+
+        signals = self._db.signals.list_by_button(button_id)
+        if not signals:
+            raise ValueError("Press must be captured before hold can be captured")
+
+        has_hold = bool(str(signals.get("hold_initial") or "").strip())
+        if has_hold and not overwrite:
+            raise RuntimeError("Hold signal already exists (set overwrite=true to replace)")
+
+        self._log(session, "info", "Capture hold started", {"button_id": button_id, "timeout_ms": timeout_ms})
+
+        result = agent.learn_hold_capture({
+            "total_timeout_ms": timeout_ms,
+            "idle_timeout_ms": self._hold_idle_timeout_ms,
+        })
+        self._agent_registry.mark_agent_activity(session.agent_id)
+
+        frame_list = result.get("frames") or []
+
+        frames_raw: List[str] = []
+        frames: List[List[int]] = []
+        tail_gaps: List[Optional[int]] = []
+        frame_end_times: List[float] = []
+
+        for fd in frame_list:
+            raw = str(fd.get("raw") or "")
+            captured_at_us = int(fd.get("captured_at_us") or 0)
+            pulses, tail_gap_us = self._parser.parse_and_normalize(raw)
+            frames_raw.append(raw)
+            frames.append(pulses)
+            tail_gaps.append(tail_gap_us)
+            # Convert µs → s for the gap candidate formula (same unit as perf_counter)
+            frame_end_times.append(captured_at_us / 1_000_000.0)
+
+        return self._finish_hold_capture(
+            session=session,
+            button=button,
+            button_id=button_id,
+            frames_raw=frames_raw,
+            frames=frames,
+            tail_gaps=tail_gaps,
+            frame_end_times=frame_end_times,
+        )
+
+    def _capture_hold_sequential(
+        self,
+        agent: Any,
+        session: LearningSession,
+        timeout_ms: int,
+        overwrite: bool,
+        button_name: Optional[str],
+    ) -> Dict[str, Any]:
+        """Capture hold frames one at a time via repeated learn_capture calls.
+
+        Used as fallback for agents that do not support can_learn_hold_batch
+        (e.g., ESP32 firmware agents).
+        """
         button = self._resolve_hold_button(session, button_name)
         button_id = int(button["id"])
 
@@ -343,6 +423,26 @@ class IrLearningService:
             tail_gaps.append(tail_gap_us)
             frame_end_times.append(received_end_time)
 
+        return self._finish_hold_capture(
+            session=session,
+            button=button,
+            button_id=button_id,
+            frames_raw=frames_raw,
+            frames=frames,
+            tail_gaps=tail_gaps,
+            frame_end_times=frame_end_times,
+        )
+
+    def _finish_hold_capture(
+        self,
+        session: LearningSession,
+        button: Dict[str, Any],
+        button_id: int,
+        frames_raw: List[str],
+        frames: List[List[int]],
+        tail_gaps: List[Optional[int]],
+        frame_end_times: List[float],
+    ) -> Dict[str, Any]:
         if len(frames) < 2:
             raise ValueError("Hold capture needs at least 2 frames. Hold the button longer or increase timeout_ms.")
 

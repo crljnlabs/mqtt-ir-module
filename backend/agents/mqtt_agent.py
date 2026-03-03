@@ -38,6 +38,9 @@ class MqttAgent:
     def learn_capture(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         return self._transport.learn_capture(payload)
 
+    def learn_hold_capture(self, session: Dict[str, Any]) -> Dict[str, Any]:
+        return self._transport.learn_hold_capture(session)
+
     def get_status(self) -> Dict[str, Any]:
         return {
             "agent_id": self._agent_id,
