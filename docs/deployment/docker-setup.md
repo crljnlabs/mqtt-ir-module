@@ -2,6 +2,29 @@
 
 Complete reference for all environment variables supported by the backend. Applies to all three Docker images (`ir-agent-hub`, `ir-hub`, `ir-agent`). Not every variable is relevant for every mode — see the mode-specific guides for what is required.
 
+## Pre-built Docker Hub images
+
+Three images are published to Docker Hub under `devcorlijoni/`:
+
+| Image | Purpose |
+| --- | --- |
+| `devcorlijoni/ir-agent-hub` | Hub + integrated local IR agent (requires IR hardware on host) |
+| `devcorlijoni/ir-hub` | Hub only — no local IR hardware required |
+| `devcorlijoni/ir-agent` | Standalone MQTT agent — no Hub UI, no HTTP API |
+
+### Available tags
+
+| Tag | When published |
+| --- | --- |
+| `latest` | On every version-tagged commit (points to the latest release) |
+| `v1.0.0` *(example)* | On every version-tagged commit |
+| `main` | On every build from the `main` branch |
+| `dev` | On every build from any non-`main` branch |
+| `main-amd64` / `main-arm64` | Per-architecture variants of the `main` build |
+| `dev-amd64` / `dev-arm64` | Per-architecture variants of the `dev` build |
+
+Multi-arch manifests (`main`, `dev`, `latest`, version tags) cover both `linux/amd64` and `linux/arm64`. Docker pulls the correct variant automatically.
+
 ## IR device
 
 | Variable | Default | Description |
@@ -64,7 +87,7 @@ The Hub's integrated local agent persists its agent ID at `${DATA_DIR}/agent/age
 ```yaml
 services:
   mqtt-ir-module:
-    image: your-registry/mqtt-ir-agent-hub:latest
+    image: devcorlijoni/ir-agent-hub:latest
     container_name: mqtt-ir-module
     restart: unless-stopped
 

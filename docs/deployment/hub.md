@@ -15,7 +15,7 @@ docker run --rm -p 8080:80 \
   -e DATA_DIR=/data \
   -e SETTINGS_MASTER_KEY=change-me \
   -v ir_hub_data:/data \
-  mqtt-ir-hub:latest
+  devcorlijoni/ir-hub:latest
 ```
 
 ## Environment reference
