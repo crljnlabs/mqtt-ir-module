@@ -251,7 +251,12 @@ export function AgentsPage() {
       </Card>
 
       <section className="space-y-2">
-        {agents.length === 0 ? (
+        {agentsQuery.isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-[rgb(var(--muted))]">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-[rgb(var(--muted))] border-t-transparent" />
+            {t('common.loading')}
+          </div>
+        ) : agents.length === 0 ? (
           <div className="text-sm text-[rgb(var(--muted))]">{t('agents.noAgentsRegistered')}</div>
         ) : (
           <div className="space-y-2">

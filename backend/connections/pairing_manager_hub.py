@@ -54,8 +54,8 @@ class PairingManagerHub:
                 return
             self._running = True
 
-        connection.subscribe(self.PAIRING_OFFER_WILDCARD_TOPIC, self._on_offer, qos=QoS.AtLeastOnce)
-        connection.subscribe(self.PAIRING_UNPAIR_ACK_WILDCARD_TOPIC, self._on_unpair_ack, qos=QoS.AtLeastOnce)
+        connection.add_on_connect(self._on_mqtt_connect)
+        self._subscribe(connection)
         with self._lock:
             self._subscribed_offers = True
             self._subscribed_unpair_acks = True
@@ -86,6 +86,19 @@ class PairingManagerHub:
                     connection.unsubscribe(self.PAIRING_UNPAIR_ACK_WILDCARD_TOPIC)
             except Exception as exc:
                 self._logger.warning(f"Failed to unsubscribe hub pairing topics: {exc}")
+
+    def _on_mqtt_connect(self, connection: Any, _client: Any, _userdata: Any, _flags: Any) -> None:
+        with self._lock:
+            if not self._running:
+                return
+        self._subscribe(connection)
+
+    def _subscribe(self, connection: Any) -> None:
+        try:
+            connection.subscribe(self.PAIRING_OFFER_WILDCARD_TOPIC, self._on_offer, qos=QoS.AtLeastOnce)
+            connection.subscribe(self.PAIRING_UNPAIR_ACK_WILDCARD_TOPIC, self._on_unpair_ack, qos=QoS.AtLeastOnce)
+        except Exception as exc:
+            self._logger.warning(f"Failed to subscribe hub pairing topics: {exc}")
 
     def open_pairing(self, duration_seconds: int = DEFAULT_WINDOW_SECONDS) -> Dict[str, Any]:
         connection = self._runtime_loader.mqtt_connection()

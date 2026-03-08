@@ -79,6 +79,7 @@ class PairingManagerAgent:
                 return
             self._running = True
 
+        connection.add_on_connect(self._on_mqtt_connect)
         connection.subscribe(self._unpair_topic_wildcard(), self._on_unpair_command, qos=QoS.AtLeastOnce)
         with self._lock:
             self._subscribed_unpair = True
@@ -98,6 +99,33 @@ class PairingManagerAgent:
 
         self._start_pairing_listeners(connection)
         self._log_reporter.info(category="pairing", message="Pairing listeners started")
+
+    def _on_mqtt_connect(self, connection: Any, _client: Any, _userdata: Any, _flags: Any) -> None:
+        with self._lock:
+            if not self._running:
+                return
+        # Always re-subscribe to unpair (needed regardless of pairing state).
+        try:
+            connection.subscribe(self._unpair_topic_wildcard(), self._on_unpair_command, qos=QoS.AtLeastOnce)
+        except Exception as exc:
+            self._logger.warning(f"Failed to resubscribe unpair topic: {exc}")
+        # Always re-subscribe to reclaim (needed to recover lost pairing binding).
+        reclaim_topic = self._reclaim_topic()
+        if reclaim_topic:
+            try:
+                connection.subscribe(reclaim_topic, self._on_reclaim_command, qos=QoS.AtLeastOnce)
+            except Exception as exc:
+                self._logger.warning(f"Failed to resubscribe reclaim topic {reclaim_topic}: {exc}")
+        # Re-subscribe to pairing open/accept only when not yet paired.
+        if not self._is_bound():
+            try:
+                connection.subscribe(self.PAIRING_OPEN_TOPIC, self._on_pairing_open, qos=QoS.AtLeastOnce)
+                connection.subscribe(self._accept_topic_wildcard(), self._on_pairing_accept, qos=QoS.AtLeastOnce)
+                with self._lock:
+                    self._subscribed_open = True
+                    self._subscribed_accept = True
+            except Exception as exc:
+                self._logger.warning(f"Failed to resubscribe pairing open/accept topics: {exc}")
 
     def stop(self) -> None:
         connection = self._runtime_loader.mqtt_connection()

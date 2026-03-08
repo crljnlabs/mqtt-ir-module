@@ -32,14 +32,23 @@ class AgentInstallationStateHub:
         with self._lock:
             if self._running and self._subscribed:
                 return
+        connection.add_on_connect(self._on_mqtt_connect)
+        self._subscribe(connection)
+        with self._lock:
+            self._running = True
+            self._subscribed = True
+
+    def _on_mqtt_connect(self, connection: Any, _client: Any, _userdata: Any, _flags: Any) -> None:
+        with self._lock:
+            if not self._running:
+                return
+        self._subscribe(connection)
+
+    def _subscribe(self, connection: Any) -> None:
         try:
             connection.subscribe(self.STATE_TOPIC_WILDCARD, self._on_state, qos=QoS.AtLeastOnce)
         except Exception as exc:
             self._logger.warning(f"Failed to subscribe installation state topic {self.STATE_TOPIC_WILDCARD}: {exc}")
-            return
-        with self._lock:
-            self._running = True
-            self._subscribed = True
 
     def stop(self) -> None:
         connection = self._runtime_loader.mqtt_connection()

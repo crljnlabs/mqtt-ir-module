@@ -47,10 +47,23 @@ class AgentCommandHandler:
             return
 
         topic = f"{self.COMMAND_TOPIC_PREFIX}/{agent_uid}/cmd/#"
+        connection.add_on_connect(self._on_mqtt_connect)
         connection.subscribe(topic, self._on_command, qos=QoS.AtLeastOnce)
         with self._lock:
             self._running = True
             self._subscribed_topic = topic
+
+    def _on_mqtt_connect(self, connection: Any, _client: Any, _userdata: Any, _flags: Any) -> None:
+        with self._lock:
+            if not self._running:
+                return
+            topic = self._subscribed_topic
+        if not topic:
+            return
+        try:
+            connection.subscribe(topic, self._on_command, qos=QoS.AtLeastOnce)
+        except Exception as exc:
+            self._logger.warning(f"Failed to resubscribe command topic {topic}: {exc}")
 
     def stop(self) -> None:
         connection = self._runtime_loader.mqtt_connection()
