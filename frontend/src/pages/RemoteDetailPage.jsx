@@ -310,6 +310,9 @@ export function RemoteDetailPage() {
         </CardHeader>
         <CardBody>
           <div className="text-xs text-[rgb(var(--muted))]">#{remote.id}</div>
+          {learnDisabledReason ? (
+            <div className="mt-2 text-sm text-[rgb(var(--muted))]">{learnDisabledReason}</div>
+          ) : null}
         </CardBody>
       </Card>
 
@@ -333,11 +336,6 @@ export function RemoteDetailPage() {
           {learningBlocked ? (
             <div className="mb-3 text-sm text-[rgb(var(--muted))]">
               {t('wizard.learningActiveElsewhere', { remote: learningRemoteLabel })}
-            </div>
-          ) : null}
-          {learnDisabledReason ? (
-            <div className="mb-3 text-sm text-[rgb(var(--muted))]">
-              {learnDisabledReason}
             </div>
           ) : null}
           {/* Mobile-first grid: keep one column until the small breakpoint. */}
