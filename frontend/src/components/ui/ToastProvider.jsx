@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 
 const ToastContext = createContext(null)
 const AUTO_DISMISS_MS = 3500
@@ -87,10 +87,17 @@ export function ToastProvider({ children }) {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className="w-[320px] rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--card))] shadow-[var(--shadow)] p-3"
+            className="relative w-[320px] rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--card))] shadow-[var(--shadow)] p-3 pr-9"
             onMouseEnter={() => pauseTimer(t.id)}
             onMouseLeave={() => resumeTimer(t.id)}
           >
+            <button
+              onClick={() => removeToast(t.id)}
+              className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center bg-[rgb(var(--muted))/20] hover:bg-[rgb(var(--muted))/40] text-[rgb(var(--muted))] transition-colors"
+              aria-label="Dismiss"
+            >
+              ✕
+            </button>
             {t.title ? <div className="font-semibold text-sm">{t.title}</div> : null}
             <div className="text-xs text-[rgb(var(--muted))]">{t.message}</div>
           </div>
