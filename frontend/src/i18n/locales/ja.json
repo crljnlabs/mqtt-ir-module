@@ -63,9 +63,9 @@
     "learningChoiceResetHint": "すべてのボタンを削除して最初から始めます。",
     "iconTitle": "リモコンアイコン",
     "carrierHzLabel": "キャリア周波数 (Hz)",
-    "carrierHzHint": "空の場合は自動。",
+    "carrierHzHint": "リモコンがIR信号を送信する周波数です。ほぼすべてのデバイスは38000 Hzを使用します。デバイスが異なる周波数を必要とすることがわかっている場合のみ変更してください。",
     "dutyCycleLabel": "デューティ比 (%)",
-    "dutyCycleHint": "空の場合は自動。",
+    "dutyCycleHint": "各パルスでIR LEDが点灯している時間の割合です。標準は33です。特定のデバイスが必要とする場合のみ変更してください。",
     "gapUsLabel": "デフォルト間隔 (us)",
     "gapUsHint": "空の場合は自動（学習中に推定される場合があります）。"
   },

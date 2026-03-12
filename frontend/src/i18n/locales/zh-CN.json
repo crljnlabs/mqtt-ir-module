@@ -63,9 +63,9 @@
     "learningChoiceResetHint": "删除现有按钮并从头开始。",
     "iconTitle": "遥控器图标",
     "carrierHzLabel": "载波频率 (Hz)",
-    "carrierHzHint": "留空为自动。",
+    "carrierHzHint": "遥控器发送红外信号的频率。几乎所有设备使用 38000 Hz。仅在确认设备需要不同频率时更改。",
     "dutyCycleLabel": "占空比 (%)",
-    "dutyCycleHint": "留空为自动。",
+    "dutyCycleHint": "每个脉冲中红外 LED 保持开启的时间百分比。标准值为 33。仅在特定设备需要时更改。",
     "gapUsLabel": "默认间隔 (us)",
     "gapUsHint": "留空为自动（可在学习时推断）。"
   },

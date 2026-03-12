@@ -63,9 +63,9 @@
     "learningChoiceResetHint": "Eliminar botones existentes y empezar desde cero.",
     "iconTitle": "Icono del mando",
     "carrierHzLabel": "Frecuencia portadora (Hz)",
-    "carrierHzHint": "Auto si está vacío.",
+    "carrierHzHint": "La frecuencia a la que el mando envía señales IR. Casi todos los dispositivos usan 38000 Hz. Cámbialo solo si sabes que tu dispositivo requiere otra frecuencia.",
     "dutyCycleLabel": "Ciclo de trabajo (%)",
-    "dutyCycleHint": "Auto si está vacío.",
+    "dutyCycleHint": "Cuánto tiempo permanece encendido el LED IR en cada pulso, en porcentaje. El estándar es 33. Cámbialo solo si un dispositivo específico lo requiere.",
     "gapUsLabel": "Intervalo predeterminado (us)",
     "gapUsHint": "Auto si está vacío (se puede inferir al aprender)."
   },

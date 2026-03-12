@@ -63,9 +63,9 @@
     "learningChoiceResetHint": "Supprimer les boutons existants et recommencer.",
     "iconTitle": "Icône de la télécommande",
     "carrierHzLabel": "Fréquence porteuse (Hz)",
-    "carrierHzHint": "Auto si vide.",
+    "carrierHzHint": "La fréquence à laquelle la télécommande envoie les signaux IR. Presque tous les appareils utilisent 38000 Hz. Ne modifiez ceci que si vous savez que votre appareil nécessite une autre fréquence.",
     "dutyCycleLabel": "Rapport cyclique (%)",
-    "dutyCycleHint": "Auto si vide.",
+    "dutyCycleHint": "La durée pendant laquelle la LED IR reste allumée à chaque impulsion, en pourcentage. La valeur standard est 33. Ne modifiez ceci que si un appareil spécifique l'exige.",
     "gapUsLabel": "Intervalle par défaut (us)",
     "gapUsHint": "Auto si vide (peut être déduit pendant l'apprentissage)."
   },

@@ -63,9 +63,9 @@
     "learningChoiceResetHint": "Remove existing buttons and start from scratch.",
     "iconTitle": "Remote icon",
     "carrierHzLabel": "Carrier frequency (Hz)",
-    "carrierHzHint": "Auto when empty.",
+    "carrierHzHint": "The frequency at which your remote sends IR signals. Nearly all devices use 38000 Hz. Only change this if you know your device requires a different frequency.",
     "dutyCycleLabel": "Duty cycle (%)",
-    "dutyCycleHint": "Auto when empty.",
+    "dutyCycleHint": "How long the IR LED stays on during each pulse, as a percentage. The standard is 33. Only change this if a specific device requires it.",
     "gapUsLabel": "Default gap (us)",
     "gapUsHint": "Auto when empty (can be inferred during learning)."
   },

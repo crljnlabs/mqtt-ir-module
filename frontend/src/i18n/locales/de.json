@@ -63,9 +63,9 @@
     "learningChoiceResetHint": "Alle bestehenden Tasten löschen und neu starten.",
     "iconTitle": "Fernbedienungs-Symbol",
     "carrierHzLabel": "Trägerfrequenz (Hz)",
-    "carrierHzHint": "Automatisch, wenn leer.",
+    "carrierHzHint": "Die Frequenz, mit der deine Fernbedienung IR-Signale sendet. Fast alle Geräte nutzen 38000 Hz. Ändere dies nur, wenn du weißt, dass dein Gerät eine andere Frequenz benötigt.",
     "dutyCycleLabel": "Tastverhältnis (%)",
-    "dutyCycleHint": "Automatisch, wenn leer.",
+    "dutyCycleHint": "Wie lange die IR-LED während jedes Pulses eingeschaltet ist, als Prozentwert. Standard sind 33. Ändere dies nur, wenn ein bestimmtes Gerät einen anderen Wert erfordert.",
     "gapUsLabel": "Standard-Abstand (us)",
     "gapUsHint": "Automatisch, wenn leer (kann beim Anlernen ermittelt werden)."
   },

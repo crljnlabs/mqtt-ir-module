@@ -63,9 +63,9 @@
     "learningChoiceResetHint": "Hapus semua tombol dan mulai dari awal.",
     "iconTitle": "Ikon remote",
     "carrierHzLabel": "Frekuensi carrier (Hz)",
-    "carrierHzHint": "Otomatis jika kosong.",
+    "carrierHzHint": "Frekuensi yang digunakan remote untuk mengirim sinyal IR. Hampir semua perangkat menggunakan 38000 Hz. Ubah hanya jika Anda tahu perangkat Anda memerlukan frekuensi berbeda.",
     "dutyCycleLabel": "Siklus tugas (%)",
-    "dutyCycleHint": "Otomatis jika kosong.",
+    "dutyCycleHint": "Berapa lama LED IR menyala pada setiap pulsa, dalam persen. Standarnya adalah 33. Ubah hanya jika perangkat tertentu memerlukannya.",
     "gapUsLabel": "Jarak default (us)",
     "gapUsHint": "Otomatis jika kosong (bisa terdeteksi saat belajar)."
   },

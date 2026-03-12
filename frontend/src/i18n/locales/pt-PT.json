@@ -63,9 +63,9 @@
     "learningChoiceResetHint": "Remover botões existentes e começar do zero.",
     "iconTitle": "Ícone do comando",
     "carrierHzLabel": "Frequência portadora (Hz)",
-    "carrierHzHint": "Auto se vazio.",
+    "carrierHzHint": "A frequência com que o comando envia sinais IR. Quase todos os dispositivos usam 38000 Hz. Altere apenas se souber que o seu dispositivo requer uma frequência diferente.",
     "dutyCycleLabel": "Ciclo de trabalho (%)",
-    "dutyCycleHint": "Auto se vazio.",
+    "dutyCycleHint": "O tempo em que o LED IR fica ligado em cada pulso, em percentagem. O padrão é 33. Altere apenas se um dispositivo específico exigir.",
     "gapUsLabel": "Intervalo predefinido (us)",
     "gapUsHint": "Auto se vazio (pode ser inferido durante a aprendizagem)."
   },

@@ -9,7 +9,6 @@ import { TextField } from '../../components/ui/TextField.jsx'
 import { NumberField } from '../../components/ui/NumberField.jsx'
 import { Collapse } from '../../components/ui/Collapse.jsx'
 import { SelectField } from '../../components/ui/SelectField.jsx'
-import { Button } from '../../components/ui/Button.jsx'
 import { IconButton } from '../../components/ui/IconButton.jsx'
 import { IconPicker } from '../../components/pickers/IconPicker.jsx'
 import { listAgents } from '../../api/agentsApi.js'
@@ -71,11 +70,16 @@ export function RemoteEditorDrawer({ open, remote, onClose }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['remotes'] })
       queryClient.invalidateQueries({ queryKey: ['buttons', remote.id] })
-      toast.show({ title: t('common.save'), message: t('common.saved') })
       onClose()
     },
     onError: (e) => toast.show({ title: t('remote.title'), message: errorMapper.getMessage(e, 'common.failed') }),
   })
+
+  function handleClose() {
+    if (mutation.isPending) return
+    if (!name.trim()) { onClose(); return }
+    mutation.mutate()
+  }
 
   if (!remote) return null
 
@@ -94,17 +98,7 @@ export function RemoteEditorDrawer({ open, remote, onClose }) {
       <Drawer
         open={open}
         title={`${t('common.edit')}: ${remote.name}`}
-        onClose={onClose}
-        footer={
-          <div className="flex gap-2 justify-end">
-            <Button variant="secondary" onClick={onClose}>
-              {t('common.cancel')}
-            </Button>
-            <Button onClick={() => mutation.mutate()} disabled={mutation.isPending || !name.trim()}>
-              {t('common.save')}
-            </Button>
-          </div>
-        }
+        onClose={handleClose}
       >
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
