@@ -101,6 +101,7 @@ export function RemotesPage() {
         open={createOpen}
         title={t('remotes.create')}
         onClose={handleCreateClose}
+        onConfirm={() => { if (newName.trim() && !createMutation.isPending) createMutation.mutate() }}
         footer={
           <div className="flex gap-2 justify-end">
             <Button variant="secondary" onClick={handleCreateClose}>

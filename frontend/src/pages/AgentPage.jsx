@@ -536,6 +536,7 @@ export function AgentPage() {
         open={createRemoteOpen}
         title={t('remotes.create')}
         onClose={handleCreateRemoteClose}
+        onConfirm={() => { if (newRemoteName.trim() && !createRemoteMutation.isPending) createRemoteMutation.mutate() }}
         footer={
           <div className="flex gap-2 justify-end">
             <Button variant="secondary" onClick={handleCreateRemoteClose}>

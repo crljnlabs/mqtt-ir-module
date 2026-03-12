@@ -422,6 +422,7 @@ export function RemoteDetailPage() {
         open={Boolean(renameTarget)}
         title={t('button.rename')}
         onClose={resetRenameState}
+        onConfirm={() => { if (renameValue.trim() && !updateButtonMutation.isPending) updateButtonMutation.mutate({ buttonId: renameTarget.id, name: renameValue.trim(), icon: renameTarget.icon }) }}
         footer={
           <div className="flex gap-2 justify-end">
             <Button variant="secondary" onClick={resetRenameState}>
