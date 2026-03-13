@@ -49,7 +49,7 @@
     "create": "Créer une télécommande",
     "name": "Nom de la télécommande",
     "deleteConfirmTitle": "Supprimer la télécommande ?",
-    "deleteConfirmBody": "Cela supprimera la télécommande et tous les boutons/signaux."
+    "deleteConfirmBody": "Cela supprimera la télécommande et tous les boutons."
   },
   "remote": {
     "title": "Télécommande",
@@ -85,7 +85,12 @@
     "deleteConfirmBody": "Cela supprimera le bouton et ses signaux.",
     "holdDialogTitle": "Durée de l'appui long",
     "holdMs": "Durée (ms)",
-    "holdRangeHint": "{{min}}-{{max}}"
+    "holdRangeHint": "{{min}}-{{max}}",
+    "deleteAllConfirmTitle": "Delete all buttons?",
+    "deleteAllConfirmBody": "This will delete all buttons and their signals.",
+    "addButtons": "Add buttons",
+    "deleteAll": "Delete all buttons",
+    "nameLabel": "Button name"
   },
   "settings": {
     "theme": "Thème",
@@ -219,9 +224,9 @@
     "learningActiveBody": "L'apprentissage est déjà actif. Arrêtez la session en cours et réessayez.",
     "signalExistsBody": "Ce signal existe déjà. Choisissez de réapprendre ou d'écraser pour le remplacer.",
     "sendWhileLearningBody": "Arrêtez l'apprentissage avant d'envoyer un signal.",
-
     "agentOfflineTitle": "Agent assigné hors ligne",
-    "agentOfflineBody": "L'agent sélectionné est hors ligne ou indisponible. Choisissez un autre agent ou mettez-le en ligne.",    "badRequestTitle": "Requête invalide",
+    "agentOfflineBody": "L'agent sélectionné est hors ligne ou indisponible. Choisissez un autre agent ou mettez-le en ligne.",
+    "badRequestTitle": "Requête invalide",
     "badRequestBody": "Vérifiez vos saisies et réessayez.",
     "nameRequiredBody": "Saisissez un nom pour continuer.",
     "settingsMissingBody": "Modifiez au moins un paramètre avant d'enregistrer.",
@@ -346,6 +351,7 @@
     "updateResetDone": "État de mise à jour réinitialisé.",
     "deleteForceWarning": "Cet agent installe actuellement un firmware. La suppression forcée le retire immédiatement sans attendre la confirmation de l’agent.",
     "deleteForceLabel": "Je comprends et je veux forcer la suppression de cet agent maintenant.",
-    "deleteForceOptionalInfo": "La suppression forcée retire cet agent immédiatement sans attendre la confirmation. Utilisez ceci si l'agent ne répond pas ou a été réinitialisé."
+    "deleteForceOptionalInfo": "La suppression forcée retire cet agent immédiatement sans attendre la confirmation. Utilisez ceci si l'agent ne répond pas ou a été réinitialisé.",
+    "nameLabel": "Agent name"
   }
 }

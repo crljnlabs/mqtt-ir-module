@@ -49,7 +49,7 @@
     "create": "创建遥控器",
     "name": "遥控器名称",
     "deleteConfirmTitle": "删除遥控器？",
-    "deleteConfirmBody": "将删除遥控器及其所有按钮/信号。"
+    "deleteConfirmBody": "将删除遥控器及其所有按钮。"
   },
   "remote": {
     "title": "遥控器",
@@ -85,7 +85,12 @@
     "deleteConfirmBody": "将删除按钮及其信号。",
     "holdDialogTitle": "长按时长",
     "holdMs": "时长 (ms)",
-    "holdRangeHint": "{{min}}-{{max}}"
+    "holdRangeHint": "{{min}}-{{max}}",
+    "deleteAllConfirmTitle": "Delete all buttons?",
+    "deleteAllConfirmBody": "This will delete all buttons and their signals.",
+    "addButtons": "Add buttons",
+    "deleteAll": "Delete all buttons",
+    "nameLabel": "Button name"
   },
   "settings": {
     "theme": "主题",
@@ -219,9 +224,9 @@
     "learningActiveBody": "学习已在进行中。请先停止当前会话再试。",
     "signalExistsBody": "该信号已存在。选择重新学习或覆盖以替换。",
     "sendWhileLearningBody": "发送信号前请先停止学习。",
-
     "agentOfflineTitle": "已分配的代理离线",
-    "agentOfflineBody": "所选代理已离线或不可用。请选择其他代理或将其上线。",    "badRequestTitle": "请求无效",
+    "agentOfflineBody": "所选代理已离线或不可用。请选择其他代理或将其上线。",
+    "badRequestTitle": "请求无效",
     "badRequestBody": "请检查输入后重试。",
     "nameRequiredBody": "请输入名称以继续。",
     "settingsMissingBody": "保存前请至少修改一项设置。",
@@ -346,6 +351,7 @@
     "updateResetDone": "已重置更新状态。",
     "deleteForceWarning": "该代理当前正在安装固件。强制删除会立即移除它，而不会等待代理确认。",
     "deleteForceLabel": "我已了解，并希望现在强制删除该代理。",
-    "deleteForceOptionalInfo": "强制删除会立即移除此代理，无需等待代理确认。若代理无响应或已被重置，请使用此选项。"
+    "deleteForceOptionalInfo": "强制删除会立即移除此代理，无需等待代理确认。若代理无响应或已被重置，请使用此选项。",
+    "nameLabel": "Agent name"
   }
 }

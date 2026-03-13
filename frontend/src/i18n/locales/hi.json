@@ -49,7 +49,7 @@
     "create": "रिमोट बनाएं",
     "name": "रिमोट का नाम",
     "deleteConfirmTitle": "रिमोट हटाएँ?",
-    "deleteConfirmBody": "यह रिमोट और उसके सभी बटन/सिग्नल हटा देगा।"
+    "deleteConfirmBody": "यह रिमोट और उसके सभी बटन हटा देगा।"
   },
   "remote": {
     "title": "रिमोट",
@@ -85,7 +85,12 @@
     "deleteConfirmBody": "यह बटन और उसके सिग्नल हटा देगा।",
     "holdDialogTitle": "दबाकर रखने की अवधि",
     "holdMs": "अवधि (ms)",
-    "holdRangeHint": "{{min}}-{{max}}"
+    "holdRangeHint": "{{min}}-{{max}}",
+    "deleteAllConfirmTitle": "Delete all buttons?",
+    "deleteAllConfirmBody": "This will delete all buttons and their signals.",
+    "addButtons": "Add buttons",
+    "deleteAll": "Delete all buttons",
+    "nameLabel": "Button name"
   },
   "settings": {
     "theme": "थीम",
@@ -219,9 +224,9 @@
     "learningActiveBody": "लर्निंग पहले से सक्रिय है। वर्तमान सत्र रोकें और फिर कोशिश करें।",
     "signalExistsBody": "यह सिग्नल पहले से मौजूद है। बदलने के लिए री-लर्न या ओवरराइट चुनें।",
     "sendWhileLearningBody": "सिग्नल भेजने से पहले लर्निंग रोकें।",
-
     "agentOfflineTitle": "असाइन किया गया एजेंट ऑफ़लाइन है",
-    "agentOfflineBody": "चयनित एजेंट ऑफ़लाइन या अनुपलब्ध है। कोई अन्य एजेंट चुनें या उसे ऑनलाइन लाएं।",    "badRequestTitle": "अमान्य अनुरोध",
+    "agentOfflineBody": "चयनित एजेंट ऑफ़लाइन या अनुपलब्ध है। कोई अन्य एजेंट चुनें या उसे ऑनलाइन लाएं।",
+    "badRequestTitle": "अमान्य अनुरोध",
     "badRequestBody": "इनपुट जाँचें और फिर से कोशिश करें।",
     "nameRequiredBody": "जारी रखने के लिए नाम दर्ज करें।",
     "settingsMissingBody": "सहेजने से पहले कम से कम एक सेटिंग बदलें।",
@@ -346,6 +351,7 @@
     "updateResetDone": "अपडेट स्थिति रीसेट कर दी गई।",
     "deleteForceWarning": "यह एजेंट अभी फर्मवेयर इंस्टॉल कर रहा है। फ़ोर्स डिलीट बिना एजेंट की पुष्टि का इंतज़ार किए इसे तुरंत हटा देगा।",
     "deleteForceLabel": "मैं समझता/समझती हूँ और अभी इस एजेंट को फ़ोर्स डिलीट करना चाहता/चाहती हूँ।",
-    "deleteForceOptionalInfo": "फ़ोर्स डिलीट इस एजेंट को बिना पुष्टि का इंतज़ार किए तुरंत हटा देता है। इसका उपयोग करें यदि एजेंट प्रतिसाद नहीं दे रहा या रीसेट हो गया है।"
+    "deleteForceOptionalInfo": "फ़ोर्स डिलीट इस एजेंट को बिना पुष्टि का इंतज़ार किए तुरंत हटा देता है। इसका उपयोग करें यदि एजेंट प्रतिसाद नहीं दे रहा या रीसेट हो गया है।",
+    "nameLabel": "Agent name"
   }
 }

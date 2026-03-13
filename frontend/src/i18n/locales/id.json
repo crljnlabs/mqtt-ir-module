@@ -49,7 +49,7 @@
     "create": "Buat remote",
     "name": "Nama remote",
     "deleteConfirmTitle": "Hapus remote?",
-    "deleteConfirmBody": "Ini akan menghapus remote dan semua tombol/sinyalnya."
+    "deleteConfirmBody": "Ini akan menghapus remote dan semua tombolnya."
   },
   "remote": {
     "title": "Remote",

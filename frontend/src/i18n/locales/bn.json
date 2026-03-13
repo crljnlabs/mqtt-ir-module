@@ -49,7 +49,7 @@
     "create": "রিমোট তৈরি করুন",
     "name": "রিমোটের নাম",
     "deleteConfirmTitle": "রিমোট মুছবেন?",
-    "deleteConfirmBody": "এতে রিমোট এবং সব বোতাম/সিগন্যাল মুছে যাবে।"
+    "deleteConfirmBody": "এতে রিমোট এবং সব বোতাম মুছে যাবে।"
   },
   "remote": {
     "title": "রিমোট",
@@ -85,7 +85,12 @@
     "deleteConfirmBody": "এতে বোতাম এবং তার সিগন্যাল মুছে যাবে।",
     "holdDialogTitle": "দীর্ঘ চাপের সময়",
     "holdMs": "সময়কাল (ms)",
-    "holdRangeHint": "{{min}}-{{max}}"
+    "holdRangeHint": "{{min}}-{{max}}",
+    "deleteAllConfirmTitle": "Delete all buttons?",
+    "deleteAllConfirmBody": "This will delete all buttons and their signals.",
+    "addButtons": "Add buttons",
+    "deleteAll": "Delete all buttons",
+    "nameLabel": "Button name"
   },
   "settings": {
     "theme": "থিম",
@@ -219,9 +224,9 @@
     "learningActiveBody": "শেখা ইতিমধ্যেই সক্রিয়। বর্তমান সেশন বন্ধ করে আবার চেষ্টা করুন।",
     "signalExistsBody": "এই সিগন্যালটি ইতিমধ্যেই আছে। প্রতিস্থাপন করতে পুনরায় শিখুন বা ওভাররাইট বেছে নিন।",
     "sendWhileLearningBody": "সিগন্যাল পাঠানোর আগে শেখা বন্ধ করুন।",
-
     "agentOfflineTitle": "নির্ধারিত এজেন্ট অফলাইনে",
-    "agentOfflineBody": "নির্বাচিত এজেন্ট অফলাইনে আছে বা অনুপলব্ধ। অন্য একটি এজেন্ট বেছে নিন অথবা এটিকে অনলাইনে আনুন।",    "badRequestTitle": "অবৈধ অনুরোধ",
+    "agentOfflineBody": "নির্বাচিত এজেন্ট অফলাইনে আছে বা অনুপলব্ধ। অন্য একটি এজেন্ট বেছে নিন অথবা এটিকে অনলাইনে আনুন।",
+    "badRequestTitle": "অবৈধ অনুরোধ",
     "badRequestBody": "ইনপুট যাচাই করে আবার চেষ্টা করুন।",
     "nameRequiredBody": "চালিয়ে যেতে একটি নাম দিন।",
     "settingsMissingBody": "সংরক্ষণ করার আগে কমপক্ষে একটি সেটিং পরিবর্তন করুন।",
@@ -346,6 +351,7 @@
     "updateResetDone": "আপডেট স্টেট রিসেট করা হয়েছে।",
     "deleteForceWarning": "এই এজেন্টটি এখন ফার্মওয়্যার ইনস্টল করছে। ফোর্স ডিলিট করলে এজেন্টের নিশ্চিতকরণ না নিয়ে এটি সাথে সাথে মুছে যাবে।",
     "deleteForceLabel": "আমি বুঝেছি এবং এখনই এই এজেন্টটিকে ফোর্স ডিলিট করতে চাই।",
-    "deleteForceOptionalInfo": "ফোর্স ডিলিট এজেন্টের নিশ্চিতকরণ না নিয়ে এটিকে সাথে সাথে মুছে দেয়। এটি ব্যবহার করুন যদি এজেন্টটি সাড়া না দেয় বা রিসেট করা হয়।"
+    "deleteForceOptionalInfo": "ফোর্স ডিলিট এজেন্টের নিশ্চিতকরণ না নিয়ে এটিকে সাথে সাথে মুছে দেয়। এটি ব্যবহার করুন যদি এজেন্টটি সাড়া না দেয় বা রিসেট করা হয়।",
+    "nameLabel": "Agent name"
   }
 }

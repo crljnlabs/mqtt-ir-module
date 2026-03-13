@@ -49,7 +49,7 @@
     "create": "ریموٹ بنائیں",
     "name": "ریموٹ کا نام",
     "deleteConfirmTitle": "ریموٹ حذف کریں؟",
-    "deleteConfirmBody": "اس سے ریموٹ اور تمام بٹن/سگنلز حذف ہو جائیں گے۔"
+    "deleteConfirmBody": "اس سے ریموٹ اور تمام بٹن حذف ہو جائیں گے۔"
   },
   "remote": {
     "title": "ریموٹ",
@@ -85,7 +85,12 @@
     "deleteConfirmBody": "اس سے بٹن اور اس کے سگنلز حذف ہو جائیں گے۔",
     "holdDialogTitle": "طویل دباؤ کی مدت",
     "holdMs": "مدت (ms)",
-    "holdRangeHint": "{{min}}-{{max}}"
+    "holdRangeHint": "{{min}}-{{max}}",
+    "deleteAllConfirmTitle": "Delete all buttons?",
+    "deleteAllConfirmBody": "This will delete all buttons and their signals.",
+    "addButtons": "Add buttons",
+    "deleteAll": "Delete all buttons",
+    "nameLabel": "Button name"
   },
   "settings": {
     "theme": "تھیم",
@@ -219,9 +224,9 @@
     "learningActiveBody": "سیکھنا پہلے سے فعال ہے۔ موجودہ سیشن روکیں اور دوبارہ کوشش کریں۔",
     "signalExistsBody": "یہ سگنل پہلے سے موجود ہے۔ بدلنے کے لیے دوبارہ سیکھیں یا اووررائٹ منتخب کریں۔",
     "sendWhileLearningBody": "سگنل بھیجنے سے پہلے سیکھنا بند کریں۔",
-
     "agentOfflineTitle": "تفویض شدہ ایجنٹ آف لائن ہے",
-    "agentOfflineBody": "منتخب ایجنٹ آف لائن یا دستیاب نہیں ہے۔ کوئی دوسرا ایجنٹ منتخب کریں یا اسے آن لائن کریں۔",    "badRequestTitle": "غلط درخواست",
+    "agentOfflineBody": "منتخب ایجنٹ آف لائن یا دستیاب نہیں ہے۔ کوئی دوسرا ایجنٹ منتخب کریں یا اسے آن لائن کریں۔",
+    "badRequestTitle": "غلط درخواست",
     "badRequestBody": "ان پٹ چیک کریں اور دوبارہ کوشش کریں۔",
     "nameRequiredBody": "جاری رکھنے کے لیے نام درج کریں۔",
     "settingsMissingBody": "محفوظ کرنے سے پہلے کم از کم ایک سیٹنگ تبدیل کریں۔",
@@ -346,6 +351,7 @@
     "updateResetDone": "اپ ڈیٹ اسٹیٹ ری سیٹ کر دی گئی ہے۔",
     "deleteForceWarning": "یہ ایجنٹ اس وقت فرم ویئر انسٹال کر رہا ہے۔ فورس ڈیلیٹ اسے ایجنٹ کی تصدیق کا انتظار کیے بغیر فوراً ہٹا دے گا۔",
     "deleteForceLabel": "میں سمجھتا ہوں اور ابھی اس ایجنٹ کو فورس ڈیلیٹ کرنا چاہتا ہوں۔",
-    "deleteForceOptionalInfo": "فورس ڈیلیٹ اس ایجنٹ کو تصدیق کا انتظار کیے بغیر فوری طور پر ہٹا دیتا ہے۔ اسے استعمال کریں اگر ایجنٹ جواب نہ دے یا ری سیٹ ہو گیا ہو۔"
+    "deleteForceOptionalInfo": "فورس ڈیلیٹ اس ایجنٹ کو تصدیق کا انتظار کیے بغیر فوری طور پر ہٹا دیتا ہے۔ اسے استعمال کریں اگر ایجنٹ جواب نہ دے یا ری سیٹ ہو گیا ہو۔",
+    "nameLabel": "Agent name"
   }
 }

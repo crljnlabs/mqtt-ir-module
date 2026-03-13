@@ -49,7 +49,7 @@
     "create": "Criar comando",
     "name": "Nome do comando",
     "deleteConfirmTitle": "Eliminar comando?",
-    "deleteConfirmBody": "Isto elimina o comando e todos os botões/sinais."
+    "deleteConfirmBody": "Isto elimina o comando e todos os botões."
   },
   "remote": {
     "title": "Comando",
@@ -85,7 +85,12 @@
     "deleteConfirmBody": "Isto elimina o botão e os seus sinais.",
     "holdDialogTitle": "Duração da pressão longa",
     "holdMs": "Duração (ms)",
-    "holdRangeHint": "{{min}}-{{max}}"
+    "holdRangeHint": "{{min}}-{{max}}",
+    "deleteAllConfirmTitle": "Delete all buttons?",
+    "deleteAllConfirmBody": "This will delete all buttons and their signals.",
+    "addButtons": "Add buttons",
+    "deleteAll": "Delete all buttons",
+    "nameLabel": "Button name"
   },
   "settings": {
     "theme": "Tema",
@@ -219,9 +224,9 @@
     "learningActiveBody": "A aprendizagem já está ativa. Pare a sessão atual e tente novamente.",
     "signalExistsBody": "Este sinal já existe. Escolha reaprender ou substituir para o trocar.",
     "sendWhileLearningBody": "Pare a aprendizagem antes de enviar um sinal.",
-
     "agentOfflineTitle": "Agente atribuído offline",
-    "agentOfflineBody": "O agente selecionado está offline ou indisponível. Escolha outro agente ou coloque-o online.",    "badRequestTitle": "Pedido inválido",
+    "agentOfflineBody": "O agente selecionado está offline ou indisponível. Escolha outro agente ou coloque-o online.",
+    "badRequestTitle": "Pedido inválido",
     "badRequestBody": "Verifique os dados e tente novamente.",
     "nameRequiredBody": "Introduza um nome para continuar.",
     "settingsMissingBody": "Altere pelo menos uma definição antes de guardar.",
@@ -346,6 +351,7 @@
     "updateResetDone": "Estado da atualização reposto.",
     "deleteForceWarning": "Este agente está a instalar firmware. A eliminação forçada remove-o de imediato sem esperar confirmação do agente.",
     "deleteForceLabel": "Compreendo e quero forçar a eliminação deste agente agora.",
-    "deleteForceOptionalInfo": "A eliminação forçada remove este agente de imediato sem aguardar confirmação. Utilize isto se o agente não responder ou tiver sido reiniciado."
+    "deleteForceOptionalInfo": "A eliminação forçada remove este agente de imediato sem aguardar confirmação. Utilize isto se o agente não responder ou tiver sido reiniciado.",
+    "nameLabel": "Agent name"
   }
 }

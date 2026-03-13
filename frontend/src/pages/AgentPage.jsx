@@ -12,7 +12,6 @@ import { Button } from '../components/ui/Button.jsx'
 import { Badge } from '../components/ui/Badge.jsx'
 import { IconButton } from '../components/ui/IconButton.jsx'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog.jsx'
-import { Drawer } from '../components/ui/Drawer.jsx'
 import { Modal } from '../components/ui/Modal.jsx'
 import { TextField } from '../components/ui/TextField.jsx'
 import { useToast } from '../components/ui/ToastProvider.jsx'
@@ -49,7 +48,6 @@ export function AgentPage() {
   const [createRemoteOpen, setCreateRemoteOpen] = useState(false)
   const [assignRemoteOpen, setAssignRemoteOpen] = useState(false)
   const [newRemoteName, setNewRemoteName] = useState('')
-  const [menuRemote, setMenuRemote] = useState(null)
   const [editRemote, setEditRemote] = useState(null)
   const [deleteRemoteTarget, setDeleteRemoteTarget] = useState(null)
   const [assigningRemoteId, setAssigningRemoteId] = useState(null)
@@ -359,7 +357,7 @@ export function AgentPage() {
                       <Icon path={findIconPath(remote.icon || DEFAULT_REMOTE_ICON)} size={1.4} />
                     </div>
                     <div onClick={(event) => event.stopPropagation()}>
-                      <IconButton label={t('common.menu')} onClick={() => setMenuRemote(remote)} className="h-9 w-9 opacity-80 group-hover:opacity-100">
+                      <IconButton label={t('common.menu')} onClick={() => setEditRemote(remote)} className="h-9 w-9 opacity-80 group-hover:opacity-100">
                         <Icon path={mdiDotsHorizontal} size={1} />
                       </IconButton>
                     </div>
@@ -375,7 +373,12 @@ export function AgentPage() {
       </Card>
 
       {editOpen ? <AgentEditorDrawer key={agent.agent_id} agent={agent} onClose={() => setEditOpen(false)} /> : null}
-      <RemoteEditorDrawer open={Boolean(editRemote)} remote={editRemote} onClose={() => setEditRemote(null)} />
+      <RemoteEditorDrawer
+        open={Boolean(editRemote)}
+        remote={editRemote}
+        onClose={() => setEditRemote(null)}
+        onDelete={(remote) => { setEditRemote(null); setDeleteRemoteTarget(remote) }}
+      />
 
       <Modal
         open={deleteOpen}
@@ -447,33 +450,6 @@ export function AgentPage() {
           deleteRemoteMutation.mutate(deleteRemoteTarget.id)
         }}
       />
-
-      <Drawer open={Boolean(menuRemote)} title={menuRemote?.name || ''} onClose={() => setMenuRemote(null)}>
-        <div className="space-y-2">
-          <Button
-            variant="secondary"
-            className="w-full justify-start"
-            onClick={() => {
-              setEditRemote(menuRemote)
-              setMenuRemote(null)
-            }}
-          >
-            <Icon path={mdiPencilOutline} size={1} />
-            {t('common.edit')}
-          </Button>
-          <Button
-            variant="danger"
-            className="w-full justify-start"
-            onClick={() => {
-              setDeleteRemoteTarget(menuRemote)
-              setMenuRemote(null)
-            }}
-          >
-            <Icon path={mdiTrashCanOutline} size={1} />
-            {t('common.delete')}
-          </Button>
-        </div>
-      </Drawer>
 
       <Modal
         open={assignRemoteOpen}

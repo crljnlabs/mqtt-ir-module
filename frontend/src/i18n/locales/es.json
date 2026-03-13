@@ -49,7 +49,7 @@
     "create": "Crear mando",
     "name": "Nombre del mando",
     "deleteConfirmTitle": "¿Eliminar mando?",
-    "deleteConfirmBody": "Esto eliminará el mando y todos los botones/señales."
+    "deleteConfirmBody": "Esto eliminará el mando y todos los botones."
   },
   "remote": {
     "title": "Mando",

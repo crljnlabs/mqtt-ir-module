@@ -1,15 +1,14 @@
 import React, { useMemo, useState } from 'react'
 import Icon from '@mdi/react'
-import { mdiAutorenew, mdiImageEditOutline } from '@mdi/js'
+import { mdiAutorenew } from '@mdi/js'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 
 import { Drawer } from '../../components/ui/Drawer.jsx'
-import { TextField } from '../../components/ui/TextField.jsx'
 import { Button } from '../../components/ui/Button.jsx'
 import { NumberField } from '../../components/ui/NumberField.jsx'
-import { IconButton } from '../../components/ui/IconButton.jsx'
 import { SelectField } from '../../components/ui/SelectField.jsx'
+import { EntityEditHeader } from '../../components/ui/EntityEditHeader.jsx'
 import { IconPicker } from '../../components/pickers/IconPicker.jsx'
 import { otaCancelAgent, otaUpdateAgent, resetAgentInstallation, updateAgent, updateAgentRuntimeConfig } from '../../api/agentsApi.js'
 import { getFirmwareCatalog } from '../../api/firmwareApi.js'
@@ -112,7 +111,7 @@ export function AgentEditorDrawer({ agent, onClose }) {
       }
 
       if (!isEsp32) {
-        return
+        return { pinsChanged: false }
       }
 
       if (parsedRxPin == null || parsedTxPin == null) {
@@ -120,24 +119,41 @@ export function AgentEditorDrawer({ agent, onClose }) {
       }
       const pinsChanged = parsedRxPin !== initialRxPin || parsedTxPin !== initialTxPin
       if (!pinsChanged) {
-        return
+        return { pinsChanged: false }
       }
 
       await updateAgentRuntimeConfig(agent.agent_id, {
         ir_rx_pin: parsedRxPin,
         ir_tx_pin: parsedTxPin,
       })
+      return { pinsChanged: true }
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['agents'] })
       queryClient.invalidateQueries({ queryKey: ['agent', agent.agent_id] })
-      toast.show({ title: t('agents.pageTitle'), message: t('agents.savedWithRuntimeHint') })
+      if (result?.pinsChanged) {
+        toast.show({ title: t('agents.pageTitle'), message: t('agents.savedWithRuntimeHint') })
+      }
       onClose()
     },
     onError: (error) => {
       toast.show({ title: t('agents.pageTitle'), message: errorMapper.getMessage(error, 'common.failed') })
     },
   })
+
+  function handleClose() {
+    if (saveMutation.isPending) return
+    const metadataChanged =
+      (name.trim() || null) !== (agent.name ?? null) ||
+      (icon ?? null) !== (agent.icon ?? null) ||
+      (configurationUrl.trim() || null) !== (agent.configuration_url ?? null)
+    const pinsChanged = isEsp32 && (parsedRxPin !== initialRxPin || parsedTxPin !== initialTxPin)
+    if (metadataChanged || pinsChanged) {
+      saveMutation.mutate()
+      return
+    }
+    onClose()
+  }
 
   const otaMutation = useMutation({
     mutationFn: (version) => otaUpdateAgent(agent.agent_id, { version }),
@@ -189,42 +205,37 @@ export function AgentEditorDrawer({ agent, onClose }) {
     <>
       <Drawer
         open
-        title={`${t('common.edit')}: ${agent.name || agent.agent_id}`}
-        onClose={onClose}
-        footer={
-          <div className="flex gap-2 justify-end">
-            <Button variant="secondary" onClick={onClose}>
-              {t('common.cancel')}
-            </Button>
-            <Button
-              onClick={() => saveMutation.mutate()}
-              disabled={
-                saveMutation.isPending ||
-                otaMutation.isPending ||
-                otaCancelMutation.isPending ||
-                resetInstallationMutation.isPending ||
-                !pinsValid ||
-                installationInProgress
-              }
-            >
-              {t('common.save')}
-            </Button>
-          </div>
-        }
+        title={`${t('common.edit')} ${t('agents.pageTitle')}`}
+        onClose={handleClose}
       >
-        <div className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-sm font-semibold">{t('common.icon')}</div>
-            <IconButton label={t('common.icon')} onClick={() => setIconPickerOpen(true)}>
-              <Icon path={mdiImageEditOutline} size={1} />
-            </IconButton>
-          </div>
-
-          <TextField
-            label={t('remotes.name')}
-            value={name}
-            onChange={(event) => setName(event.target.value)}
+        <div className="space-y-4">
+          <EntityEditHeader
+            label={t('agents.nameLabel')}
+            name={name}
+            onNameChange={(event) => setName(event.target.value)}
+            onIconClick={() => setIconPickerOpen(true)}
           />
+
+          <label className="block">
+            <div className="mb-1 text-sm font-medium">{t('agents.configurationUrlLabel')}</div>
+            <div className="relative">
+              <input
+                className="h-11 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] px-3 pr-12 text-sm text-[rgb(var(--fg))] outline-none focus:ring-2 focus:ring-[rgb(var(--primary))]"
+                value={configurationUrl}
+                onChange={(event) => setConfigurationUrl(event.target.value)}
+              />
+              <button
+                type="button"
+                aria-label={t('agents.configurationUrlAuto')}
+                title={t('agents.configurationUrlAuto')}
+                onClick={fillCurrentUrl}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-[rgb(var(--muted))] hover:text-[rgb(var(--fg))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--primary))] focus:ring-offset-2 focus:ring-offset-[rgb(var(--bg))]"
+              >
+                <Icon path={mdiAutorenew} size={0.8} />
+              </button>
+            </div>
+            <div className="mt-1 text-xs text-[rgb(var(--muted))]">{t('agents.configurationUrlHint')}</div>
+          </label>
 
           {isEsp32 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -325,26 +336,6 @@ export function AgentEditorDrawer({ agent, onClose }) {
             </div>
           ) : null}
 
-          <label className="block">
-            <div className="mb-1 text-sm font-medium">{t('agents.configurationUrlLabel')}</div>
-            <div className="relative">
-              <input
-                className="h-11 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] px-3 pr-12 text-sm text-[rgb(var(--fg))] outline-none focus:ring-2 focus:ring-[rgb(var(--primary))]"
-                value={configurationUrl}
-                onChange={(event) => setConfigurationUrl(event.target.value)}
-              />
-              <button
-                type="button"
-                aria-label={t('agents.configurationUrlAuto')}
-                title={t('agents.configurationUrlAuto')}
-                onClick={fillCurrentUrl}
-                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-[rgb(var(--muted))] hover:text-[rgb(var(--fg))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--primary))] focus:ring-offset-2 focus:ring-offset-[rgb(var(--bg))]"
-              >
-                <Icon path={mdiAutorenew} size={0.8} />
-              </button>
-            </div>
-            <div className="mt-1 text-xs text-[rgb(var(--muted))]">{t('agents.configurationUrlHint')}</div>
-          </label>
         </div>
       </Drawer>
 
@@ -353,6 +344,7 @@ export function AgentEditorDrawer({ agent, onClose }) {
         title={t('common.icon')}
         initialIconKey={icon || DEFAULT_AGENT_ICON}
         onClose={() => setIconPickerOpen(false)}
+        onBack={() => setIconPickerOpen(false)}
         onSelect={(key) => {
           setIcon(key)
           setIconPickerOpen(false)

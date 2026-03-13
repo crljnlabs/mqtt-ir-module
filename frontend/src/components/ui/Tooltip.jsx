@@ -1,16 +1,8 @@
 import React, { useCallback, useId, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { cn } from './cn.js'
 
-const SIDE_POSITION = {
-  top: 'bottom-full mb-2',
-  bottom: 'top-full mt-2',
-}
-
-const ALIGN_POSITION = {
-  center: 'left-1/2 -translate-x-1/2',
-  start: 'left-0',
-  end: 'right-0',
-}
+const VIEWPORT_PADDING = 8
 
 const ARROW_SIDE = {
   top: 'bottom-[-4px]',
@@ -22,8 +14,6 @@ const ARROW_ALIGN = {
   start: 'left-3',
   end: 'right-3',
 }
-
-const VIEWPORT_PADDING = 8
 
 // Keep consumer handlers while still toggling tooltip state.
 function mergeEventHandlers(userHandler, internalHandler) {
@@ -39,6 +29,7 @@ function mergeEventHandlers(userHandler, internalHandler) {
 
 export function Tooltip({ label, side = 'top', align = 'center', className, children }) {
   const [open, setOpen] = useState(false)
+  const [style, setStyle] = useState(null)
   const [resolvedSide, setResolvedSide] = useState(side)
   const [resolvedAlign, setResolvedAlign] = useState(align)
   const tooltipId = useId()
@@ -91,14 +82,32 @@ export function Tooltip({ label, side = 'top', align = 'center', className, chil
       }
     }
 
+    // Compute fixed pixel position so the tooltip renders above any overflow container.
+    const top =
+      nextSide === 'top'
+        ? triggerRect.top - tooltipRect.height - 8
+        : triggerRect.bottom + 8
+
+    let left
+    if (nextAlign === 'center') {
+      left = triggerRect.left + triggerRect.width / 2 - tooltipRect.width / 2
+    } else if (nextAlign === 'start') {
+      left = triggerRect.left
+    } else {
+      left = triggerRect.right - tooltipRect.width
+    }
+    left = Math.max(VIEWPORT_PADDING, Math.min(left, viewportWidth - tooltipRect.width - VIEWPORT_PADDING))
+
     setResolvedSide((prev) => (prev === nextSide ? prev : nextSide))
     setResolvedAlign((prev) => (prev === nextAlign ? prev : nextAlign))
+    setStyle({ position: 'fixed', top, left })
   }, [align, side])
 
   useLayoutEffect(() => {
     if (!open) {
       setResolvedSide(side)
       setResolvedAlign(align)
+      setStyle(null)
       return
     }
 
@@ -127,30 +136,36 @@ export function Tooltip({ label, side = 'top', align = 'center', className, chil
     }),
   }
 
+  // Render off-screen when not yet positioned so getBoundingClientRect returns
+  // the correct dimensions for the initial placement calculation.
+  const tooltipStyle = style ?? { position: 'fixed', top: -9999, left: -9999 }
+
   return (
     <span ref={wrapperRef} className="relative inline-flex">
       {React.cloneElement(trigger, triggerProps)}
-      <span
-        role="tooltip"
-        id={tooltipId}
-        ref={tooltipRef}
-        className={cn(
-          'pointer-events-none absolute z-50 w-max max-w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-center text-xs font-medium leading-snug text-[rgb(var(--fg))] shadow-[var(--shadow)] transition-opacity duration-150',
-          SIDE_POSITION[resolvedSide] || SIDE_POSITION.top,
-          ALIGN_POSITION[resolvedAlign] || ALIGN_POSITION.center,
-          open ? 'opacity-100' : 'opacity-0',
-          className,
-        )}
-      >
-        <span className="block whitespace-normal break-words">{label}</span>
+      {createPortal(
         <span
+          role="tooltip"
+          id={tooltipId}
+          ref={tooltipRef}
+          style={tooltipStyle}
           className={cn(
-            'absolute h-2 w-2 rotate-45 border border-[rgb(var(--border))] bg-[rgb(var(--card))]',
-            ARROW_SIDE[resolvedSide] || ARROW_SIDE.top,
-            ARROW_ALIGN[resolvedAlign] || ARROW_ALIGN.center,
+            'pointer-events-none z-[9999] w-max max-w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-center text-xs font-medium leading-snug text-[rgb(var(--fg))] shadow-[var(--shadow)] transition-opacity duration-150',
+            open ? 'opacity-100' : 'opacity-0',
+            className,
           )}
-        />
-      </span>
+        >
+          <span className="block whitespace-normal break-words">{label}</span>
+          <span
+            className={cn(
+              'absolute h-2 w-2 rotate-45 border border-[rgb(var(--border))] bg-[rgb(var(--card))]',
+              ARROW_SIDE[resolvedSide] || ARROW_SIDE.top,
+              ARROW_ALIGN[resolvedAlign] || ARROW_ALIGN.center,
+            )}
+          />
+        </span>,
+        document.body,
+      )}
     </span>
   )
 }

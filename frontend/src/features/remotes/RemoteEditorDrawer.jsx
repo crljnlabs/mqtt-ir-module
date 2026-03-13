@@ -1,15 +1,14 @@
 import React, { useEffect, useState } from 'react'
+import Icon from '@mdi/react'
+import { mdiTrashCanOutline } from '@mdi/js'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import Icon from '@mdi/react'
-import { mdiImageEditOutline } from '@mdi/js'
-
 import { Drawer } from '../../components/ui/Drawer.jsx'
-import { TextField } from '../../components/ui/TextField.jsx'
+import { Button } from '../../components/ui/Button.jsx'
 import { NumberField } from '../../components/ui/NumberField.jsx'
 import { Collapse } from '../../components/ui/Collapse.jsx'
 import { SelectField } from '../../components/ui/SelectField.jsx'
-import { IconButton } from '../../components/ui/IconButton.jsx'
+import { EntityEditHeader } from '../../components/ui/EntityEditHeader.jsx'
 import { IconPicker } from '../../components/pickers/IconPicker.jsx'
 import { listAgents } from '../../api/agentsApi.js'
 import { updateRemote } from '../../api/remotesApi.js'
@@ -17,7 +16,7 @@ import { DEFAULT_REMOTE_ICON } from '../../icons/iconRegistry.js'
 import { useToast } from '../../components/ui/ToastProvider.jsx'
 import { ApiErrorMapper } from '../../utils/apiErrorMapper.js'
 
-export function RemoteEditorDrawer({ open, remote, onClose }) {
+export function RemoteEditorDrawer({ open, remote, onClose, onDelete }) {
   const { t } = useTranslation()
   const toast = useToast()
   const queryClient = useQueryClient()
@@ -97,18 +96,16 @@ export function RemoteEditorDrawer({ open, remote, onClose }) {
     <>
       <Drawer
         open={open}
-        title={`${t('common.edit')}: ${remote.name}`}
+        title={`${t('common.edit')} ${t('remote.title')}`}
         onClose={handleClose}
       >
-        <div className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-sm font-semibold">{t('remotes.name')}</div>
-            <IconButton label={t('common.icon')} onClick={() => setIconPickerOpen(true)}>
-              <Icon path={mdiImageEditOutline} size={1} />
-            </IconButton>
-          </div>
-
-          <TextField value={name} onChange={(e) => setName(e.target.value)} placeholder={t('remotes.name')} />
+        <div className="space-y-4">
+          <EntityEditHeader
+            label={t('remotes.name')}
+            name={name}
+            onNameChange={(e) => setName(e.target.value)}
+            onIconClick={() => setIconPickerOpen(true)}
+          />
 
           <SelectField
             label={t('agents.remoteLabel')}
@@ -149,6 +146,21 @@ export function RemoteEditorDrawer({ open, remote, onClose }) {
               />
             </div>
           </Collapse>
+
+          {onDelete ? (
+            <>
+              <hr className="border-[rgb(var(--border))]" />
+              <Button
+                variant="danger"
+                className="w-full justify-start"
+                disabled={mutation.isPending}
+                onClick={() => { onClose(); onDelete(remote) }}
+              >
+                <Icon path={mdiTrashCanOutline} size={1} />
+                {t('common.delete')}
+              </Button>
+            </>
+          ) : null}
         </div>
       </Drawer>
 
@@ -157,6 +169,7 @@ export function RemoteEditorDrawer({ open, remote, onClose }) {
         title={t('remote.iconTitle')}
         initialIconKey={icon || DEFAULT_REMOTE_ICON}
         onClose={() => setIconPickerOpen(false)}
+        onBack={() => setIconPickerOpen(false)}
         onSelect={(key) => {
           setIcon(key)
           setIconPickerOpen(false)

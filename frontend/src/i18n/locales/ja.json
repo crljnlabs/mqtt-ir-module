@@ -49,7 +49,7 @@
     "create": "リモコンを作成",
     "name": "リモコン名",
     "deleteConfirmTitle": "リモコンを削除しますか？",
-    "deleteConfirmBody": "リモコンとすべてのボタン/信号が削除されます。"
+    "deleteConfirmBody": "リモコンとすべてのボタンが削除されます。"
   },
   "remote": {
     "title": "リモコン",
@@ -85,7 +85,12 @@
     "deleteConfirmBody": "ボタンとその信号が削除されます。",
     "holdDialogTitle": "長押しの時間",
     "holdMs": "時間 (ms)",
-    "holdRangeHint": "{{min}}-{{max}}"
+    "holdRangeHint": "{{min}}-{{max}}",
+    "deleteAllConfirmTitle": "Delete all buttons?",
+    "deleteAllConfirmBody": "This will delete all buttons and their signals.",
+    "addButtons": "Add buttons",
+    "deleteAll": "Delete all buttons",
+    "nameLabel": "Button name"
   },
   "settings": {
     "theme": "テーマ",
@@ -219,9 +224,9 @@
     "learningActiveBody": "学習は既に有効です。現在のセッションを停止して再試行してください。",
     "signalExistsBody": "この信号は既に存在します。置き換えるには再学習または上書きを選択してください。",
     "sendWhileLearningBody": "信号を送信する前に学習を停止してください。",
-
     "agentOfflineTitle": "割り当てられたエージェントがオフライン",
-    "agentOfflineBody": "選択したエージェントはオフラインまたは利用できません。別のエージェントを選択するか、オンラインにしてください。",    "badRequestTitle": "無効なリクエスト",
+    "agentOfflineBody": "選択したエージェントはオフラインまたは利用できません。別のエージェントを選択するか、オンラインにしてください。",
+    "badRequestTitle": "無効なリクエスト",
     "badRequestBody": "入力内容を確認して再試行してください。",
     "nameRequiredBody": "続行するには名前を入力してください。",
     "settingsMissingBody": "保存する前に少なくとも1つの設定を変更してください。",
@@ -346,6 +351,7 @@
     "updateResetDone": "更新状態をリセットしました。",
     "deleteForceWarning": "このエージェントは現在ファームウェアをインストール中です。強制削除すると、エージェントの確認を待たずに即時に削除されます。",
     "deleteForceLabel": "内容を理解し、このエージェントを今すぐ強制削除します。",
-    "deleteForceOptionalInfo": "強制削除はエージェントの確認を待たずに即座に削除します。エージェントが応答しない場合やリセットされた場合に使用してください。"
+    "deleteForceOptionalInfo": "強制削除はエージェントの確認を待たずに即座に削除します。エージェントが応答しない場合やリセットされた場合に使用してください。",
+    "nameLabel": "Agent name"
   }
 }
