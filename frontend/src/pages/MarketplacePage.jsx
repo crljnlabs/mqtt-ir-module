@@ -206,7 +206,7 @@ export function MarketplacePage() {
             placeholder={t('marketplace.searchPlaceholder')}
           />
         </div>
-        <div className="w-full sm:w-44">
+        <div className="w-full sm:w-48">
           <SelectField
             value={brand}
             onChange={(e) => setBrand(e.target.value)}
@@ -215,11 +215,11 @@ export function MarketplacePage() {
           >
             <option value="">{t('marketplace.brandAll')}</option>
             {brands.map((b) => (
-              <option key={b} value={b}>{b}</option>
+              <option key={b} value={b}>{b.replace(/_/g, ' ')}</option>
             ))}
           </SelectField>
         </div>
-        <div className="w-full sm:w-44">
+        <div className="w-full sm:w-48">
           <SelectField
             value={category}
             onChange={(e) => setCategory(e.target.value)}
