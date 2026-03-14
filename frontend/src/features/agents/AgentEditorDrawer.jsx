@@ -10,6 +10,8 @@ import { NumberField } from '../../components/ui/NumberField.jsx'
 import { SelectField } from '../../components/ui/SelectField.jsx'
 import { EntityEditHeader } from '../../components/ui/EntityEditHeader.jsx'
 import { IconPicker } from '../../components/pickers/IconPicker.jsx'
+import { Tooltip } from '../../components/ui/Tooltip.jsx'
+import { cn } from '../../components/ui/cn.js'
 import { otaCancelAgent, otaUpdateAgent, resetAgentInstallation, updateAgent, updateAgentRuntimeConfig } from '../../api/agentsApi.js'
 import { getFirmwareCatalog } from '../../api/firmwareApi.js'
 import { useToast } from '../../components/ui/ToastProvider.jsx'
@@ -36,6 +38,7 @@ export function AgentEditorDrawer({ agent, onClose }) {
   const runtime = agent?.runtime || {}
   const ota = agent?.ota || {}
   const installation = agent?.installation || {}
+  const isOnline = String(agent.status || '').trim().toLowerCase() === 'online'
   const isEsp32 = String(runtime.agent_type || '').trim().toLowerCase() === 'esp32' && String(agent?.transport || '').trim().toLowerCase() === 'mqtt'
   const otaSupported = isEsp32 && Boolean(runtime.ota_supported || ota.supported)
   const installationInProgress = isInstallationInProgress(installation)
@@ -110,7 +113,7 @@ export function AgentEditorDrawer({ agent, onClose }) {
         await updateAgent(agent.agent_id, metadataPayload)
       }
 
-      if (!isEsp32) {
+      if (!isEsp32 || !isOnline) {
         return { pinsChanged: false }
       }
 
@@ -238,102 +241,112 @@ export function AgentEditorDrawer({ agent, onClose }) {
           </label>
 
           {isEsp32 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <NumberField
-                label={t('agents.irRxPinLabel')}
-                hint={t('agents.irRxPinHint')}
-                min={0}
-                max={39}
-                step={1}
-                value={irRxPin}
-                aria-invalid={parsedRxPin == null}
-                onChange={(event) => setIrRxPin(event.target.value)}
-              />
-              <NumberField
-                label={t('agents.irTxPinLabel')}
-                hint={t('agents.irTxPinHint')}
-                min={0}
-                max={39}
-                step={1}
-                value={irTxPin}
-                aria-invalid={parsedTxPin == null}
-                onChange={(event) => setIrTxPin(event.target.value)}
-              />
-            </div>
+            <Tooltip wrapperClassName="block" label={!isOnline ? t('agents.onlyWhenOnline') : undefined}>
+              <div className={!isOnline ? 'cursor-not-allowed' : undefined}>
+                <div className={cn('grid grid-cols-1 md:grid-cols-2 gap-3', !isOnline && 'opacity-50 pointer-events-none')}>
+                  <NumberField
+                    label={t('agents.irRxPinLabel')}
+                    hint={t('agents.irRxPinHint')}
+                    min={0}
+                    max={39}
+                    step={1}
+                    value={irRxPin}
+                    aria-invalid={parsedRxPin == null}
+                    onChange={(event) => setIrRxPin(event.target.value)}
+                    disabled={!isOnline}
+                  />
+                  <NumberField
+                    label={t('agents.irTxPinLabel')}
+                    hint={t('agents.irTxPinHint')}
+                    min={0}
+                    max={39}
+                    step={1}
+                    value={irTxPin}
+                    aria-invalid={parsedTxPin == null}
+                    onChange={(event) => setIrTxPin(event.target.value)}
+                    disabled={!isOnline}
+                  />
+                </div>
+              </div>
+            </Tooltip>
           ) : null}
 
           {otaSupported ? (
-            <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] p-3 space-y-3">
-              <div className="text-sm font-semibold">{t('agents.updateAction')}</div>
-              <div className="text-sm text-[rgb(var(--muted))]">{t('agents.updateSelectVersionHint')}</div>
-              {firmwareQuery.isLoading ? <div className="text-sm text-[rgb(var(--muted))]">{t('common.loading')}</div> : null}
-              {firmwareQuery.isError ? (
-                <div className="text-sm text-red-600">{errorMapper.getMessage(firmwareQuery.error, 'common.failed')}</div>
-              ) : null}
-              {hasInstallationState ? (
-                <div className="text-sm text-[rgb(var(--muted))]">
-                  {installation.message || installationStatus.toUpperCase()}
+            <Tooltip wrapperClassName="block" label={!isOnline ? t('agents.onlyWhenOnline') : undefined}>
+              <div className={!isOnline ? 'cursor-not-allowed' : undefined}>
+                <div className={cn('rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] p-3 space-y-3', !isOnline && 'opacity-50 pointer-events-none')}>
+                  <div className="text-sm font-semibold">{t('agents.updateAction')}</div>
+                  <div className="text-sm text-[rgb(var(--muted))]">{t('agents.updateSelectVersionHint')}</div>
+                  {firmwareQuery.isLoading ? <div className="text-sm text-[rgb(var(--muted))]">{t('common.loading')}</div> : null}
+                  {firmwareQuery.isError ? (
+                    <div className="text-sm text-red-600">{errorMapper.getMessage(firmwareQuery.error, 'common.failed')}</div>
+                  ) : null}
+                  {hasInstallationState ? (
+                    <div className="text-sm text-[rgb(var(--muted))]">
+                      {installation.message || installationStatus.toUpperCase()}
+                    </div>
+                  ) : null}
+                  {!firmwareQuery.isLoading && !firmwareQuery.isError && installableFirmwareOptions.length === 0 ? (
+                    <div className="text-sm text-red-600">{t('agents.updateNoFirmware')}</div>
+                  ) : null}
+                  {!installationInProgress && !firmwareQuery.isLoading && !firmwareQuery.isError && installableFirmwareOptions.length > 0 ? (
+                    <div className="space-y-3">
+                      <SelectField
+                        label={t('agents.updateVersionLabel')}
+                        value={otaVersion}
+                        onChange={(event) => setOtaVersionOverride(event.target.value)}
+                        disabled={otaMutation.isPending || otaCancelMutation.isPending || resetInstallationMutation.isPending}
+                      >
+                        {installableFirmwareOptions.map((entry) => (
+                          <option key={entry.version} value={entry.version}>
+                            {entry.version}
+                          </option>
+                        ))}
+                      </SelectField>
+                      <div className="flex justify-end">
+                        <Button
+                          size="sm"
+                          disabled={
+                            !otaVersion ||
+                            saveMutation.isPending ||
+                            otaMutation.isPending ||
+                            otaCancelMutation.isPending ||
+                            resetInstallationMutation.isPending
+                          }
+                          onClick={() => otaMutation.mutate(otaVersion)}
+                        >
+                          {t('agents.updateAction')}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+                  {installationInProgress ? (
+                    <div className="flex justify-end">
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        disabled={saveMutation.isPending || otaMutation.isPending || otaCancelMutation.isPending || resetInstallationMutation.isPending}
+                        onClick={() => otaCancelMutation.mutate()}
+                      >
+                        {t('agents.updateCancelAction')}
+                      </Button>
+                    </div>
+                  ) : null}
+                  {hasInstallationState ? (
+                    <div className="flex justify-end">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        disabled={saveMutation.isPending || otaMutation.isPending || otaCancelMutation.isPending || resetInstallationMutation.isPending}
+                        onClick={() => resetInstallationMutation.mutate()}
+                      >
+                        {t('agents.updateResetAction')}
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
-              ) : null}
-              {!firmwareQuery.isLoading && !firmwareQuery.isError && installableFirmwareOptions.length === 0 ? (
-                <div className="text-sm text-red-600">{t('agents.updateNoFirmware')}</div>
-              ) : null}
-              {!installationInProgress && !firmwareQuery.isLoading && !firmwareQuery.isError && installableFirmwareOptions.length > 0 ? (
-                <div className="space-y-3">
-                  <SelectField
-                    label={t('agents.updateVersionLabel')}
-                    value={otaVersion}
-                    onChange={(event) => setOtaVersionOverride(event.target.value)}
-                    disabled={otaMutation.isPending || otaCancelMutation.isPending || resetInstallationMutation.isPending}
-                  >
-                    {installableFirmwareOptions.map((entry) => (
-                      <option key={entry.version} value={entry.version}>
-                        {entry.version}
-                      </option>
-                    ))}
-                  </SelectField>
-                  <div className="flex justify-end">
-                    <Button
-                      size="sm"
-                      disabled={
-                        !otaVersion ||
-                        saveMutation.isPending ||
-                        otaMutation.isPending ||
-                        otaCancelMutation.isPending ||
-                        resetInstallationMutation.isPending
-                      }
-                      onClick={() => otaMutation.mutate(otaVersion)}
-                    >
-                      {t('agents.updateAction')}
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
-              {installationInProgress ? (
-                <div className="flex justify-end">
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    disabled={saveMutation.isPending || otaMutation.isPending || otaCancelMutation.isPending || resetInstallationMutation.isPending}
-                    onClick={() => otaCancelMutation.mutate()}
-                  >
-                    {t('agents.updateCancelAction')}
-                  </Button>
-                </div>
-              ) : null}
-              {hasInstallationState ? (
-                <div className="flex justify-end">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={saveMutation.isPending || otaMutation.isPending || otaCancelMutation.isPending || resetInstallationMutation.isPending}
-                    onClick={() => resetInstallationMutation.mutate()}
-                  >
-                    {t('agents.updateResetAction')}
-                  </Button>
-                </div>
-              ) : null}
-            </div>
+              </div>
+            </Tooltip>
           ) : null}
 
         </div>

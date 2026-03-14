@@ -27,7 +27,7 @@ function mergeEventHandlers(userHandler, internalHandler) {
   }
 }
 
-export function Tooltip({ label, side = 'top', align = 'center', className, children }) {
+export function Tooltip({ label, side = 'top', align = 'center', className, wrapperClassName, children }) {
   const [open, setOpen] = useState(false)
   const [style, setStyle] = useState(null)
   const [resolvedSide, setResolvedSide] = useState(side)
@@ -141,7 +141,7 @@ export function Tooltip({ label, side = 'top', align = 'center', className, chil
   const tooltipStyle = style ?? { position: 'fixed', top: -9999, left: -9999 }
 
   return (
-    <span ref={wrapperRef} className="relative inline-flex">
+    <span ref={wrapperRef} className={cn('relative inline-flex', wrapperClassName)}>
       {React.cloneElement(trigger, triggerProps)}
       {createPortal(
         <span

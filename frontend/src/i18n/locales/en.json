@@ -172,7 +172,8 @@
     "incompatibleSendHint": "IR send is blocked: the agent's send protocol is incompatible with this hub.",
     "incompatibleLearnHint": "IR learning is blocked: the agent's learn protocol is incompatible with this hub.",
     "incompatibleSystemHint": "Core protocol mismatch: manually re-flash this agent to restore full compatibility.",
-    "nameLabel": "Agent name"
+    "nameLabel": "Agent name",
+    "onlyWhenOnline": "Can only be changed when the agent is online."
   },
   "settings": {
     "theme": "Theme",
