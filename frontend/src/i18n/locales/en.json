@@ -353,6 +353,28 @@
     "ur": "Urdu",
     "ja": "Japanese"
   },
+  "marketplace": {
+    "nav": "Marketplace",
+    "title": "Marketplace",
+    "searchPlaceholder": "Search brand or model...",
+    "categoryAll": "All categories",
+    "sourceLink": "Browse Flipper IRDB on GitHub",
+    "syncButton": "Sync",
+    "syncRunning": "Syncing...",
+    "syncError": "Sync failed",
+    "syncNever": "Not synced yet. Fetch the remote library to browse.",
+    "syncLastAt": "Last synced: {{when}}",
+    "installButton": "Install",
+    "installedBadge": "Installed",
+    "noResults": "No remotes found.",
+    "buttonCount_one": "{{count}} button",
+    "buttonCount_other": "{{count}} buttons",
+    "installTitle": "Install remote",
+    "remoteNameLabel": "Remote name",
+    "installConfirm": "Install",
+    "installSuccess": "Remote installed.",
+    "installFailed": "Install failed."
+  },
   "update": {
     "available": "Version {{version}} available",
     "download": "Download"

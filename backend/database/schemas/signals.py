@@ -17,7 +17,7 @@ class Signals(DatabaseBase):
             CREATE TABLE IF NOT EXISTS button_signals (
                 button_id INTEGER PRIMARY KEY,
                 encoding TEXT NOT NULL,
-                press_initial TEXT NOT NULL,
+                press_initial TEXT NULL,
                 press_repeat TEXT NULL,
                 hold_initial TEXT NULL,
                 hold_repeat TEXT NULL,
@@ -27,8 +27,8 @@ class Signals(DatabaseBase):
                 quality_score_press REAL NULL,
                 quality_score_hold REAL NULL,
 
-                -- Optional decoded fields. Not populated yet.
-                -- A later decoder component can fill these in.
+                -- Protocol fields. Populated for encoding='protocol' signals.
+                -- A later decoder component may also fill these for captured raw signals.
                 protocol TEXT NULL,
                 address TEXT NULL,
                 command_hex TEXT NULL,
@@ -125,6 +125,82 @@ class Signals(DatabaseBase):
             out = c.execute("SELECT * FROM button_signals WHERE button_id = ?", (button_id,)).fetchone()
             if not out:
                 raise ValueError("Failed to upsert press signal")
+            return dict(out)
+        finally:
+            if close:
+                c.close()
+
+    def upsert_protocol(
+        self,
+        button_id: int,
+        protocol: str,
+        address: str,
+        command_hex: str,
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> Dict[str, Any]:
+        """Store a protocol-encoded IR signal (NEC, Samsung32, etc.)."""
+        protocol = protocol.strip()
+        address = address.strip()
+        command_hex = command_hex.strip()
+        if not protocol or not address or not command_hex:
+            raise ValueError("protocol, address, and command_hex must not be empty")
+
+        c, close = self._use_conn(conn)
+        try:
+            now = time.time()
+            existing = c.execute(
+                "SELECT button_id FROM button_signals WHERE button_id = ?",
+                (button_id,),
+            ).fetchone()
+
+            if existing:
+                c.execute(
+                    """
+                    UPDATE button_signals
+                    SET encoding = 'protocol',
+                        press_initial = NULL,
+                        press_repeat = NULL,
+                        sample_count_press = 0,
+                        quality_score_press = NULL,
+                        protocol = ?,
+                        address = ?,
+                        command_hex = ?,
+                        updated_at = ?
+                    WHERE button_id = ?
+                    """,
+                    (protocol, address, command_hex, now, button_id),
+                )
+            else:
+                c.execute(
+                    """
+                    INSERT INTO button_signals(
+                        button_id,
+                        encoding,
+                        press_initial,
+                        press_repeat,
+                        hold_initial,
+                        hold_repeat,
+                        hold_gap_us,
+                        sample_count_press,
+                        sample_count_hold,
+                        quality_score_press,
+                        quality_score_hold,
+                        protocol,
+                        address,
+                        command_hex,
+                        decode_confidence,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES(?, 'protocol', NULL, NULL, NULL, NULL, NULL, 0, 0, NULL, NULL, ?, ?, ?, NULL, ?, ?)
+                    """,
+                    (button_id, protocol, address, command_hex, now, now),
+                )
+
+            c.commit()
+            out = c.execute("SELECT * FROM button_signals WHERE button_id = ?", (button_id,)).fetchone()
+            if not out:
+                raise ValueError("Failed to upsert protocol signal")
             return dict(out)
         finally:
             if close:

@@ -56,6 +56,9 @@ from connections import (
 from firmware import FirmwareCatalog
 from helper import Environment, SettingsCipher
 from database import Database
+from marketplace import GitHubMarketplaceIndex, InstallService
+from marketplace.ir_protocol_utils import get_mqtt_protocol_payload
+from pydantic import BaseModel
 from runtime_version import SOFTWARE_VERSION
 
 LOCAL_AGENT_LOG_STREAM_LEVEL = "info"
@@ -71,6 +74,8 @@ env = Environment()
 database = Database(data_dir=env.data_folder)
 settings_cipher = SettingsCipher(env.settings_master_key)
 firmware_catalog = FirmwareCatalog(root_dir=env.firmware_dir)
+marketplace_index = GitHubMarketplaceIndex(database=database)
+install_service = InstallService(database=database)
 
 parser = IrSignalParser()
 aggregator = IrSignalAggregator()
@@ -394,6 +399,8 @@ def _require_agent_compatible_learn(agent_id: str) -> None:
 async def lifespan(app: FastAPI):
     database.init()
     firmware_catalog.ensure_layout()
+    # Start marketplace background sync if local index is empty
+    marketplace_index.auto_sync()
     # Load persisted learning defaults after the settings table exists.
     learning.apply_learning_settings(database.settings.get_learning_settings())
     # Store the running loop so sync code can broadcast status updates.
@@ -1131,16 +1138,24 @@ def send_ir(body: SendRequest, x_api_key: Optional[str] = Header(default=None)) 
         if learning.is_learning_for_agent(agent.agent_id):
             raise AgentError(code="send_while_learning", message="Cannot send while learning is active", status_code=409)
 
+        encoding = str(signals.get("encoding") or "raw").strip().lower()
         payload = {
             "button_id": body.button_id,
             "mode": body.mode,
             "hold_ms": body.hold_ms,
+            "encoding": encoding,
+            "signal_type": "protocol" if encoding == "protocol" else "raw",
+            # Raw signal fields
             "press_initial": signals.get("press_initial"),
             "hold_initial": signals.get("hold_initial"),
             "hold_repeat": signals.get("hold_repeat"),
             "hold_gap_us": signals.get("hold_gap_us"),
-            "carrier_hz": remote.get("carrier_hz"),
-            "duty_cycle": remote.get("duty_cycle"),
+            "carrier_hz": remote.get("carrier_hz") if encoding != "protocol" else None,
+            "duty_cycle": remote.get("duty_cycle") if encoding != "protocol" else None,
+            # Protocol signal fields (populated for encoding='protocol', None otherwise)
+            "protocol": signals.get("protocol"),
+            "address": signals.get("address"),
+            "command_hex": signals.get("command_hex"),
         }
 
         result = agent.send(payload)
@@ -1154,6 +1169,62 @@ def send_ir(body: SendRequest, x_api_key: Optional[str] = Header(default=None)) 
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+
+# -----------------
+# Marketplace
+# -----------------
+
+
+class _MarketplaceInstallBody(BaseModel):
+    path: str
+    remote_name: str
+
+
+@api.get("/marketplace/index")
+def marketplace_index_list(
+    q: Optional[str] = None,
+    category: Optional[str] = None,
+    source: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    return database.marketplace.search(q=q, category=category, source=source)
+
+
+@api.get("/marketplace/categories")
+def marketplace_categories() -> List[str]:
+    return database.marketplace.list_categories()
+
+
+@api.get("/marketplace/sync/status")
+def marketplace_sync_status() -> Dict[str, Any]:
+    return marketplace_index.get_status()
+
+
+@api.post("/marketplace/sync")
+def marketplace_sync(x_api_key: Optional[str] = Header(default=None)) -> Dict[str, Any]:
+    require_api_key(x_api_key)
+    started = marketplace_index.trigger_sync()
+    return {"started": started}
+
+
+@api.get("/marketplace/installed-paths")
+def marketplace_installed_paths() -> List[str]:
+    return database.remotes.list_marketplace_paths()
+
+
+@api.post("/marketplace/install")
+def marketplace_install(
+    body: _MarketplaceInstallBody,
+    x_api_key: Optional[str] = Header(default=None),
+) -> Dict[str, Any]:
+    require_api_key(x_api_key)
+    try:
+        return install_service.install(path=body.path, remote_name=body.remote_name)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
 
 # Register API at /api

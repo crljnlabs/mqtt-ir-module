@@ -72,6 +72,32 @@ bool executeSendCommand(
 
   const String mode = String(payload["mode"] | "");
   const String normalizedMode = mode.length() ? mode : "press";
+
+  // Protocol-encoded signals (NEC, Samsung32, SIRC, RC5, RC6, Kaseikyo, JVC).
+  const String signalType = String(payload["signal_type"] | "raw");
+  if (signalType == "protocol") {
+    const String protocolName = String(payload["protocol"] | "");
+    const String addressStr = String(payload["address"] | "");
+    const String commandHexStr = String(payload["command_hex"] | "");
+    if (protocolName.isEmpty() || addressStr.isEmpty() || commandHexStr.isEmpty()) {
+      errorCode = "validation_error";
+      errorMessage = "protocol, address, and command_hex are required for protocol signals";
+      statusCode = 400;
+      return false;
+    }
+    markActivity();
+    if (!sendFrameProtocol(protocolName, addressStr, commandHexStr)) {
+      errorCode = "runtime_error";
+      errorMessage = String("Unsupported or invalid IR protocol: ") + protocolName;
+      statusCode = 409;
+      return false;
+    }
+    result["mode"] = "press";
+    result["repeats"] = 0;
+    result["gap_us"] = nullptr;
+    return true;
+  }
+
   const uint16_t carrierHz = static_cast<uint16_t>(payload["carrier_hz"] | 38000);
   const String pressInitial = String(payload["press_initial"] | "");
   if (pressInitial.isEmpty()) {
