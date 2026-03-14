@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import Icon from '@mdi/react'
@@ -6,6 +6,8 @@ import { mdiRefresh, mdiGithub } from '@mdi/js'
 import {
   listMarketplace,
   getMarketplaceCategories,
+  getMarketplaceBrands,
+  getMarketplaceCount,
   getMarketplaceSyncStatus,
   triggerMarketplaceSync,
   getInstalledMarketplacePaths,
@@ -88,10 +90,12 @@ function MarketplaceTile({ remote, installed, onInstall }) {
 export function MarketplacePage() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const prevSyncStatusRef = useRef(null)
 
   const [q, setQ] = useState('')
   const [debouncedQ, setDebouncedQ] = useState('')
   const [category, setCategory] = useState('')
+  const [brand, setBrand] = useState('')
   const [installTarget, setInstallTarget] = useState(null)
 
   useEffect(() => {
@@ -99,28 +103,66 @@ export function MarketplacePage() {
     return () => clearTimeout(timer)
   }, [q])
 
+  // Reset brand when category changes
+  useEffect(() => {
+    setBrand('')
+  }, [category])
+
+  const syncStatusQuery = useQuery({
+    queryKey: ['marketplace-sync-status'],
+    queryFn: getMarketplaceSyncStatus,
+    refetchInterval: 5000,
+  })
+
+  const syncStatus = syncStatusQuery.data
+  const isSyncing = syncStatus?.status === 'running'
+
+  // Invalidate all data queries the moment sync transitions running → idle
+  useEffect(() => {
+    const current = syncStatus?.status
+    const prev = prevSyncStatusRef.current
+    prevSyncStatusRef.current = current
+    if (prev === 'running' && current === 'idle') {
+      queryClient.invalidateQueries({ queryKey: ['marketplace'] })
+      queryClient.invalidateQueries({ queryKey: ['marketplace-categories'] })
+      queryClient.invalidateQueries({ queryKey: ['marketplace-brands'] })
+      queryClient.invalidateQueries({ queryKey: ['marketplace-count'] })
+      queryClient.invalidateQueries({ queryKey: ['marketplace-installed'] })
+    }
+  }, [syncStatus?.status, queryClient])
+
   const categoriesQuery = useQuery({
     queryKey: ['marketplace-categories'],
     queryFn: getMarketplaceCategories,
     staleTime: 60_000,
+    refetchInterval: isSyncing ? 4000 : false,
+  })
+
+  const brandsQuery = useQuery({
+    queryKey: ['marketplace-brands', category],
+    queryFn: () => getMarketplaceBrands(category),
+    staleTime: 60_000,
+    refetchInterval: isSyncing ? 4000 : false,
+  })
+
+  const countQuery = useQuery({
+    queryKey: ['marketplace-count'],
+    queryFn: getMarketplaceCount,
+    staleTime: 60_000,
+    refetchInterval: isSyncing ? 4000 : false,
   })
 
   const listQuery = useQuery({
-    queryKey: ['marketplace', debouncedQ, category],
-    queryFn: () => listMarketplace({ q: debouncedQ, category }),
+    queryKey: ['marketplace', debouncedQ, category, brand],
+    queryFn: () => listMarketplace({ q: debouncedQ, category, brand }),
     staleTime: 30_000,
+    refetchInterval: isSyncing ? 4000 : false,
   })
 
   const installedQuery = useQuery({
     queryKey: ['marketplace-installed'],
     queryFn: getInstalledMarketplacePaths,
     staleTime: 30_000,
-  })
-
-  const syncStatusQuery = useQuery({
-    queryKey: ['marketplace-sync-status'],
-    queryFn: getMarketplaceSyncStatus,
-    refetchInterval: 5000,
   })
 
   const syncMutation = useMutation({
@@ -130,10 +172,10 @@ export function MarketplacePage() {
 
   const installedPaths = new Set(installedQuery.data || [])
   const items = listQuery.data || []
-  const syncStatus = syncStatusQuery.data
-  const categories = categoriesQuery.data || []
+  const categories = Array.isArray(categoriesQuery.data) ? categoriesQuery.data : []
+  const brands = Array.isArray(brandsQuery.data) ? brandsQuery.data : []
+  const totalCount = typeof countQuery.data?.total === 'number' ? countQuery.data.total : null
 
-  const isSyncing = syncStatus?.status === 'running'
   const neverSynced = !isSyncing && !syncStatus?.last_synced
 
   function formatSyncStatus() {
@@ -164,8 +206,26 @@ export function MarketplacePage() {
             placeholder={t('marketplace.searchPlaceholder')}
           />
         </div>
-        <div className="w-full sm:w-36">
-          <SelectField value={category} onChange={(e) => setCategory(e.target.value)}>
+        <div className="w-full sm:w-44">
+          <SelectField
+            value={brand}
+            onChange={(e) => setBrand(e.target.value)}
+            searchable
+            searchPlaceholder={t('marketplace.brandSearch')}
+          >
+            <option value="">{t('marketplace.brandAll')}</option>
+            {brands.map((b) => (
+              <option key={b} value={b}>{b}</option>
+            ))}
+          </SelectField>
+        </div>
+        <div className="w-full sm:w-44">
+          <SelectField
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            searchable
+            searchPlaceholder={t('marketplace.categorySearch')}
+          >
             <option value="">{t('marketplace.categoryAll')}</option>
             {categories.map((cat) => (
               <option key={cat} value={cat}>
@@ -185,6 +245,9 @@ export function MarketplacePage() {
             ].join(' ')}
           >
             {formatSyncStatus()}
+            {totalCount !== null && !isSyncing && syncStatus.last_synced
+              ? ` · ${totalCount} ${t('marketplace.totalRemotes')}`
+              : null}
           </span>
         )}
         <Button
@@ -233,7 +296,7 @@ export function MarketplacePage() {
           setInstallTarget(null)
           queryClient.invalidateQueries({ queryKey: ['remotes'] })
           queryClient.invalidateQueries({ queryKey: ['marketplace-installed'] })
-          queryClient.invalidateQueries({ queryKey: ['marketplace', debouncedQ, category] })
+          queryClient.invalidateQueries({ queryKey: ['marketplace', debouncedQ, category, brand] })
         }}
       />
     </div>

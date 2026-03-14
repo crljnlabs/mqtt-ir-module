@@ -1186,14 +1186,25 @@ class _MarketplaceInstallBody(BaseModel):
 def marketplace_index_list(
     q: Optional[str] = None,
     category: Optional[str] = None,
+    brand: Optional[str] = None,
     source: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    return database.marketplace.search(q=q, category=category, source=source)
+    return database.marketplace.search(q=q, category=category, brand=brand, source=source)
 
 
 @api.get("/marketplace/categories")
 def marketplace_categories() -> List[str]:
     return database.marketplace.list_categories()
+
+
+@api.get("/marketplace/brands")
+def marketplace_brands(category: Optional[str] = None) -> List[str]:
+    return database.marketplace.list_brands(category=category)
+
+
+@api.get("/marketplace/count")
+def marketplace_count() -> Dict[str, Any]:
+    return {"total": database.marketplace.count()}
 
 
 @api.get("/marketplace/sync/status")

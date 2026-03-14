@@ -49,14 +49,17 @@ class GitHubMarketplaceIndex:
             return dict(self._status)
 
     def auto_sync(self) -> None:
-        """Trigger a sync only if the local index is empty. Called at server startup."""
+        """Trigger an incremental sync on startup.
+
+        Always runs because the SHA comparison in _run_sync makes it cheap:
+        only new or changed files are downloaded. This also recovers from
+        interrupted syncs that left the index incomplete.
+        """
         try:
-            count = self._db.marketplace.count()
-            if count == 0:
-                logger.info("Marketplace index is empty — starting initial sync")
-                self.trigger_sync()
+            self.trigger_sync()
+            logger.info("Marketplace auto-sync started")
         except Exception as exc:
-            logger.error(f"Marketplace auto-sync check failed: {exc}")
+            logger.error(f"Marketplace auto-sync failed to start: {exc}")
 
     def trigger_sync(self) -> bool:
         """Start a background sync. Returns False if a sync is already running."""

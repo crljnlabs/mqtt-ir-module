@@ -124,6 +124,7 @@ class Marketplace(DatabaseBase):
         self,
         q: Optional[str] = None,
         category: Optional[str] = None,
+        brand: Optional[str] = None,
         source: Optional[str] = None,
         conn: Optional[sqlite3.Connection] = None,
     ) -> List[Dict[str, Any]]:
@@ -137,6 +138,9 @@ class Marketplace(DatabaseBase):
         if category:
             conditions.append("category = ?")
             params.append(category)
+        if brand:
+            conditions.append("brand = ?")
+            params.append(brand)
         if source:
             conditions.append("source = ?")
             params.append(source)
@@ -180,6 +184,25 @@ class Marketplace(DatabaseBase):
             rows = c.execute(
                 "SELECT DISTINCT category FROM marketplace_remotes ORDER BY category"
             ).fetchall()
+            return [r[0] for r in rows]
+        finally:
+            if close:
+                c.close()
+
+    def list_brands(
+        self, category: Optional[str] = None, conn: Optional[sqlite3.Connection] = None
+    ) -> List[str]:
+        c, close = self._use_conn(conn)
+        try:
+            if category:
+                rows = c.execute(
+                    "SELECT DISTINCT brand FROM marketplace_remotes WHERE category = ? ORDER BY brand",
+                    (category,),
+                ).fetchall()
+            else:
+                rows = c.execute(
+                    "SELECT DISTINCT brand FROM marketplace_remotes ORDER BY brand"
+                ).fetchall()
             return [r[0] for r in rows]
         finally:
             if close:
