@@ -1,5 +1,6 @@
 #include "agent_ir.h"
 
+#include "agent_logs.h"
 #include "agent_state.h"
 
 #include <IRremoteESP8266.h>
@@ -38,25 +39,41 @@ void applyLearningReceiverState() {
 }
 
 void initIrHardware() {
+  logWarn("ir", String("initIrHardware: start has_sender=") + (gIrSender ? "1" : "0") + " has_receiver=" + (gIrReceiver ? "1" : "0"));
   if (gIrSender) {
+    logWarn("ir", "initIrHardware: deleting sender");
     delete gIrSender;
     gIrSender = nullptr;
+    logWarn("ir", "initIrHardware: sender deleted");
   }
   if (gIrReceiver) {
+    logWarn("ir", String("initIrHardware: disabling receiver enabled=") + (gIrReceiverEnabled ? "1" : "0"));
+    if (gIrReceiverEnabled) {
+      gIrReceiver->disableIRIn();
+      gIrReceiverEnabled = false;
+      logWarn("ir", "initIrHardware: receiver disabled");
+    }
+    logWarn("ir", "initIrHardware: deleting receiver");
     delete gIrReceiver;
     gIrReceiver = nullptr;
-    gIrReceiverEnabled = false;
+    logWarn("ir", "initIrHardware: receiver deleted");
   }
-
   if (isValidPin(gRuntimeConfig.irTxPin)) {
+    logWarn("ir", String("initIrHardware: creating sender pin=") + gRuntimeConfig.irTxPin);
     gIrSender = new IRsend(static_cast<uint16_t>(gRuntimeConfig.irTxPin));
+    logWarn("ir", "initIrHardware: calling sender begin");
     gIrSender->begin();
+    logWarn("ir", "initIrHardware: sender ready");
   }
   if (isValidPin(gRuntimeConfig.irRxPin)) {
+    logWarn("ir", String("initIrHardware: creating receiver pin=") + gRuntimeConfig.irRxPin);
     gIrReceiver = new IRrecv(static_cast<uint16_t>(gRuntimeConfig.irRxPin), 1024, 15, true);
     gIrReceiverEnabled = false;
+    logWarn("ir", "initIrHardware: receiver created");
   }
+  logWarn("ir", "initIrHardware: calling applyLearningReceiverState");
   applyLearningReceiverState();
+  logWarn("ir", "initIrHardware: done");
 }
 
 String buildRawTextFromDecode(const decode_results& result) {

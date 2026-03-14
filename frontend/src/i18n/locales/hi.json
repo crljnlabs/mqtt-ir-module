@@ -353,5 +353,31 @@
     "deleteForceLabel": "मैं समझता/समझती हूँ और अभी इस एजेंट को फ़ोर्स डिलीट करना चाहता/चाहती हूँ।",
     "deleteForceOptionalInfo": "फ़ोर्स डिलीट इस एजेंट को बिना पुष्टि का इंतज़ार किए तुरंत हटा देता है। इसका उपयोग करें यदि एजेंट प्रतिसाद नहीं दे रहा या रीसेट हो गया है।",
     "nameLabel": "Agent name"
+  },
+  "marketplace": {
+    "nav": "मार्केटप्लेस",
+    "title": "मार्केटप्लेस",
+    "searchPlaceholder": "ब्रांड या मॉडल खोजें...",
+    "categoryAll": "सभी श्रेणियाँ",
+    "categorySearch": "श्रेणी खोजें...",
+    "brandAll": "सभी ब्रांड",
+    "brandSearch": "ब्रांड खोजें...",
+    "totalRemotes": "रिमोट",
+    "sourceLink": "GitHub पर Flipper IRDB देखें",
+    "syncButton": "सिंक करें",
+    "syncRunning": "सिंक हो रहा है...",
+    "syncError": "सिंक विफल",
+    "syncNever": "अभी तक सिंक नहीं हुआ। लाइब्रेरी लाने के लिए सिंक करें।",
+    "syncLastAt": "अंतिम सिंक: {{when}}",
+    "installButton": "इंस्टॉल करें",
+    "installedBadge": "इंस्टॉल हो गया",
+    "noResults": "कोई रिमोट नहीं मिला।",
+    "buttonCount_one": "{{count}} बटन",
+    "buttonCount_other": "{{count}} बटन",
+    "installTitle": "रिमोट इंस्टॉल करें",
+    "remoteNameLabel": "रिमोट का नाम",
+    "installConfirm": "इंस्टॉल करें",
+    "installSuccess": "रिमोट इंस्टॉल हो गया।",
+    "installFailed": "इंस्टॉल विफल।"
   }
 }

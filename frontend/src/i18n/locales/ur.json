@@ -353,5 +353,31 @@
     "deleteForceLabel": "میں سمجھتا ہوں اور ابھی اس ایجنٹ کو فورس ڈیلیٹ کرنا چاہتا ہوں۔",
     "deleteForceOptionalInfo": "فورس ڈیلیٹ اس ایجنٹ کو تصدیق کا انتظار کیے بغیر فوری طور پر ہٹا دیتا ہے۔ اسے استعمال کریں اگر ایجنٹ جواب نہ دے یا ری سیٹ ہو گیا ہو۔",
     "nameLabel": "Agent name"
+  },
+  "marketplace": {
+    "nav": "مارکیٹ پلیس",
+    "title": "مارکیٹ پلیس",
+    "searchPlaceholder": "برانڈ یا ماڈل تلاش کریں...",
+    "categoryAll": "تمام اقسام",
+    "categorySearch": "قسم تلاش کریں...",
+    "brandAll": "تمام برانڈز",
+    "brandSearch": "برانڈ تلاش کریں...",
+    "totalRemotes": "ریموٹ",
+    "sourceLink": "GitHub پر Flipper IRDB دیکھیں",
+    "syncButton": "مطابقت کریں",
+    "syncRunning": "مطابقت ہو رہی ہے...",
+    "syncError": "مطابقت ناکام",
+    "syncNever": "ابھی تک مطابقت نہیں ہوئی۔ لائبریری لانے کے لیے مطابقت کریں۔",
+    "syncLastAt": "آخری مطابقت: {{when}}",
+    "installButton": "انسٹال کریں",
+    "installedBadge": "انسٹال ہو گیا",
+    "noResults": "کوئی ریموٹ نہیں ملا۔",
+    "buttonCount_one": "{{count}} بٹن",
+    "buttonCount_other": "{{count}} بٹن",
+    "installTitle": "ریموٹ انسٹال کریں",
+    "remoteNameLabel": "ریموٹ کا نام",
+    "installConfirm": "انسٹال کریں",
+    "installSuccess": "ریموٹ انسٹال ہو گیا۔",
+    "installFailed": "انسٹال ناکام ہوا۔"
   }
 }

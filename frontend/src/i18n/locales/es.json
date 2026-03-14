@@ -219,9 +219,9 @@
     "learningActiveBody": "El aprendizaje ya está activo. Detén la sesión actual y vuelve a intentarlo.",
     "signalExistsBody": "Esta señal ya existe. Elige volver a aprender o sobrescribir para reemplazarla.",
     "sendWhileLearningBody": "Detén el aprendizaje antes de enviar una señal.",
-
     "agentOfflineTitle": "Agente asignado sin conexión",
-    "agentOfflineBody": "El agente seleccionado está sin conexión o no disponible. Elija otro agente o conéctelo.",    "badRequestTitle": "Solicitud inválida",
+    "agentOfflineBody": "El agente seleccionado está sin conexión o no disponible. Elija otro agente o conéctelo.",
+    "badRequestTitle": "Solicitud inválida",
     "badRequestBody": "Revisa los datos e inténtalo de nuevo.",
     "nameRequiredBody": "Introduce un nombre para continuar.",
     "settingsMissingBody": "Cambia al menos un ajuste antes de guardar.",
@@ -347,5 +347,31 @@
     "deleteForceWarning": "Este agente está instalando firmware. El borrado forzado lo elimina de inmediato sin esperar confirmación del agente.",
     "deleteForceLabel": "Entiendo esto y quiero forzar el borrado de este agente ahora.",
     "deleteForceOptionalInfo": "El borrado forzado elimina este agente inmediatamente sin esperar confirmación. Úsalo si el agente no responde o ha sido reiniciado."
+  },
+  "marketplace": {
+    "nav": "Tienda",
+    "title": "Tienda",
+    "searchPlaceholder": "Buscar marca o modelo...",
+    "categoryAll": "Todas las categorías",
+    "categorySearch": "Buscar categoría...",
+    "brandAll": "Todas las marcas",
+    "brandSearch": "Buscar marca...",
+    "totalRemotes": "mandos",
+    "sourceLink": "Ver Flipper IRDB en GitHub",
+    "syncButton": "Sincronizar",
+    "syncRunning": "Sincronizando...",
+    "syncError": "Error de sincronización",
+    "syncNever": "Aún no sincronizado. Obtén la biblioteca para explorar.",
+    "syncLastAt": "Última sincronización: {{when}}",
+    "installButton": "Instalar",
+    "installedBadge": "Instalado",
+    "noResults": "No se encontraron mandos.",
+    "buttonCount_one": "{{count}} botón",
+    "buttonCount_other": "{{count}} botones",
+    "installTitle": "Instalar mando",
+    "remoteNameLabel": "Nombre del mando",
+    "installConfirm": "Instalar",
+    "installSuccess": "Mando instalado.",
+    "installFailed": "Error al instalar."
   }
 }

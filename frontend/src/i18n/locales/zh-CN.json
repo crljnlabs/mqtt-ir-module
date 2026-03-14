@@ -353,5 +353,31 @@
     "deleteForceLabel": "我已了解，并希望现在强制删除该代理。",
     "deleteForceOptionalInfo": "强制删除会立即移除此代理，无需等待代理确认。若代理无响应或已被重置，请使用此选项。",
     "nameLabel": "Agent name"
+  },
+  "marketplace": {
+    "nav": "商城",
+    "title": "商城",
+    "searchPlaceholder": "搜索品牌或型号...",
+    "categoryAll": "所有分类",
+    "categorySearch": "搜索分类...",
+    "brandAll": "所有品牌",
+    "brandSearch": "搜索品牌...",
+    "totalRemotes": "个遥控器",
+    "sourceLink": "在 GitHub 上浏览 Flipper IRDB",
+    "syncButton": "同步",
+    "syncRunning": "同步中...",
+    "syncError": "同步失败",
+    "syncNever": "尚未同步，请获取遥控库以浏览。",
+    "syncLastAt": "上次同步：{{when}}",
+    "installButton": "安装",
+    "installedBadge": "已安装",
+    "noResults": "未找到遥控器。",
+    "buttonCount_one": "{{count}} 个按键",
+    "buttonCount_other": "{{count}} 个按键",
+    "installTitle": "安装遥控器",
+    "remoteNameLabel": "遥控器名称",
+    "installConfirm": "安装",
+    "installSuccess": "遥控器已安装。",
+    "installFailed": "安装失败。"
   }
 }

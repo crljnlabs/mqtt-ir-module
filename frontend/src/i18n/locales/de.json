@@ -359,5 +359,31 @@
     "deleteForceOptionalInfo": "Erzwungenes Löschen entfernt den Agenten sofort, ohne auf dessen Bestätigung zu warten. Verwende dies, wenn der Agent nicht antwortet oder neu geflasht wurde.",
     "nameLabel": "Agent name",
     "onlyWhenOnline": "Nur änderbar wenn der Agent online ist."
+  },
+  "marketplace": {
+    "nav": "Marktplatz",
+    "title": "Marktplatz",
+    "searchPlaceholder": "Marke oder Modell suchen...",
+    "categoryAll": "Alle Kategorien",
+    "categorySearch": "Kategorie suchen...",
+    "brandAll": "Alle Marken",
+    "brandSearch": "Marke suchen...",
+    "totalRemotes": "Fernbedienungen",
+    "sourceLink": "Flipper IRDB auf GitHub",
+    "syncButton": "Synchronisieren",
+    "syncRunning": "Synchronisierung...",
+    "syncError": "Synchronisierung fehlgeschlagen",
+    "syncNever": "Noch nicht synchronisiert. Bibliothek abrufen zum Stöbern.",
+    "syncLastAt": "Zuletzt synchronisiert: {{when}}",
+    "installButton": "Installieren",
+    "installedBadge": "Installiert",
+    "noResults": "Keine Fernbedienungen gefunden.",
+    "buttonCount_one": "{{count}} Taste",
+    "buttonCount_other": "{{count}} Tasten",
+    "installTitle": "Fernbedienung installieren",
+    "remoteNameLabel": "Name der Fernbedienung",
+    "installConfirm": "Installieren",
+    "installSuccess": "Fernbedienung installiert.",
+    "installFailed": "Installation fehlgeschlagen."
   }
 }

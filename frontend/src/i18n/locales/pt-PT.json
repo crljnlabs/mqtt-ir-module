@@ -353,5 +353,31 @@
     "deleteForceLabel": "Compreendo e quero forçar a eliminação deste agente agora.",
     "deleteForceOptionalInfo": "A eliminação forçada remove este agente de imediato sem aguardar confirmação. Utilize isto se o agente não responder ou tiver sido reiniciado.",
     "nameLabel": "Agent name"
+  },
+  "marketplace": {
+    "nav": "Loja",
+    "title": "Loja",
+    "searchPlaceholder": "Pesquisar marca ou modelo...",
+    "categoryAll": "Todas as categorias",
+    "categorySearch": "Pesquisar categoria...",
+    "brandAll": "Todas as marcas",
+    "brandSearch": "Pesquisar marca...",
+    "totalRemotes": "comandos",
+    "sourceLink": "Ver Flipper IRDB no GitHub",
+    "syncButton": "Sincronizar",
+    "syncRunning": "A sincronizar...",
+    "syncError": "Falha na sincronização",
+    "syncNever": "Ainda não sincronizado. Obtenha a biblioteca para navegar.",
+    "syncLastAt": "Última sincronização: {{when}}",
+    "installButton": "Instalar",
+    "installedBadge": "Instalado",
+    "noResults": "Nenhum comando encontrado.",
+    "buttonCount_one": "{{count}} botão",
+    "buttonCount_other": "{{count}} botões",
+    "installTitle": "Instalar comando",
+    "remoteNameLabel": "Nome do comando",
+    "installConfirm": "Instalar",
+    "installSuccess": "Comando instalado.",
+    "installFailed": "Falha ao instalar."
   }
 }

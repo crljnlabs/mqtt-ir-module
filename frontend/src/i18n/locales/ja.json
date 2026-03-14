@@ -353,5 +353,31 @@
     "deleteForceLabel": "内容を理解し、このエージェントを今すぐ強制削除します。",
     "deleteForceOptionalInfo": "強制削除はエージェントの確認を待たずに即座に削除します。エージェントが応答しない場合やリセットされた場合に使用してください。",
     "nameLabel": "Agent name"
+  },
+  "marketplace": {
+    "nav": "マーケット",
+    "title": "マーケット",
+    "searchPlaceholder": "ブランドやモデルで検索...",
+    "categoryAll": "すべてのカテゴリ",
+    "categorySearch": "カテゴリを検索...",
+    "brandAll": "すべてのブランド",
+    "brandSearch": "ブランドを検索...",
+    "totalRemotes": "個のリモコン",
+    "sourceLink": "GitHub で Flipper IRDB を見る",
+    "syncButton": "同期",
+    "syncRunning": "同期中...",
+    "syncError": "同期に失敗しました",
+    "syncNever": "未同期です。ライブラリを取得して閲覧できます。",
+    "syncLastAt": "最終同期：{{when}}",
+    "installButton": "インストール",
+    "installedBadge": "インストール済み",
+    "noResults": "リモコンが見つかりません。",
+    "buttonCount_one": "{{count}} ボタン",
+    "buttonCount_other": "{{count}} ボタン",
+    "installTitle": "リモコンをインストール",
+    "remoteNameLabel": "リモコン名",
+    "installConfirm": "インストール",
+    "installSuccess": "リモコンをインストールしました。",
+    "installFailed": "インストールに失敗しました。"
   }
 }

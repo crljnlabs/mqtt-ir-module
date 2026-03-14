@@ -353,5 +353,31 @@
     "deleteForceLabel": "Je comprends et je veux forcer la suppression de cet agent maintenant.",
     "deleteForceOptionalInfo": "La suppression forcée retire cet agent immédiatement sans attendre la confirmation. Utilisez ceci si l'agent ne répond pas ou a été réinitialisé.",
     "nameLabel": "Agent name"
+  },
+  "marketplace": {
+    "nav": "Marketplace",
+    "title": "Marketplace",
+    "searchPlaceholder": "Rechercher marque ou modèle...",
+    "categoryAll": "Toutes les catégories",
+    "categorySearch": "Rechercher une catégorie...",
+    "brandAll": "Toutes les marques",
+    "brandSearch": "Rechercher une marque...",
+    "totalRemotes": "télécommandes",
+    "sourceLink": "Parcourir Flipper IRDB sur GitHub",
+    "syncButton": "Synchroniser",
+    "syncRunning": "Synchronisation...",
+    "syncError": "Échec de la synchronisation",
+    "syncNever": "Pas encore synchronisé. Récupérez la bibliothèque pour naviguer.",
+    "syncLastAt": "Dernière sync : {{when}}",
+    "installButton": "Installer",
+    "installedBadge": "Installé",
+    "noResults": "Aucune télécommande trouvée.",
+    "buttonCount_one": "{{count}} bouton",
+    "buttonCount_other": "{{count}} boutons",
+    "installTitle": "Installer une télécommande",
+    "remoteNameLabel": "Nom de la télécommande",
+    "installConfirm": "Installer",
+    "installSuccess": "Télécommande installée.",
+    "installFailed": "Échec de l'installation."
   }
 }

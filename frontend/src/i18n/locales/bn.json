@@ -353,5 +353,31 @@
     "deleteForceLabel": "আমি বুঝেছি এবং এখনই এই এজেন্টটিকে ফোর্স ডিলিট করতে চাই।",
     "deleteForceOptionalInfo": "ফোর্স ডিলিট এজেন্টের নিশ্চিতকরণ না নিয়ে এটিকে সাথে সাথে মুছে দেয়। এটি ব্যবহার করুন যদি এজেন্টটি সাড়া না দেয় বা রিসেট করা হয়।",
     "nameLabel": "Agent name"
+  },
+  "marketplace": {
+    "nav": "মার্কেটপ্লেস",
+    "title": "মার্কেটপ্লেস",
+    "searchPlaceholder": "ব্র্যান্ড বা মডেল খুঁজুন...",
+    "categoryAll": "সব ক্যাটাগরি",
+    "categorySearch": "ক্যাটাগরি খুঁজুন...",
+    "brandAll": "সব ব্র্যান্ড",
+    "brandSearch": "ব্র্যান্ড খুঁজুন...",
+    "totalRemotes": "রিমোট",
+    "sourceLink": "GitHub-এ Flipper IRDB দেখুন",
+    "syncButton": "সিঙ্ক করুন",
+    "syncRunning": "সিঙ্ক হচ্ছে...",
+    "syncError": "সিঙ্ক ব্যর্থ",
+    "syncNever": "এখনও সিঙ্ক হয়নি। লাইব্রেরি আনতে সিঙ্ক করুন।",
+    "syncLastAt": "শেষ সিঙ্ক: {{when}}",
+    "installButton": "ইনস্টল করুন",
+    "installedBadge": "ইনস্টল হয়েছে",
+    "noResults": "কোনো রিমোট পাওয়া যায়নি।",
+    "buttonCount_one": "{{count}} বাটন",
+    "buttonCount_other": "{{count}} বাটন",
+    "installTitle": "রিমোট ইনস্টল করুন",
+    "remoteNameLabel": "রিমোটের নাম",
+    "installConfirm": "ইনস্টল করুন",
+    "installSuccess": "রিমোট ইনস্টল হয়েছে।",
+    "installFailed": "ইনস্টল ব্যর্থ হয়েছে।"
   }
 }

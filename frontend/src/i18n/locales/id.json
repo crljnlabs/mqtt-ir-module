@@ -219,9 +219,9 @@
     "learningActiveBody": "Pembelajaran sudah aktif. Hentikan sesi saat ini lalu coba lagi.",
     "signalExistsBody": "Sinyal ini sudah ada. Pilih belajar ulang atau timpa untuk menggantinya.",
     "sendWhileLearningBody": "Hentikan pembelajaran sebelum mengirim sinyal.",
-
     "agentOfflineTitle": "Agen yang ditugaskan offline",
-    "agentOfflineBody": "Agen yang dipilih sedang offline atau tidak tersedia. Pilih agen lain atau hubungkan agen tersebut.",    "badRequestTitle": "Permintaan tidak valid",
+    "agentOfflineBody": "Agen yang dipilih sedang offline atau tidak tersedia. Pilih agen lain atau hubungkan agen tersebut.",
+    "badRequestTitle": "Permintaan tidak valid",
     "badRequestBody": "Periksa input dan coba lagi.",
     "nameRequiredBody": "Masukkan nama untuk melanjutkan.",
     "settingsMissingBody": "Ubah setidaknya satu pengaturan sebelum menyimpan.",
@@ -347,5 +347,31 @@
     "deleteForceWarning": "Agen ini sedang memasang firmware. Hapus paksa akan langsung menghapusnya tanpa menunggu konfirmasi dari agen.",
     "deleteForceLabel": "Saya paham dan ingin menghapus paksa agen ini sekarang.",
     "deleteForceOptionalInfo": "Hapus paksa akan menghapus agen ini segera tanpa menunggu konfirmasi. Gunakan ini jika agen tidak merespons atau telah direset."
+  },
+  "marketplace": {
+    "nav": "Pasar",
+    "title": "Pasar",
+    "searchPlaceholder": "Cari merek atau model...",
+    "categoryAll": "Semua kategori",
+    "categorySearch": "Cari kategori...",
+    "brandAll": "Semua merek",
+    "brandSearch": "Cari merek...",
+    "totalRemotes": "remote",
+    "sourceLink": "Lihat Flipper IRDB di GitHub",
+    "syncButton": "Sinkronisasi",
+    "syncRunning": "Menyinkronkan...",
+    "syncError": "Sinkronisasi gagal",
+    "syncNever": "Belum disinkronkan. Ambil pustaka untuk menjelajah.",
+    "syncLastAt": "Terakhir disinkronkan: {{when}}",
+    "installButton": "Pasang",
+    "installedBadge": "Terpasang",
+    "noResults": "Tidak ada remote yang ditemukan.",
+    "buttonCount_one": "{{count}} tombol",
+    "buttonCount_other": "{{count}} tombol",
+    "installTitle": "Pasang remote",
+    "remoteNameLabel": "Nama remote",
+    "installConfirm": "Pasang",
+    "installSuccess": "Remote terpasang.",
+    "installFailed": "Pemasangan gagal."
   }
 }

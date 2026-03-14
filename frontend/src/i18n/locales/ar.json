@@ -219,9 +219,9 @@
     "learningActiveBody": "التعلّم نشط بالفعل. أوقف الجلسة الحالية وحاول مرة أخرى.",
     "signalExistsBody": "هذه الإشارة موجودة بالفعل. اختر إعادة التعلّم أو الاستبدال لاستبدالها.",
     "sendWhileLearningBody": "أوقف التعلّم قبل إرسال إشارة.",
-
     "agentOfflineTitle": "العميل المُعيَّن غير متصل",
-    "agentOfflineBody": "العميل المحدد غير متصل بالإنترنت أو غير متاح. اختر عميلاً آخر أو قم بتشغيله.",    "badRequestTitle": "طلب غير صالح",
+    "agentOfflineBody": "العميل المحدد غير متصل بالإنترنت أو غير متاح. اختر عميلاً آخر أو قم بتشغيله.",
+    "badRequestTitle": "طلب غير صالح",
     "badRequestBody": "تحقق من الإدخال وحاول مرة أخرى.",
     "nameRequiredBody": "أدخل اسماً للمتابعة.",
     "settingsMissingBody": "غيّر إعداداً واحداً على الأقل قبل الحفظ.",
@@ -347,5 +347,31 @@
     "deleteForceWarning": "يقوم هذا الوكيل حاليًا بتثبيت البرنامج الثابت. سيؤدي الحذف الإجباري إلى إزالته فورًا دون انتظار تأكيد من الوكيل.",
     "deleteForceLabel": "أفهم ذلك وأريد حذف هذا الوكيل إجباريًا الآن.",
     "deleteForceOptionalInfo": "يؤدي الحذف الإجباري إلى إزالة هذا الوكيل فورًا دون انتظار تأكيده. استخدم هذا الخيار إذا كان الوكيل لا يستجيب أو أُعيد ضبطه."
+  },
+  "marketplace": {
+    "nav": "السوق",
+    "title": "السوق",
+    "searchPlaceholder": "ابحث عن ماركة أو موديل...",
+    "categoryAll": "جميع الفئات",
+    "categorySearch": "ابحث عن فئة...",
+    "brandAll": "جميع الماركات",
+    "brandSearch": "ابحث عن ماركة...",
+    "totalRemotes": "جهاز تحكم",
+    "sourceLink": "تصفح Flipper IRDB على GitHub",
+    "syncButton": "مزامنة",
+    "syncRunning": "جاري المزامنة...",
+    "syncError": "فشلت المزامنة",
+    "syncNever": "لم تتم المزامنة بعد. جلب مكتبة الأجهزة للتصفح.",
+    "syncLastAt": "آخر مزامنة: {{when}}",
+    "installButton": "تثبيت",
+    "installedBadge": "مثبت",
+    "noResults": "لم يتم العثور على أجهزة تحكم.",
+    "buttonCount_one": "زر واحد",
+    "buttonCount_other": "{{count}} أزرار",
+    "installTitle": "تثبيت جهاز التحكم",
+    "remoteNameLabel": "اسم جهاز التحكم",
+    "installConfirm": "تثبيت",
+    "installSuccess": "تم تثبيت جهاز التحكم.",
+    "installFailed": "فشل التثبيت."
   }
 }

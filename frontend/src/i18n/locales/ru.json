@@ -353,5 +353,31 @@
     "deleteForceLabel": "Я понимаю это и хочу принудительно удалить этого агента сейчас.",
     "deleteForceOptionalInfo": "Принудительное удаление немедленно удаляет агента без ожидания подтверждения. Используйте это, если агент не отвечает или был сброшен.",
     "nameLabel": "Agent name"
+  },
+  "marketplace": {
+    "nav": "Маркетплейс",
+    "title": "Маркетплейс",
+    "searchPlaceholder": "Поиск по марке или модели...",
+    "categoryAll": "Все категории",
+    "categorySearch": "Поиск категории...",
+    "brandAll": "Все марки",
+    "brandSearch": "Поиск марки...",
+    "totalRemotes": "пультов",
+    "sourceLink": "Flipper IRDB на GitHub",
+    "syncButton": "Синхронизировать",
+    "syncRunning": "Синхронизация...",
+    "syncError": "Ошибка синхронизации",
+    "syncNever": "Ещё не синхронизировано. Загрузите библиотеку.",
+    "syncLastAt": "Последняя синхронизация: {{when}}",
+    "installButton": "Установить",
+    "installedBadge": "Установлено",
+    "noResults": "Пульты не найдены.",
+    "buttonCount_one": "{{count}} кнопка",
+    "buttonCount_other": "{{count}} кнопок",
+    "installTitle": "Установить пульт",
+    "remoteNameLabel": "Название пульта",
+    "installConfirm": "Установить",
+    "installSuccess": "Пульт установлен.",
+    "installFailed": "Ошибка установки."
   }
 }
