@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import asyncio
 import json
+import logging
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -395,8 +396,32 @@ def _require_agent_compatible_learn(agent_id: str) -> None:
         )
 
 
+_APP_LOG_MODULES = (
+    "agents", "connections", "database", "electronics",
+    "firmware", "helper", "marketplace",
+)
+
+
+def _setup_app_logging() -> None:
+    """Align all app module loggers with uvicorn's output style.
+
+    Uvicorn owns the root logger; we attach a dedicated handler to each app
+    sub-package so their messages appear with level + name instead of a bare
+    message string.
+    """
+    fmt = logging.Formatter("%(levelname)-9s %(name)s - %(message)s")
+    handler = logging.StreamHandler()
+    handler.setFormatter(fmt)
+    for name in _APP_LOG_MODULES:
+        log = logging.getLogger(name)
+        log.setLevel(logging.INFO)
+        log.addHandler(handler)
+        log.propagate = False  # don't double-log through uvicorn's root handler
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _setup_app_logging()
     database.init()
     firmware_catalog.ensure_layout()
     # Start marketplace background sync if local index is empty

@@ -30,6 +30,9 @@ _RAW_BASE = f"https://raw.githubusercontent.com/{_REPO}/{_BRANCH}/"
 # Directories to exclude from the index
 _EXCLUDED_PREFIXES = ("_Converted_/",)
 
+_DOWNLOAD_RETRIES = 3
+_RETRY_BACKOFF = (2, 4)  # seconds before 2nd and 3rd attempts
+
 
 class GitHubMarketplaceIndex:
     def __init__(self, database: Any) -> None:
@@ -224,8 +227,18 @@ class GitHubMarketplaceIndex:
         path = item["path"]
         url = _RAW_BASE + urllib.parse.quote(path)
 
-        resp = requests.get(url, timeout=15)
-        resp.raise_for_status()
+        last_exc: Exception = RuntimeError("unreachable")
+        for attempt in range(_DOWNLOAD_RETRIES):
+            if attempt:
+                time.sleep(_RETRY_BACKOFF[attempt - 1])
+            try:
+                resp = requests.get(url, timeout=15)
+                resp.raise_for_status()
+                break
+            except Exception as exc:
+                last_exc = exc
+        else:
+            raise last_exc
 
         parts = path.split("/")
         category = parts[0]
