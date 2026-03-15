@@ -7,7 +7,10 @@ import { getAppConfig } from '../utils/appConfig.js'
 import { getElectronicsStatus, getMqttStatus } from '../api/statusApi.js'
 import { getSettings, updateSettings } from '../api/settingsApi.js'
 import { getFirmwareCatalog } from '../api/firmwareApi.js'
+import Icon from '@mdi/react'
+import { mdiTextBoxSearchOutline } from '@mdi/js'
 import { Button } from '../components/ui/Button.jsx'
+import { IconButton } from '../components/ui/IconButton.jsx'
 import { Modal } from '../components/ui/Modal.jsx'
 import { NumberField } from '../components/ui/NumberField.jsx'
 import { SelectField } from '../components/ui/SelectField.jsx'
@@ -469,9 +472,9 @@ export function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Logs</CardTitle>
-          <Button variant="secondary" size="sm" onClick={() => navigate('/logs', { state: { from: '/settings' } })}>
-            View Logs
-          </Button>
+          <IconButton label="View Logs" onClick={() => navigate('/logs', { state: { from: '/settings' } })}>
+            <Icon path={mdiTextBoxSearchOutline} size={1} />
+          </IconButton>
         </CardHeader>
         <CardBody>
           <div className="text-sm text-[rgb(var(--muted))]">

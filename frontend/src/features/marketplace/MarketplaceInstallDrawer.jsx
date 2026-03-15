@@ -26,11 +26,12 @@ export function MarketplaceInstallDrawer({ open, remote, onClose, onInstall }) {
 
   useEffect(() => {
     if (!open || !remote) return
-    const prefix = (remote.brand || '').replace(/_/g, ' ') + ' '
-    const name = remote.model?.startsWith(prefix)
-      ? remote.model.slice(prefix.length)
-      : remote.model || ''
-    setRemoteName(name)
+    const brand = (remote.brand || '').replace(/_/g, ' ')
+    const model = (remote.model || '').replace(/_/g, ' ')
+    const brandLower = brand.toLowerCase()
+    const modelLower = model.toLowerCase()
+    const startsWithBrand = brand && (modelLower === brandLower || modelLower.startsWith(brandLower + ' '))
+    setRemoteName(startsWithBrand ? model : brand ? `${brand} ${model}` : model)
   }, [open, remote])
 
   if (!remote) return null
