@@ -1,5 +1,7 @@
 import React, { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import Icon from '@mdi/react'
+import { mdiChevronLeft } from '@mdi/js'
 import { cn } from './cn.js'
 
 const TEXTBOX_TYPES = new Set(['text', 'search', 'email', 'url', 'tel', 'password', 'number'])
@@ -19,7 +21,7 @@ function findPrimaryTextbox(container) {
   })
 }
 
-export function Drawer({ open, title, children, footer, onClose, closeOnEscape = true }) {
+export function Drawer({ open, title, children, footer, onClose, onBack, closeOnEscape = true }) {
   const panelRef = useRef(null)
 
   useEffect(() => {
@@ -49,7 +51,21 @@ export function Drawer({ open, title, children, footer, onClose, closeOnEscape =
           className={cn('w-full md:w-[420px] max-h-[90dvh] md:max-h-none rounded-t-2xl md:rounded-none md:rounded-l-2xl border border-[rgb(var(--border))] bg-[rgb(var(--card))] shadow-[var(--shadow)] flex flex-col')}
           ref={panelRef}
         >
-          {title ? <div className="px-4 py-3 border-b border-[rgb(var(--border))] font-semibold">{title}</div> : null}
+          {title ? (
+            <div className="px-4 py-3 border-b border-[rgb(var(--border))] flex items-center gap-2">
+              {onBack ? (
+                <button
+                  type="button"
+                  aria-label="Back"
+                  onClick={onBack}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[rgb(var(--muted))] hover:text-[rgb(var(--fg))] transition cursor-pointer flex-shrink-0"
+                >
+                  <Icon path={mdiChevronLeft} size={1} />
+                </button>
+              ) : null}
+              <span className="font-semibold">{title}</span>
+            </div>
+          ) : null}
           <div className="p-4 overflow-auto">{children}</div>
           {footer ? <div className="px-4 py-3 border-t border-[rgb(var(--border))]">{footer}</div> : null}
         </div>

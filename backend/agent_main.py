@@ -20,7 +20,9 @@ from helper import Environment
 from runtime_version import SOFTWARE_VERSION
 
 AGENT_LOG_STREAM_LEVEL = "info"
-AGENT_PROTOCOL_VERSION = "1"
+SYSTEM_VERSION = 1
+SEND_VERSION = 1
+LEARN_VERSION = 1
 
 env = Environment()
 parser = IrSignalParser()
@@ -43,18 +45,15 @@ state_store = AgentRuntimeStateStore(
     agent_id_resolver=lambda: _resolve_runtime_agent_uid(),
     static_state={
         "agent_type": "docker",
-        "protocol_version": AGENT_PROTOCOL_VERSION,
         "sw_version": SOFTWARE_VERSION,
+        "system_version": SYSTEM_VERSION,
+        "send_version": SEND_VERSION,
+        "learn_version": LEARN_VERSION,
         "can_send": True,
         "can_learn": True,
         "can_learn_hold_batch": True,
         "ota_supported": False,
         "reboot_required": False,
-        "runtime_commands": [
-            "runtime/debug/get",
-            "runtime/debug/set",
-            "runtime/config/get",
-        ],
     },
 )
 agent_log_reporter = AgentLogReporter(
@@ -72,7 +71,6 @@ pairing_manager = PairingManagerAgent(
     can_send=True,
     can_learn=True,
     agent_type="docker",
-    protocol_version=AGENT_PROTOCOL_VERSION,
     ota_supported=False,
     reset_binding=env.agent_pairing_reset,
     log_reporter=agent_log_reporter,

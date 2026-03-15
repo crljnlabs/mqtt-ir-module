@@ -57,6 +57,12 @@ bool executeSendCommand(
     String& errorCode,
     String& errorMessage,
     int& statusCode) {
+  if (gLearningActive) {
+    errorCode = "send_while_learning";
+    errorMessage = "Cannot send while learning is active";
+    statusCode = 409;
+    return false;
+  }
   if (!canSend()) {
     errorCode = "runtime_error";
     errorMessage = "IR sender is not available";
@@ -66,6 +72,32 @@ bool executeSendCommand(
 
   const String mode = String(payload["mode"] | "");
   const String normalizedMode = mode.length() ? mode : "press";
+
+  // Protocol-encoded signals (NEC, Samsung32, SIRC, RC5, RC6, Kaseikyo, JVC).
+  const String signalType = String(payload["signal_type"] | "raw");
+  if (signalType == "protocol") {
+    const String protocolName = String(payload["protocol"] | "");
+    const String addressStr = String(payload["address"] | "");
+    const String commandHexStr = String(payload["command_hex"] | "");
+    if (protocolName.isEmpty() || addressStr.isEmpty() || commandHexStr.isEmpty()) {
+      errorCode = "validation_error";
+      errorMessage = "protocol, address, and command_hex are required for protocol signals";
+      statusCode = 400;
+      return false;
+    }
+    markActivity();
+    if (!sendFrameProtocol(protocolName, addressStr, commandHexStr)) {
+      errorCode = "runtime_error";
+      errorMessage = String("Unsupported or invalid IR protocol: ") + protocolName;
+      statusCode = 409;
+      return false;
+    }
+    result["mode"] = "press";
+    result["repeats"] = 0;
+    result["gap_us"] = nullptr;
+    return true;
+  }
+
   const uint16_t carrierHz = static_cast<uint16_t>(payload["carrier_hz"] | 38000);
   const String pressInitial = String(payload["press_initial"] | "");
   if (pressInitial.isEmpty()) {
@@ -271,11 +303,17 @@ bool executeRuntimeConfigSet(
   const bool changed = (nextRx != gRuntimeConfig.irRxPin) || (nextTx != gRuntimeConfig.irTxPin);
   gRuntimeConfig.irRxPin = nextRx;
   gRuntimeConfig.irTxPin = nextTx;
-  if (changed) {
-    initIrHardware();
-  }
   saveRebootRequired(false);
-  publishState();
+  if (changed) {
+    // RMT hardware teardown (rmt_driver_uninstall) is not safe at runtime regardless of context.
+    // Persist the new pins to NVS and publish the updated state before rebooting so setup()
+    // initialises IR hardware with the correct pins on the next boot.
+    saveRuntimeConfig();
+    publishState();
+    scheduleReboot(kRebootDelayMs);
+  } else {
+    publishState();
+  }
 
   result["ir_rx_pin"] = gRuntimeConfig.irRxPin;
   result["ir_tx_pin"] = gRuntimeConfig.irTxPin;

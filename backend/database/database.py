@@ -1,6 +1,6 @@
 import os
 from database.database_base import DatabaseBase
-from database.schemas import Remotes, Buttons, Signals, Captures, Settings, Agents
+from database.schemas import Remotes, Buttons, Signals, Captures, Settings, Agents, Marketplace
 
 
 class Database(DatabaseBase):
@@ -13,6 +13,7 @@ class Database(DatabaseBase):
         self.captures = Captures(data_dir)
         self.settings = Settings(data_dir)
         self.agents = Agents(data_dir)
+        self.marketplace = Marketplace(data_dir)
 
     def init(self) -> None:
         conn = self._connect()
@@ -23,6 +24,7 @@ class Database(DatabaseBase):
             self.captures._create_schema(conn)
             self.settings._create_schema(conn)
             self.agents._create_schema(conn)
+            self.marketplace._create_schema(conn)
             conn.commit()
         finally:
             conn.close()

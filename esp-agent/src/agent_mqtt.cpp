@@ -13,12 +13,15 @@ namespace agent {
 
 namespace {
 
-bool gRetainedStateReceived = false;
+// Track retained state receipt separately for hub binding and runtime fields.
+bool gRetainedHubStateReceived = false;
+bool gRetainedRuntimeStateReceived = false;
 constexpr unsigned long kRetainedStateTimeoutMs = 1200;
 
 void waitForRetainedStateSnapshot() {
+  // Wait until both retained subtopics are received or the timeout expires.
   const unsigned long deadline = millis() + kRetainedStateTimeoutMs;
-  while (!gRetainedStateReceived && millis() < deadline) {
+  while ((!gRetainedHubStateReceived || !gRetainedRuntimeStateReceived) && millis() < deadline) {
     gMqttClient.loop();
     delay(2);
   }
@@ -28,14 +31,32 @@ void waitForRetainedStateSnapshot() {
 
 void onMqttMessage(char* topicChars, byte* payload, unsigned int length) {
   const String topic(topicChars ? topicChars : "");
-  if (topic == topicState()) {
-    gRetainedStateReceived = true;
+
+  // Restore hub binding from retained state/hub on connect.
+  if (topic == topicStateHub()) {
+    gRetainedHubStateReceived = true;
+    JsonDocument doc;
+    if (!parsePayloadObject(payload, length, doc)) {
+      return;
+    }
+    const String hubId = String(doc["id"] | "");
+    gPairingHubId = hubId;
+    gPairingHubId.trim();
+    return;
+  }
+
+  // Restore operational state from retained state/runtime on connect.
+  if (topic == topicStateRuntime()) {
+    gRetainedRuntimeStateReceived = true;
     JsonDocument doc;
     if (!parsePayloadObject(payload, length, doc)) {
       return;
     }
     if (applyRuntimeStateSnapshot(doc.as<JsonObjectConst>())) {
-      initIrHardware();
+      // Pins differ from NVS defaults (e.g. first boot after factory flash).
+      // Persist and reboot — RMT teardown at runtime causes a hardware panic.
+      saveRuntimeConfig();
+      scheduleReboot(kRebootDelayMs);
     }
     return;
   }
@@ -90,12 +111,12 @@ bool connectMqtt() {
         gAgentId.c_str(),
         gRuntimeConfig.mqttUser.c_str(),
         gRuntimeConfig.mqttPass.c_str(),
-        topicStatus().c_str(),
+        topicStateAvailability().c_str(),
         1,
         true,
         "offline");
   } else {
-    connected = gMqttClient.connect(gAgentId.c_str(), topicStatus().c_str(), 1, true, "offline");
+    connected = gMqttClient.connect(gAgentId.c_str(), topicStateAvailability().c_str(), 1, true, "offline");
   }
 
   if (!connected) {
@@ -107,9 +128,11 @@ bool connectMqtt() {
     return false;
   }
 
-  gMqttClient.publish(topicStatus().c_str(), "online", true);
-  gRetainedStateReceived = false;
-  gMqttClient.subscribe(topicState().c_str());
+  gMqttClient.publish(topicStateAvailability().c_str(), "online", true);
+  gRetainedHubStateReceived = false;
+  gRetainedRuntimeStateReceived = false;
+  gMqttClient.subscribe(topicStateHub().c_str());
+  gMqttClient.subscribe(topicStateRuntime().c_str());
   waitForRetainedStateSnapshot();
   gMqttClient.subscribe("ir/pairing/open");
   gMqttClient.subscribe(topicPairingAccept().c_str());

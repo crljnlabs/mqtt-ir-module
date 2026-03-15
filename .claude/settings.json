@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \":*)",
+      "Bash(wc -l /Users/jonathanhaueis/Coding/mqtt-ir-module/frontend/src/i18n/locales/*.json)",
+      "Bash(grep -n \"class AgentErrorResponse\\\\|AgentErrorResponse\" /Users/jonathanhaueis/Coding/mqtt-ir-module/backend/models/*.py)",
+      "Read(//Users/jonathanhaueis/Coding/mqtt-ir-module/frontend/src/i18n/locales/**)"
+    ],
+    "additionalDirectories": [
+      "/Users/jonathanhaueis/Coding/mqtt-ir-module/backend"
+    ]
+  }
+}

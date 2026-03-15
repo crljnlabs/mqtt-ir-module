@@ -6,7 +6,7 @@ import { mdiHomeOutline, mdiRemoteTv, mdiCogOutline, mdiAccountGroupOutline } fr
 
 function isActive(pathname, to) {
   if (to === '/') return pathname === '/'
-  if (to === '/remotes') return pathname.startsWith('/remotes')
+  if (to === '/remotes') return pathname.startsWith('/remotes') || pathname.startsWith('/marketplace')
   if (to === '/agents') return pathname === '/agents' || pathname.startsWith('/agent/')
   if (to === '/settings') return pathname.startsWith('/settings')
   return pathname === to

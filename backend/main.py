@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import asyncio
 import json
+import logging
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -13,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from agents import (
     AgentRegistry,
-    AgentRoutingError,
+    AgentError,
     LocalAgent,
     LocalTransport,
     MqttAgent,
@@ -56,15 +57,26 @@ from connections import (
 from firmware import FirmwareCatalog
 from helper import Environment, SettingsCipher
 from database import Database
+from marketplace import GitHubMarketplaceIndex, InstallService
+from marketplace.ir_protocol_utils import get_mqtt_protocol_payload
+from pydantic import BaseModel
 from runtime_version import SOFTWARE_VERSION
 
 LOCAL_AGENT_LOG_STREAM_LEVEL = "info"
-AGENT_PROTOCOL_VERSION = "1"
+# Protocol version integers — increment the relevant constant for any breaking change.
+# system: state topic structure, pairing, OTA handshake, LWT format → mismatch requires reflash
+# send: IR send command topic/payload format
+# learn: IR learn flow topics/payloads
+SYSTEM_VERSION = 1
+SEND_VERSION = 1
+LEARN_VERSION = 1
 
 env = Environment()
 database = Database(data_dir=env.data_folder)
 settings_cipher = SettingsCipher(env.settings_master_key)
 firmware_catalog = FirmwareCatalog(root_dir=env.firmware_dir)
+marketplace_index = GitHubMarketplaceIndex(database=database)
+install_service = InstallService(database=database)
 
 parser = IrSignalParser()
 aggregator = IrSignalAggregator()
@@ -132,7 +144,7 @@ def require_api_key(x_api_key: Optional[str]) -> None:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
 
-def agent_error_response(error: AgentRoutingError) -> JSONResponse:
+def agent_error_response(error: AgentError) -> JSONResponse:
     payload = AgentErrorResponse(code=error.code, message=error.message)
     return JSONResponse(
         status_code=error.status_code,
@@ -189,9 +201,6 @@ def register_external_mqtt_agent(agent_data: Dict[str, Any], online: bool = True
     agent_type = str(runtime_state.get("agent_type") or "").strip().lower()
     if agent_type:
         capabilities["agent_type"] = agent_type
-    protocol_version = str(runtime_state.get("protocol_version") or "").strip()
-    if protocol_version:
-        capabilities["protocol_version"] = protocol_version
     capabilities["ota_supported"] = bool(runtime_state.get("ota_supported"))
     if runtime_state.get("can_learn_hold_batch"):
         capabilities["can_learn_hold_batch"] = True
@@ -263,16 +272,20 @@ def _decorate_agent_payload(agent: Dict[str, Any]) -> Dict[str, Any]:
 
     sw_version = str(runtime_state.get("sw_version") or payload.get("sw_version") or "").strip()
     agent_type = _normalize_agent_type(runtime_state.get("agent_type"), transport=transport)
-    protocol_version = str(runtime_state.get("protocol_version") or AGENT_PROTOCOL_VERSION).strip() or AGENT_PROTOCOL_VERSION
     ota_supported = bool(runtime_state.get("ota_supported"))
     reboot_required = bool(runtime_state.get("reboot_required"))
-    runtime_commands = runtime_state.get("runtime_commands")
-    if not isinstance(runtime_commands, list):
-        runtime_commands = []
+
+    # Version compatibility — compare agent's reported versions against hub constants.
+    # Missing version (0) is treated as compatible to avoid false blocks during startup.
+    agent_system = int(runtime_state.get("system_version") or 0)
+    agent_send = int(runtime_state.get("send_version") or 0)
+    agent_learn = int(runtime_state.get("learn_version") or 0)
+    compatible_system = agent_system == 0 or agent_system == SYSTEM_VERSION
+    compatible_send = agent_send == 0 or agent_send == SEND_VERSION
+    compatible_learn = agent_learn == 0 or agent_learn == LEARN_VERSION
 
     runtime_payload: Dict[str, Any] = {
         "agent_type": agent_type,
-        "protocol_version": protocol_version,
         "sw_version": sw_version,
         "can_send": can_send,
         "can_learn": can_learn,
@@ -284,10 +297,7 @@ def _decorate_agent_payload(agent: Dict[str, Any]) -> Dict[str, Any]:
         "free_heap": runtime_state.get("free_heap"),
         "ir_rx_pin": runtime_state.get("ir_rx_pin"),
         "ir_tx_pin": runtime_state.get("ir_tx_pin"),
-        "power_mode": str(runtime_state.get("power_mode") or "").strip().lower(),
-        "runtime_commands": runtime_commands,
         "state_seen_at": runtime_state.get("state_seen_at"),
-        "state_updated_at": runtime_state.get("updated_at"),
     }
 
     ota_payload = {
@@ -333,8 +343,12 @@ def _decorate_agent_payload(agent: Dict[str, Any]) -> Dict[str, Any]:
         "can_learn": can_learn,
         "sw_version": sw_version,
         "agent_type": agent_type,
-        "protocol_version": protocol_version,
         "ota_supported": ota_supported,
+    }
+    payload["compatibility"] = {
+        "system": compatible_system,
+        "send": compatible_send,
+        "learn": compatible_learn,
     }
     payload["installation"] = installation
     return payload
@@ -356,10 +370,62 @@ def _require_agent_not_installing(agent_id: str) -> None:
     )
 
 
+def _require_agent_compatible_send(agent_id: str) -> None:
+    """Raise AgentError if the agent's send protocol version mismatches the hub."""
+    from agents.errors import AgentError
+    state = runtime_state_hub.get_state(agent_id) or {}
+    agent_send = int(state.get("send_version") or 0)
+    if agent_send != 0 and agent_send != SEND_VERSION:
+        raise AgentError(
+            code="agent_incompatible_send",
+            message="Agent send protocol is incompatible. Firmware update required.",
+            status_code=503,
+        )
+
+
+def _require_agent_compatible_learn(agent_id: str) -> None:
+    """Raise AgentError if the agent's learn protocol version mismatches the hub."""
+    from agents.errors import AgentError
+    state = runtime_state_hub.get_state(agent_id) or {}
+    agent_learn = int(state.get("learn_version") or 0)
+    if agent_learn != 0 and agent_learn != LEARN_VERSION:
+        raise AgentError(
+            code="agent_incompatible_learn",
+            message="Agent learn protocol is incompatible. Firmware update required.",
+            status_code=503,
+        )
+
+
+_APP_LOG_MODULES = (
+    "agents", "connections", "database", "electronics",
+    "firmware", "helper", "marketplace",
+)
+
+
+def _setup_app_logging() -> None:
+    """Align all app module loggers with uvicorn's output style.
+
+    Uvicorn owns the root logger; we attach a dedicated handler to each app
+    sub-package so their messages appear with level + name instead of a bare
+    message string.
+    """
+    fmt = logging.Formatter("%(levelname)-9s %(name)s - %(message)s")
+    handler = logging.StreamHandler()
+    handler.setFormatter(fmt)
+    for name in _APP_LOG_MODULES:
+        log = logging.getLogger(name)
+        log.setLevel(logging.INFO)
+        log.addHandler(handler)
+        log.propagate = False  # don't double-log through uvicorn's root handler
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _setup_app_logging()
     database.init()
     firmware_catalog.ensure_layout()
+    # Start marketplace background sync if local index is empty
+    marketplace_index.auto_sync()
     # Load persisted learning defaults after the settings table exists.
     learning.apply_learning_settings(database.settings.get_learning_settings())
     # Store the running loop so sync code can broadcast status updates.
@@ -404,8 +470,8 @@ app = FastAPI(
 )
 
 
-@app.exception_handler(AgentRoutingError)
-async def agent_routing_error_handler(request: Request, exc: AgentRoutingError) -> JSONResponse:
+@app.exception_handler(AgentError)
+async def agent_error_handler(request: Request, exc: AgentError) -> JSONResponse:
     return agent_error_response(exc)
 
 app.add_middleware(
@@ -685,6 +751,16 @@ def get_agent_logs(agent_id: str, limit: int = 100) -> Dict[str, Any]:
     }
 
 
+@api.delete("/agents/{agent_id}/logs")
+def delete_agent_logs(agent_id: str, x_api_key: Optional[str] = Header(default=None)) -> Dict[str, Any]:
+    require_api_key(x_api_key)
+    agent = agent_registry.get_agent(agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Unknown agent_id")
+    agent_log_hub.clear_agent_logs(agent_id)
+    return {"agent_id": str(agent.get("agent_id") or agent_id), "cleared": True}
+
+
 @api.websocket("/agents/{agent_id}/logs/ws")
 async def agent_logs_ws(agent_id: str, websocket: WebSocket) -> None:
     agent = agent_registry.get_agent(agent_id)
@@ -694,7 +770,9 @@ async def agent_logs_ws(agent_id: str, websocket: WebSocket) -> None:
     await agent_log_hub.connect(agent_id, websocket)
     try:
         while True:
-            await websocket.receive()
+            msg = await websocket.receive()
+            if msg["type"] == "websocket.disconnect":
+                break
     except WebSocketDisconnect:
         pass
     finally:
@@ -855,11 +933,15 @@ def update_settings(body: SettingsUpdate, x_api_key: Optional[str] = Header(defa
         if mqtt_runtime_changed:
             command_client.stop()
             pairing_manager.stop()
+            availability_hub.stop()
+            installation_state_hub.stop()
             runtime_state_hub.stop()
             agent_log_hub.stop()
             runtime_loader.reload()
             agent_log_hub.start()
             runtime_state_hub.start()
+            installation_state_hub.start()
+            availability_hub.start()
             command_client.start()
             pairing_manager.start()
         return decorate_settings_payload(updated)
@@ -992,9 +1074,13 @@ def delete_button(button_id: int, x_api_key: Optional[str] = Header(default=None
 def learn_start(body: LearnStart, x_api_key: Optional[str] = Header(default=None)) -> LearnStartResponse:
     require_api_key(x_api_key)
     try:
+        remote = database.remotes.get(body.remote_id)
+        if remote:
+            pre_agent = agent_registry.resolve_agent_for_remote(remote_id=body.remote_id, remote=remote)
+            _require_agent_compatible_learn(pre_agent.agent_id)
         result = learning.start(remote_id=body.remote_id, extend=body.extend)
         return LearnStartResponse.model_validate(result)
-    except AgentRoutingError:
+    except AgentError:
         raise
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -1027,7 +1113,7 @@ def learn_capture(body: LearnCapture, x_api_key: Optional[str] = Header(default=
             button_name=body.button_name,
         )
         return LearnCaptureResponse.model_validate(result)
-    except AgentRoutingError:
+    except AgentError:
         raise
     except TimeoutError as e:
         raise HTTPException(status_code=408, detail=str(e))
@@ -1085,25 +1171,34 @@ def send_ir(body: SendRequest, x_api_key: Optional[str] = Header(default=None)) 
 
         remote = database.remotes.get(int(button["remote_id"]))
         agent = agent_registry.resolve_agent_for_remote(remote_id=int(remote["id"]), remote=remote)
+        _require_agent_compatible_send(agent.agent_id)
         if learning.is_learning_for_agent(agent.agent_id):
-            raise HTTPException(status_code=409, detail="Cannot send while learning is active on this agent")
+            raise AgentError(code="send_while_learning", message="Cannot send while learning is active", status_code=409)
 
+        encoding = str(signals.get("encoding") or "raw").strip().lower()
         payload = {
             "button_id": body.button_id,
             "mode": body.mode,
             "hold_ms": body.hold_ms,
+            "encoding": encoding,
+            "signal_type": "protocol" if encoding == "protocol" else "raw",
+            # Raw signal fields
             "press_initial": signals.get("press_initial"),
             "hold_initial": signals.get("hold_initial"),
             "hold_repeat": signals.get("hold_repeat"),
             "hold_gap_us": signals.get("hold_gap_us"),
-            "carrier_hz": remote.get("carrier_hz"),
-            "duty_cycle": remote.get("duty_cycle"),
+            "carrier_hz": remote.get("carrier_hz") if encoding != "protocol" else None,
+            "duty_cycle": remote.get("duty_cycle") if encoding != "protocol" else None,
+            # Protocol signal fields (populated for encoding='protocol', None otherwise)
+            "protocol": signals.get("protocol"),
+            "address": signals.get("address"),
+            "command_hex": signals.get("command_hex"),
         }
 
         result = agent.send(payload)
         agent_registry.mark_agent_activity(agent.agent_id)
         return SendResponse.model_validate(result)
-    except AgentRoutingError:
+    except AgentError:
         raise
     except HTTPException:
         raise
@@ -1111,6 +1206,73 @@ def send_ir(body: SendRequest, x_api_key: Optional[str] = Header(default=None)) 
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+
+# -----------------
+# Marketplace
+# -----------------
+
+
+class _MarketplaceInstallBody(BaseModel):
+    path: str
+    remote_name: str
+
+
+@api.get("/marketplace/index")
+def marketplace_index_list(
+    q: Optional[str] = None,
+    category: Optional[str] = None,
+    brand: Optional[str] = None,
+    source: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    return database.marketplace.search(q=q, category=category, brand=brand, source=source)
+
+
+@api.get("/marketplace/categories")
+def marketplace_categories() -> List[str]:
+    return database.marketplace.list_categories()
+
+
+@api.get("/marketplace/brands")
+def marketplace_brands(category: Optional[str] = None) -> List[str]:
+    return database.marketplace.list_brands(category=category)
+
+
+@api.get("/marketplace/count")
+def marketplace_count() -> Dict[str, Any]:
+    return {"total": database.marketplace.count()}
+
+
+@api.get("/marketplace/sync/status")
+def marketplace_sync_status() -> Dict[str, Any]:
+    return marketplace_index.get_status()
+
+
+@api.post("/marketplace/sync")
+def marketplace_sync(x_api_key: Optional[str] = Header(default=None)) -> Dict[str, Any]:
+    require_api_key(x_api_key)
+    started = marketplace_index.trigger_sync()
+    return {"started": started}
+
+
+@api.get("/marketplace/installed-paths")
+def marketplace_installed_paths() -> List[str]:
+    return database.remotes.list_marketplace_paths()
+
+
+@api.post("/marketplace/install")
+def marketplace_install(
+    body: _MarketplaceInstallBody,
+    x_api_key: Optional[str] = Header(default=None),
+) -> Dict[str, Any]:
+    require_api_key(x_api_key)
+    try:
+        return install_service.install(path=body.path, remote_name=body.remote_name)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
 
 # Register API at /api

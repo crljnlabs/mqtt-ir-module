@@ -49,7 +49,7 @@
     "create": "Create remote",
     "name": "Remote name",
     "deleteConfirmTitle": "Delete remote?",
-    "deleteConfirmBody": "This will delete the remote and all buttons/signals."
+    "deleteConfirmBody": "This will delete the remote and all buttons."
   },
   "remote": {
     "title": "Remote",
@@ -63,9 +63,9 @@
     "learningChoiceResetHint": "Remove existing buttons and start from scratch.",
     "iconTitle": "Remote icon",
     "carrierHzLabel": "Carrier frequency (Hz)",
-    "carrierHzHint": "Auto when empty.",
+    "carrierHzHint": "The frequency at which your remote sends IR signals. Nearly all devices use 38000 Hz. Only change this if you know your device requires a different frequency.",
     "dutyCycleLabel": "Duty cycle (%)",
-    "dutyCycleHint": "Auto when empty.",
+    "dutyCycleHint": "How long the IR LED stays on during each pulse, as a percentage. The standard is 33. Only change this if a specific device requires it.",
     "gapUsLabel": "Default gap (us)",
     "gapUsHint": "Auto when empty (can be inferred during learning)."
   },
@@ -83,9 +83,14 @@
     "relearn": "Re-learn",
     "deleteConfirmTitle": "Delete button?",
     "deleteConfirmBody": "This will delete the button and its signals.",
+    "deleteAllConfirmTitle": "Delete all buttons?",
+    "deleteAllConfirmBody": "This will delete all buttons and their signals.",
+    "addButtons": "Add buttons",
+    "deleteAll": "Delete all buttons",
     "holdDialogTitle": "Hold duration",
     "holdMs": "Hold (ms)",
-    "holdRangeHint": "{{min}}-{{max}}"
+    "holdRangeHint": "{{min}}-{{max}}",
+    "nameLabel": "Button name"
   },
   "agents": {
     "pickerTitle": "Assign agent",
@@ -114,7 +119,7 @@
     "irRxPinHint": "Default: GPIO 34",
     "irTxPinLabel": "IR TX pin",
     "irTxPinHint": "Default: GPIO 4",
-    "savedWithRuntimeHint": "Saved. If runtime pins changed, reboot the agent to apply them.",
+    "savedWithRuntimeHint": "Saved. The agent is rebooting to apply the new pin configuration.",
     "assignedRemotesTitle": "Assigned remotes",
     "assignedRemotesEmpty": "No remotes are assigned to this agent.",
     "assignExistingRemoteAction": "Assign existing remote",
@@ -160,7 +165,15 @@
     "updateVersionLabel": "Firmware version",
     "rebootRequired": "Reboot required",
     "rebootAction": "Reboot",
-    "rebootRequested": "Reboot command sent."
+    "rebootRequested": "Reboot command sent.",
+    "incompatibleSend": "Send incompatible",
+    "incompatibleLearn": "Learn incompatible",
+    "incompatibleSystem": "Re-flash required",
+    "incompatibleSendHint": "IR send is blocked: the agent's send protocol is incompatible with this hub.",
+    "incompatibleLearnHint": "IR learning is blocked: the agent's learn protocol is incompatible with this hub.",
+    "incompatibleSystemHint": "Core protocol mismatch: manually re-flash this agent to restore full compatibility.",
+    "nameLabel": "Agent name",
+    "onlyWhenOnline": "Can only be changed when the agent is online."
   },
   "settings": {
     "theme": "Theme",
@@ -307,6 +320,10 @@
     "noAgentsBody": "Enable a local agent or connect an external agent to continue.",
     "agentOfflineTitle": "Assigned agent offline",
     "agentOfflineBody": "The selected agent is offline or unavailable. Choose another agent or bring it online.",
+    "agentIncompatibleSendTitle": "Send blocked",
+    "agentIncompatibleSendBody": "The agent's send protocol version is incompatible with this hub. Re-flash the agent to fix this.",
+    "agentIncompatibleLearnTitle": "Learn blocked",
+    "agentIncompatibleLearnBody": "The agent's learn protocol version is incompatible with this hub. Re-flash the agent to fix this.",
     "badRequestTitle": "Invalid request",
     "badRequestBody": "Check your input and try again.",
     "nameRequiredBody": "Enter a name to continue.",
@@ -336,6 +353,32 @@
     "id": "Indonesian",
     "ur": "Urdu",
     "ja": "Japanese"
+  },
+  "marketplace": {
+    "nav": "Marketplace",
+    "title": "Marketplace",
+    "searchPlaceholder": "Search brand or model...",
+    "categoryAll": "All categories",
+    "categorySearch": "Search category...",
+    "brandAll": "All brands",
+    "brandSearch": "Search brand...",
+    "totalRemotes": "remotes",
+    "sourceLink": "Browse Flipper IRDB on GitHub",
+    "syncButton": "Sync",
+    "syncRunning": "Syncing...",
+    "syncError": "Sync failed",
+    "syncNever": "Not synced yet. Fetch the remote library to browse.",
+    "syncLastAt": "Last synced: {{when}}",
+    "installButton": "Install",
+    "installedBadge": "Installed",
+    "noResults": "No remotes found.",
+    "buttonCount_one": "{{count}} button",
+    "buttonCount_other": "{{count}} buttons",
+    "installTitle": "Install remote",
+    "remoteNameLabel": "Remote name",
+    "installConfirm": "Install",
+    "installSuccess": "Remote installed.",
+    "installFailed": "Install failed."
   },
   "update": {
     "available": "Version {{version}} available",

@@ -7,7 +7,7 @@ from typing import Any, Callable, Dict, Optional
 
 from jmqtt import MQTTMessage, QualityOfService as QoS
 
-from agents.errors import AgentRoutingError
+from agents.errors import AgentError
 from .runtime_loader import RuntimeLoader
 
 
@@ -35,10 +35,23 @@ class AgentCommandClientHub:
 
         hub_id = self._hub_id()
         topic = f"{self.RESPONSE_TOPIC_PREFIX}/{hub_id}/agents/+/resp/+"
+        connection.add_on_connect(self._on_mqtt_connect)
         connection.subscribe(topic, self._on_response, qos=QoS.AtLeastOnce)
         with self._lock:
             self._running = True
             self._subscribed_topic = topic
+
+    def _on_mqtt_connect(self, connection: Any, _client: Any, _userdata: Any, _flags: Any) -> None:
+        with self._lock:
+            if not self._running:
+                return
+            topic = self._subscribed_topic
+        if not topic:
+            return
+        try:
+            connection.subscribe(topic, self._on_response, qos=QoS.AtLeastOnce)
+        except Exception as exc:
+            self._logger.warning(f"Failed to resubscribe response topic {topic}: {exc}")
 
     def stop(self) -> None:
         connection = self._runtime_loader.mqtt_connection()
@@ -174,11 +187,11 @@ class AgentCommandClientHub:
     def _request(self, agent_id: str, command: str, payload: Dict[str, Any], timeout_seconds: float) -> Dict[str, Any]:
         normalized_agent_id = str(agent_id or "").strip()
         if not normalized_agent_id:
-            raise AgentRoutingError(code="agent_required", message="agent_id is required", status_code=400)
+            raise AgentError(code="agent_required", message="agent_id is required", status_code=400)
 
         connection = self._runtime_loader.mqtt_connection()
         if connection is None:
-            raise AgentRoutingError(code="mqtt_not_connected", message="MQTT is not connected", status_code=503)
+            raise AgentError(code="mqtt_not_connected", message="MQTT is not connected", status_code=503)
 
         request_id = uuid.uuid4().hex
         hub_id = self._hub_id()
@@ -210,7 +223,7 @@ class AgentCommandClientHub:
         except Exception as exc:
             with self._lock:
                 self._pending.pop(request_id, None)
-            raise AgentRoutingError(
+            raise AgentError(
                 code="mqtt_publish_failed",
                 message=f"Failed to publish agent command: {exc}",
                 status_code=503,
@@ -226,7 +239,7 @@ class AgentCommandClientHub:
                     self._on_agent_timeout(normalized_agent_id)
                 except Exception as exc:
                     self._logger.warning(f"Failed to handle agent timeout fallback for {normalized_agent_id}: {exc}")
-            raise AgentRoutingError(
+            raise AgentError(
                 code="agent_timeout",
                 message=f"Agent {normalized_agent_id} did not respond in time",
                 status_code=504,
@@ -240,7 +253,7 @@ class AgentCommandClientHub:
 
         error = state.get("error")
         if not isinstance(error, dict):
-            raise AgentRoutingError(
+            raise AgentError(
                 code="agent_error",
                 message=f"Agent {normalized_agent_id} returned an unknown error",
                 status_code=400,
@@ -252,7 +265,7 @@ class AgentCommandClientHub:
             status_code = int(error.get("status_code") or 400)
         except Exception:
             status_code = 400
-        raise AgentRoutingError(code=code, message=message, status_code=status_code)
+        raise AgentError(code=code, message=message, status_code=status_code)
 
     def _on_response(self, connection: Any, client: Any, userdata: Any, message: MQTTMessage) -> None:
         agent_id, request_id = self._parse_response_topic(message.topic)

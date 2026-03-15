@@ -19,17 +19,22 @@ function findPrimaryTextbox(container) {
   })
 }
 
-export function Modal({ open, title, children, footer, onClose }) {
+export function Modal({ open, title, children, footer, onClose, onConfirm }) {
   const panelRef = useRef(null)
 
   useEffect(() => {
     if (!open) return
     const handler = (e) => {
       if (e.key === 'Escape') onClose?.()
+      if (e.key === 'Enter') {
+        // Submit on Enter only when focus is inside a text-like input, not a button.
+        const tag = document.activeElement?.tagName?.toLowerCase()
+        if (tag === 'input' || tag === 'textarea') onConfirm?.()
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [open, onClose])
+  }, [open, onClose, onConfirm])
 
   useEffect(() => {
     if (!open) return

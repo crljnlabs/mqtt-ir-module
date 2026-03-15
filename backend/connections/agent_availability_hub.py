@@ -11,7 +11,7 @@ from .runtime_loader import RuntimeLoader
 
 
 class AgentAvailabilityHub:
-    STATUS_TOPIC_WILDCARD = "ir/agents/+/status"
+    STATUS_TOPIC_WILDCARD = "ir/agents/+/state/availability"
 
     def __init__(
         self,
@@ -34,14 +34,23 @@ class AgentAvailabilityHub:
         with self._lock:
             if self._running and self._subscribed:
                 return
+        connection.add_on_connect(self._on_mqtt_connect)
+        self._subscribe(connection)
+        with self._lock:
+            self._running = True
+            self._subscribed = True
+
+    def _on_mqtt_connect(self, connection: Any, _client: Any, _userdata: Any, _flags: Any) -> None:
+        with self._lock:
+            if not self._running:
+                return
+        self._subscribe(connection)
+
+    def _subscribe(self, connection: Any) -> None:
         try:
             connection.subscribe(self.STATUS_TOPIC_WILDCARD, self._on_status, qos=QoS.AtLeastOnce)
         except Exception as exc:
             self._logger.warning(f"Failed to subscribe availability topic {self.STATUS_TOPIC_WILDCARD}: {exc}")
-            return
-        with self._lock:
-            self._running = True
-            self._subscribed = True
 
     def stop(self) -> None:
         connection = self._runtime_loader.mqtt_connection()
@@ -90,10 +99,11 @@ class AgentAvailabilityHub:
             )
 
     def _parse_agent_id(self, topic: str) -> str:
+        # Topic pattern: ir/agents/{id}/state/availability
         parts = str(topic or "").split("/")
-        if len(parts) != 4:
+        if len(parts) != 5:
             return ""
-        if parts[0] != "ir" or parts[1] != "agents" or parts[3] != "status":
+        if parts[0] != "ir" or parts[1] != "agents" or parts[3] != "state" or parts[4] != "availability":
             return ""
         return parts[2].strip()
 

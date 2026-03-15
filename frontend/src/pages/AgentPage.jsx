@@ -12,7 +12,6 @@ import { Button } from '../components/ui/Button.jsx'
 import { Badge } from '../components/ui/Badge.jsx'
 import { IconButton } from '../components/ui/IconButton.jsx'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog.jsx'
-import { Drawer } from '../components/ui/Drawer.jsx'
 import { Modal } from '../components/ui/Modal.jsx'
 import { TextField } from '../components/ui/TextField.jsx'
 import { useToast } from '../components/ui/ToastProvider.jsx'
@@ -49,7 +48,6 @@ export function AgentPage() {
   const [createRemoteOpen, setCreateRemoteOpen] = useState(false)
   const [assignRemoteOpen, setAssignRemoteOpen] = useState(false)
   const [newRemoteName, setNewRemoteName] = useState('')
-  const [menuRemote, setMenuRemote] = useState(null)
   const [editRemote, setEditRemote] = useState(null)
   const [deleteRemoteTarget, setDeleteRemoteTarget] = useState(null)
   const [assigningRemoteId, setAssigningRemoteId] = useState(null)
@@ -218,6 +216,7 @@ export function AgentPage() {
   const agent = agentQuery.data
   const agentLabel = agent.name || agent.agent_id
   const runtime = agent.runtime || {}
+  const compatibility = agent.compatibility || {}
   const rebootRequired = Boolean(runtime.reboot_required || agent.ota?.reboot_required)
   const isOnline = String(agent.status || '').trim().toLowerCase() === 'online'
   const installation = agent.installation || {}
@@ -227,6 +226,9 @@ export function AgentPage() {
   const agentType = String(runtime.agent_type || agent.agent_type || '').trim().toLowerCase()
   const isLocalAgent = agentType === 'local'
   const swVersion = String(runtime.sw_version || agent.sw_version || '').trim()
+  const incompatibleSystem = isOnline && compatibility.system === false
+  const incompatibleSend = isOnline && compatibility.send === false
+  const incompatibleLearn = isOnline && compatibility.learn === false
   const typeLabel =
     agentType === 'esp32'
       ? t('agents.typeEsp32')
@@ -290,21 +292,31 @@ export function AgentPage() {
             {t('agents.typeLabel')}: {typeLabel}
             {swVersion ? ` · v${swVersion}` : ''}
           </div>
-          <div className="mt-2">
+          <div className="mt-2 flex items-center gap-2 flex-wrap">
             <Badge variant={isOnline ? 'success' : 'danger'}>
               {isOnline ? t('health.online') : t('health.offline')}
             </Badge>
             {installationLabel ? (
-              <span className="ml-2">
-                <Badge variant={installationBadgeVariant(installation)}>{installationLabel}</Badge>
-              </span>
+              <Badge variant={installationBadgeVariant(installation)}>{installationLabel}</Badge>
             ) : null}
+            {incompatibleSystem ? <Badge variant="danger">{t('agents.incompatibleSystem')}</Badge> : null}
+            {incompatibleSend ? <Badge variant="warning">{t('agents.incompatibleSend')}</Badge> : null}
+            {incompatibleLearn ? <Badge variant="warning">{t('agents.incompatibleLearn')}</Badge> : null}
           </div>
           {installationInProgress ? (
             <div className="text-xs text-amber-600 mt-1">{installation.message || t('common.loading')}</div>
           ) : null}
           {rebootRequired ? (
             <div className="text-xs text-amber-600 mt-1">{t('agents.rebootRequired')}</div>
+          ) : null}
+          {incompatibleSystem ? (
+            <div className="text-xs text-red-600 mt-1">{t('agents.incompatibleSystemHint')}</div>
+          ) : null}
+          {incompatibleSend ? (
+            <div className="text-xs text-amber-600 mt-1">{t('agents.incompatibleSendHint')}</div>
+          ) : null}
+          {incompatibleLearn ? (
+            <div className="text-xs text-amber-600 mt-1">{t('agents.incompatibleLearnHint')}</div>
           ) : null}
         </CardBody>
       </Card>
@@ -345,7 +357,7 @@ export function AgentPage() {
                       <Icon path={findIconPath(remote.icon || DEFAULT_REMOTE_ICON)} size={1.4} />
                     </div>
                     <div onClick={(event) => event.stopPropagation()}>
-                      <IconButton label={t('common.menu')} onClick={() => setMenuRemote(remote)} className="h-9 w-9 opacity-80 group-hover:opacity-100">
+                      <IconButton label={t('common.menu')} onClick={() => setEditRemote(remote)} className="h-9 w-9 opacity-80 group-hover:opacity-100">
                         <Icon path={mdiDotsHorizontal} size={1} />
                       </IconButton>
                     </div>
@@ -361,7 +373,12 @@ export function AgentPage() {
       </Card>
 
       {editOpen ? <AgentEditorDrawer key={agent.agent_id} agent={agent} onClose={() => setEditOpen(false)} /> : null}
-      <RemoteEditorDrawer open={Boolean(editRemote)} remote={editRemote} onClose={() => setEditRemote(null)} />
+      <RemoteEditorDrawer
+        open={Boolean(editRemote)}
+        remote={editRemote}
+        onClose={() => setEditRemote(null)}
+        onDelete={(remote) => { setEditRemote(null); setDeleteRemoteTarget(remote) }}
+      />
 
       <Modal
         open={deleteOpen}
@@ -434,33 +451,6 @@ export function AgentPage() {
         }}
       />
 
-      <Drawer open={Boolean(menuRemote)} title={menuRemote?.name || ''} onClose={() => setMenuRemote(null)}>
-        <div className="space-y-2">
-          <Button
-            variant="secondary"
-            className="w-full justify-start"
-            onClick={() => {
-              setEditRemote(menuRemote)
-              setMenuRemote(null)
-            }}
-          >
-            <Icon path={mdiPencilOutline} size={1} />
-            {t('common.edit')}
-          </Button>
-          <Button
-            variant="danger"
-            className="w-full justify-start"
-            onClick={() => {
-              setDeleteRemoteTarget(menuRemote)
-              setMenuRemote(null)
-            }}
-          >
-            <Icon path={mdiTrashCanOutline} size={1} />
-            {t('common.delete')}
-          </Button>
-        </div>
-      </Drawer>
-
       <Modal
         open={assignRemoteOpen}
         title={t('agents.assignExistingRemoteTitle')}
@@ -522,6 +512,7 @@ export function AgentPage() {
         open={createRemoteOpen}
         title={t('remotes.create')}
         onClose={handleCreateRemoteClose}
+        onConfirm={() => { if (newRemoteName.trim() && !createRemoteMutation.isPending) createRemoteMutation.mutate() }}
         footer={
           <div className="flex gap-2 justify-end">
             <Button variant="secondary" onClick={handleCreateRemoteClose}>

@@ -4,21 +4,20 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/ui/Button.jsx'
 import { IconButton } from '../../components/ui/IconButton.jsx'
 import { findIconPath, DEFAULT_BUTTON_ICON } from '../../icons/iconRegistry.js'
-import { mdiDotsHorizontal, mdiPencilOutline, mdiImageEditOutline, mdiTrashCanOutline, mdiRepeat } from '@mdi/js'
-import { Drawer } from '../../components/ui/Drawer.jsx'
+import { mdiDotsHorizontal } from '@mdi/js'
+import { ButtonEditorDrawer } from './ButtonEditorDrawer.jsx'
 
 export function ButtonTile({
   button,
   sendingDisabled,
   onSendPress,
   onSendHold,
-  onRename,
-  onChangeIcon,
+  onSave,
   onDelete,
   onRelearn,
 }) {
   const { t } = useTranslation()
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [editorOpen, setEditorOpen] = useState(false)
   const iconKey = button.icon || DEFAULT_BUTTON_ICON
 
   return (
@@ -29,7 +28,7 @@ export function ButtonTile({
             <Icon path={findIconPath(iconKey)} size={1.2} />
           </div>
 
-          <IconButton label={t('common.menu')} onClick={() => setMenuOpen(true)}>
+          <IconButton label={t('common.menu')} onClick={() => setEditorOpen(true)}>
             <Icon path={mdiDotsHorizontal} size={1} />
           </IconButton>
         </div>
@@ -56,33 +55,14 @@ export function ButtonTile({
         </div>
       </div>
 
-      <Drawer
-        open={menuOpen}
-        title={button.name}
-        onClose={() => setMenuOpen(false)}
-      >
-        <div className="space-y-2">
-          <Button variant="secondary" className="w-full justify-start" onClick={() => { setMenuOpen(false); onRename(button) }}>
-            <Icon path={mdiPencilOutline} size={1} />
-            {t('button.rename')}
-          </Button>
-
-          <Button variant="secondary" className="w-full justify-start" onClick={() => { setMenuOpen(false); onChangeIcon(button) }}>
-            <Icon path={mdiImageEditOutline} size={1} />
-            {t('button.changeIcon')}
-          </Button>
-
-          <Button variant="secondary" className="w-full justify-start" onClick={() => { setMenuOpen(false); onRelearn(button) }}>
-            <Icon path={mdiRepeat} size={1} />
-            {t('button.relearn')}
-          </Button>
-
-          <Button variant="danger" className="w-full justify-start" onClick={() => { setMenuOpen(false); onDelete(button) }}>
-            <Icon path={mdiTrashCanOutline} size={1} />
-            {t('common.delete')}
-          </Button>
-        </div>
-      </Drawer>
+      <ButtonEditorDrawer
+        open={editorOpen}
+        button={button}
+        onClose={() => setEditorOpen(false)}
+        onSave={onSave}
+        onDelete={(b) => { setEditorOpen(false); onDelete(b) }}
+        onRelearn={(b) => { setEditorOpen(false); onRelearn(b) }}
+      />
     </>
   )
 }

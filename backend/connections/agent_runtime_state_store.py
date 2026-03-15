@@ -2,7 +2,7 @@ import json
 import logging
 import threading
 import time
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from jmqtt import MQTTMessage, QualityOfService as QoS
 
@@ -14,6 +14,17 @@ DebugChangeHandler = Callable[[bool], None]
 
 class AgentRuntimeStateStore:
     STATE_TOPIC_PREFIX = "ir/agents"
+
+    # Fields routed to state/version (stored in _extra_state with these keys)
+    VERSION_FIELDS = {"sw_version", "system_version", "send_version", "learn_version"}
+    # Fields routed to state/agent
+    AGENT_FIELDS = {"agent_type", "can_send", "can_learn", "can_learn_hold_batch", "ota_supported"}
+    # Fields routed to state/runtime (debug is handled separately)
+    RUNTIME_EXTRA_FIELDS = {"reboot_required", "ir_rx_pin", "ir_tx_pin"}
+    # Fields routed to state/diagnostics (not retained)
+    DIAGNOSTICS_FIELDS = {"free_heap", "last_reset_reason", "last_reset_code", "last_reset_crash"}
+
+    # Reserved keys never stored in _extra_state
     RESERVED_KEYS = {"pairing_hub_id", "debug", "updated_at"}
 
     def __init__(
@@ -27,7 +38,8 @@ class AgentRuntimeStateStore:
         self._logger = logging.getLogger("agent_runtime_state_store")
         self._lock = threading.Lock()
         self._running = False
-        self._subscribed_topic = ""
+        self._subscribed_hub_topic = ""
+        self._subscribed_runtime_topic = ""
         self._pairing_hub_id = ""
         self._debug = False
         self._extra_state: Dict[str, Any] = {}
@@ -48,37 +60,52 @@ class AgentRuntimeStateStore:
         if not agent_id:
             return
 
-        topic = f"{self.STATE_TOPIC_PREFIX}/{agent_id}/state"
+        prefix = f"{self.STATE_TOPIC_PREFIX}/{agent_id}/state"
+        hub_topic = f"{prefix}/hub"
+        runtime_topic = f"{prefix}/runtime"
         state_loaded = threading.Event()
-        try:
-            connection.subscribe(topic, self._on_state, qos=QoS.AtLeastOnce)
-        except Exception as exc:
-            self._logger.warning(f"Failed to subscribe agent runtime state topic {topic}: {exc}")
-            return
+
+        for topic, handler in [
+            (hub_topic, self._on_hub_state),
+            (runtime_topic, self._on_runtime_state),
+        ]:
+            try:
+                connection.subscribe(topic, handler, qos=QoS.AtLeastOnce)
+            except Exception as exc:
+                self._logger.warning(f"Failed to subscribe state topic {topic}: {exc}")
+                return
 
         with self._lock:
             self._running = True
-            self._subscribed_topic = topic
+            self._subscribed_hub_topic = hub_topic
+            self._subscribed_runtime_topic = runtime_topic
             self._state_loaded_event = state_loaded
 
-        # Allow broker delivery of retained state on subscribe.
+        # Allow broker to deliver retained state before publishing fresh state.
         state_loaded.wait(1.0)
-        # Always publish current state so the hub can observe fresh runtime metadata.
         self._publish_state()
+        # Publish availability after state so hub sees a fully populated agent.
+        self._publish_availability("online")
 
     def stop(self) -> None:
         connection = self._runtime_loader.mqtt_connection()
         with self._lock:
-            topic = self._subscribed_topic
-            self._subscribed_topic = ""
+            hub_topic = self._subscribed_hub_topic
+            runtime_topic = self._subscribed_runtime_topic
+            self._subscribed_hub_topic = ""
+            self._subscribed_runtime_topic = ""
             self._running = False
             self._state_loaded_event = None
-        if connection is None or not topic:
+        self._publish_availability("offline")
+        if connection is None:
             return
-        try:
-            connection.unsubscribe(topic)
-        except Exception as exc:
-            self._logger.warning(f"Failed to unsubscribe agent runtime state topic {topic}: {exc}")
+        for topic in [hub_topic, runtime_topic]:
+            if not topic:
+                continue
+            try:
+                connection.unsubscribe(topic)
+            except Exception as exc:
+                self._logger.warning(f"Failed to unsubscribe state topic {topic}: {exc}")
 
     def is_bound(self) -> bool:
         return bool(self.hub_id())
@@ -141,14 +168,29 @@ class AgentRuntimeStateStore:
         self._apply_state({"debug": bool(enabled)}, publish=True)
         return self.debug_enabled()
 
-    def _on_state(self, connection: Any, client: Any, userdata: Any, message: MQTTMessage) -> None:
-        del connection
-        del client
-        del userdata
+    def _on_hub_state(self, connection: Any, client: Any, userdata: Any, message: MQTTMessage) -> None:
+        del connection, client, userdata
         payload = self._parse_payload(message)
         if payload is None:
             return
-        self._apply_state(payload, publish=False)
+        hub_id = str(payload.get("id") or "").strip()
+        with self._lock:
+            self._pairing_hub_id = hub_id
+            event = self._state_loaded_event
+        if isinstance(event, threading.Event):
+            event.set()
+
+    def _on_runtime_state(self, connection: Any, client: Any, userdata: Any, message: MQTTMessage) -> None:
+        del connection, client, userdata
+        payload = self._parse_payload(message)
+        if payload is None:
+            return
+        # Only restore the fields that belong to runtime state on reconnect.
+        filtered = {
+            k: v for k, v in payload.items()
+            if k in self.RUNTIME_EXTRA_FIELDS or k == "debug"
+        }
+        self._apply_state(filtered, publish=False)
         with self._lock:
             event = self._state_loaded_event
         if isinstance(event, threading.Event):
@@ -188,30 +230,82 @@ class AgentRuntimeStateStore:
 
     def _publish_state(self) -> None:
         connection = self._runtime_loader.mqtt_connection()
-        topic = self._state_topic()
-        if connection is None or not topic:
+        prefix = self._state_prefix()
+        if connection is None or not prefix:
             return
+
         with self._lock:
-            payload = {
-                "pairing_hub_id": self._pairing_hub_id,
-                "debug": self._debug,
-                **self._extra_state,
-                "updated_at": time.time(),
-            }
+            pairing_hub_id = self._pairing_hub_id
+            debug = self._debug
+            extra = dict(self._extra_state)
+
+        # state/hub — binding state (retained)
+        self._publish_subtopic(
+            connection,
+            f"{prefix}/hub",
+            {"id": pairing_hub_id},
+            retain=True,
+        )
+
+        # state/version — all version integers + sw_version (retained)
+        self._publish_subtopic(
+            connection,
+            f"{prefix}/version",
+            {
+                "sw_version": str(extra.get("sw_version") or ""),
+                "system": int(extra.get("system_version") or 0),
+                "send": int(extra.get("send_version") or 0),
+                "learn": int(extra.get("learn_version") or 0),
+            },
+            retain=True,
+        )
+
+        # state/agent — static capabilities (retained)
+        agent_payload = {k: v for k, v in extra.items() if k in self.AGENT_FIELDS}
+        if agent_payload:
+            self._publish_subtopic(connection, f"{prefix}/agent", agent_payload, retain=True)
+
+        # state/runtime — mutable operational state (retained)
+        runtime_payload: Dict[str, Any] = {"debug": debug}
+        runtime_payload.update({k: v for k, v in extra.items() if k in self.RUNTIME_EXTRA_FIELDS})
+        self._publish_subtopic(connection, f"{prefix}/runtime", runtime_payload, retain=True)
+
+        # state/diagnostics — point-in-time data, not retained
+        diag_payload = {k: v for k, v in extra.items() if k in self.DIAGNOSTICS_FIELDS}
+        if diag_payload:
+            self._publish_subtopic(connection, f"{prefix}/diagnostics", diag_payload, retain=False)
+
+    def _publish_availability(self, status: str) -> None:
+        connection = self._runtime_loader.mqtt_connection()
+        prefix = self._state_prefix()
+        if connection is None or not prefix:
+            return
+        try:
+            connection.publish(
+                f"{prefix}/availability",
+                status,
+                qos=QoS.AtLeastOnce,
+                retain=True,
+            )
+        except Exception as exc:
+            self._logger.warning(f"Failed to publish availability to {prefix}/availability: {exc}")
+
+    def _publish_subtopic(self, connection: Any, topic: str, payload: Dict[str, Any], retain: bool) -> None:
         try:
             connection.publish(
                 topic,
                 json.dumps(payload, separators=(",", ":")),
                 qos=QoS.AtLeastOnce,
-                retain=True,
+                retain=retain,
             )
         except Exception as exc:
-            self._logger.warning(f"Failed to publish agent runtime state topic {topic}: {exc}")
+            self._logger.warning(f"Failed to publish state subtopic {topic}: {exc}")
 
-    def _state_topic(self) -> str:
+    def _state_prefix(self) -> str:
         with self._lock:
-            if self._subscribed_topic:
-                return self._subscribed_topic
+            if self._subscribed_hub_topic:
+                # Derive prefix from subscribed hub topic: ".../state/hub" → ".../state"
+                return "/".join(self._subscribed_hub_topic.split("/")[:-1])
         agent_id = self._agent_id()
         if not agent_id:
             return ""
@@ -277,11 +371,11 @@ class AgentRuntimeStateStore:
                 result[normalized_key] = normalized_item
             return result
         if isinstance(value, (list, tuple)):
-            result = []
+            result_list: List[Any] = []
             for item in value:
                 normalized_item = self._sanitize_runtime_value(item)
                 if normalized_item is None:
                     continue
-                result.append(normalized_item)
-            return result
+                result_list.append(normalized_item)
+            return result_list
         return str(value)

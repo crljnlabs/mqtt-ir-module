@@ -1,6 +1,7 @@
 import threading
 from typing import Any, Dict, Optional
 
+from .errors import BusyLearningError
 from .local_transport import LocalTransport
 
 
@@ -55,7 +56,7 @@ class LocalAgent:
                 message="Send rejected because learning is active",
                 error_code="learning_active",
             )
-            raise RuntimeError("Cannot send while learning is active")
+            raise BusyLearningError("Cannot send while learning is active")
         mode = str(payload.get("mode") or "press").strip().lower() or "press"
         hold_ms = int(payload.get("hold_ms") or 0)
         button_id = int(payload.get("button_id") or 0)

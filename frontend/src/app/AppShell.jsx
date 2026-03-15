@@ -60,12 +60,12 @@ export function AppShell() {
   }, [language, toast])
 
   return (
-    <div className="min-h-dvh">
+    <div className="h-dvh overflow-hidden">
       <SidebarNav />
-      <div className="md:pl-64">
+      <div className="md:pl-64 h-full flex flex-col overflow-hidden">
         <TopBar />
 
-        <main className="px-4 md:px-6 pb-24 md:pb-8 pt-4">
+        <main className="flex-1 overflow-y-auto px-4 md:px-6 pb-24 md:pb-4 pt-4">
           <Outlet />
         </main>
 

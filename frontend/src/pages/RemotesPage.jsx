@@ -1,6 +1,9 @@
 import React, { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
+import Icon from '@mdi/react'
+import { mdiStore } from '@mdi/js'
 import { listRemotes, createRemote, deleteRemote } from '../api/remotesApi.js'
 import { RemoteTile } from '../features/remotes/RemoteTile.jsx'
 import { TextField } from '../components/ui/TextField.jsx'
@@ -15,6 +18,7 @@ export function RemotesPage() {
   const { t } = useTranslation()
   const toast = useToast()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const errorMapper = new ApiErrorMapper(t)
 
   const remotesQuery = useQuery({ queryKey: ['remotes'], queryFn: listRemotes })
@@ -72,7 +76,13 @@ export function RemotesPage() {
             placeholder={t('common.search')}
           />
         </div>
-        <Button onClick={() => setCreateOpen(true)}>{t('remotes.create')}</Button>
+        <div className="flex gap-2 sm:w-auto w-full">
+          <Button variant="secondary" className="flex-1 sm:flex-none" onClick={() => navigate('/marketplace')}>
+            <Icon path={mdiStore} size={0.85} />
+            {t('marketplace.nav')}
+          </Button>
+          <Button className="flex-1 sm:flex-none" onClick={() => setCreateOpen(true)}>{t('remotes.create')}</Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3">
@@ -101,6 +111,7 @@ export function RemotesPage() {
         open={createOpen}
         title={t('remotes.create')}
         onClose={handleCreateClose}
+        onConfirm={() => { if (newName.trim() && !createMutation.isPending) createMutation.mutate() }}
         footer={
           <div className="flex gap-2 justify-end">
             <Button variant="secondary" onClick={handleCreateClose}>

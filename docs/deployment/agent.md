@@ -18,7 +18,7 @@ docker run --rm \
   -e MQTT_PORT=1883 \
   -e MQTT_USERNAME=user \
   -e MQTT_PASSWORD=pass \
-  mqtt-ir-agent:latest
+  devcorlijoni/ir-agent:latest
 ```
 
 ## Environment reference

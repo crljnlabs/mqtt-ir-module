@@ -1,16 +1,17 @@
 import React, { useMemo, useState } from 'react'
 import Icon from '@mdi/react'
-import { mdiAutorenew, mdiImageEditOutline } from '@mdi/js'
+import { mdiAutorenew } from '@mdi/js'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 
 import { Drawer } from '../../components/ui/Drawer.jsx'
-import { TextField } from '../../components/ui/TextField.jsx'
 import { Button } from '../../components/ui/Button.jsx'
 import { NumberField } from '../../components/ui/NumberField.jsx'
-import { IconButton } from '../../components/ui/IconButton.jsx'
 import { SelectField } from '../../components/ui/SelectField.jsx'
+import { EntityEditHeader } from '../../components/ui/EntityEditHeader.jsx'
 import { IconPicker } from '../../components/pickers/IconPicker.jsx'
+import { Tooltip } from '../../components/ui/Tooltip.jsx'
+import { cn } from '../../components/ui/cn.js'
 import { otaCancelAgent, otaUpdateAgent, resetAgentInstallation, updateAgent, updateAgentRuntimeConfig } from '../../api/agentsApi.js'
 import { getFirmwareCatalog } from '../../api/firmwareApi.js'
 import { useToast } from '../../components/ui/ToastProvider.jsx'
@@ -37,6 +38,7 @@ export function AgentEditorDrawer({ agent, onClose }) {
   const runtime = agent?.runtime || {}
   const ota = agent?.ota || {}
   const installation = agent?.installation || {}
+  const isOnline = String(agent.status || '').trim().toLowerCase() === 'online'
   const isEsp32 = String(runtime.agent_type || '').trim().toLowerCase() === 'esp32' && String(agent?.transport || '').trim().toLowerCase() === 'mqtt'
   const otaSupported = isEsp32 && Boolean(runtime.ota_supported || ota.supported)
   const installationInProgress = isInstallationInProgress(installation)
@@ -111,8 +113,8 @@ export function AgentEditorDrawer({ agent, onClose }) {
         await updateAgent(agent.agent_id, metadataPayload)
       }
 
-      if (!isEsp32) {
-        return
+      if (!isEsp32 || !isOnline) {
+        return { pinsChanged: false }
       }
 
       if (parsedRxPin == null || parsedTxPin == null) {
@@ -120,24 +122,41 @@ export function AgentEditorDrawer({ agent, onClose }) {
       }
       const pinsChanged = parsedRxPin !== initialRxPin || parsedTxPin !== initialTxPin
       if (!pinsChanged) {
-        return
+        return { pinsChanged: false }
       }
 
       await updateAgentRuntimeConfig(agent.agent_id, {
         ir_rx_pin: parsedRxPin,
         ir_tx_pin: parsedTxPin,
       })
+      return { pinsChanged: true }
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['agents'] })
       queryClient.invalidateQueries({ queryKey: ['agent', agent.agent_id] })
-      toast.show({ title: t('agents.pageTitle'), message: t('agents.savedWithRuntimeHint') })
+      if (result?.pinsChanged) {
+        toast.show({ title: t('agents.pageTitle'), message: t('agents.savedWithRuntimeHint') })
+      }
       onClose()
     },
     onError: (error) => {
       toast.show({ title: t('agents.pageTitle'), message: errorMapper.getMessage(error, 'common.failed') })
     },
   })
+
+  function handleClose() {
+    if (saveMutation.isPending) return
+    const metadataChanged =
+      (name.trim() || null) !== (agent.name ?? null) ||
+      (icon ?? null) !== (agent.icon ?? null) ||
+      (configurationUrl.trim() || null) !== (agent.configuration_url ?? null)
+    const pinsChanged = isEsp32 && (parsedRxPin !== initialRxPin || parsedTxPin !== initialTxPin)
+    if (metadataChanged || pinsChanged) {
+      saveMutation.mutate()
+      return
+    }
+    onClose()
+  }
 
   const otaMutation = useMutation({
     mutationFn: (version) => otaUpdateAgent(agent.agent_id, { version }),
@@ -189,141 +208,16 @@ export function AgentEditorDrawer({ agent, onClose }) {
     <>
       <Drawer
         open
-        title={`${t('common.edit')}: ${agent.name || agent.agent_id}`}
-        onClose={onClose}
-        footer={
-          <div className="flex gap-2 justify-end">
-            <Button variant="secondary" onClick={onClose}>
-              {t('common.cancel')}
-            </Button>
-            <Button
-              onClick={() => saveMutation.mutate()}
-              disabled={
-                saveMutation.isPending ||
-                otaMutation.isPending ||
-                otaCancelMutation.isPending ||
-                resetInstallationMutation.isPending ||
-                !pinsValid ||
-                installationInProgress
-              }
-            >
-              {t('common.save')}
-            </Button>
-          </div>
-        }
+        title={`${t('common.edit')} ${t('agents.pageTitle')}`}
+        onClose={handleClose}
       >
-        <div className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-sm font-semibold">{t('common.icon')}</div>
-            <IconButton label={t('common.icon')} onClick={() => setIconPickerOpen(true)}>
-              <Icon path={mdiImageEditOutline} size={1} />
-            </IconButton>
-          </div>
-
-          <TextField
-            label={t('remotes.name')}
-            value={name}
-            onChange={(event) => setName(event.target.value)}
+        <div className="space-y-4">
+          <EntityEditHeader
+            label={t('agents.nameLabel')}
+            name={name}
+            onNameChange={(event) => setName(event.target.value)}
+            onIconClick={() => setIconPickerOpen(true)}
           />
-
-          {isEsp32 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <NumberField
-                label={t('agents.irRxPinLabel')}
-                hint={t('agents.irRxPinHint')}
-                min={0}
-                max={39}
-                step={1}
-                value={irRxPin}
-                aria-invalid={parsedRxPin == null}
-                onChange={(event) => setIrRxPin(event.target.value)}
-              />
-              <NumberField
-                label={t('agents.irTxPinLabel')}
-                hint={t('agents.irTxPinHint')}
-                min={0}
-                max={39}
-                step={1}
-                value={irTxPin}
-                aria-invalid={parsedTxPin == null}
-                onChange={(event) => setIrTxPin(event.target.value)}
-              />
-            </div>
-          ) : null}
-
-          {otaSupported ? (
-            <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] p-3 space-y-3">
-              <div className="text-sm font-semibold">{t('agents.updateAction')}</div>
-              <div className="text-sm text-[rgb(var(--muted))]">{t('agents.updateSelectVersionHint')}</div>
-              {firmwareQuery.isLoading ? <div className="text-sm text-[rgb(var(--muted))]">{t('common.loading')}</div> : null}
-              {firmwareQuery.isError ? (
-                <div className="text-sm text-red-600">{errorMapper.getMessage(firmwareQuery.error, 'common.failed')}</div>
-              ) : null}
-              {hasInstallationState ? (
-                <div className="text-sm text-[rgb(var(--muted))]">
-                  {installation.message || installationStatus.toUpperCase()}
-                </div>
-              ) : null}
-              {!firmwareQuery.isLoading && !firmwareQuery.isError && installableFirmwareOptions.length === 0 ? (
-                <div className="text-sm text-red-600">{t('agents.updateNoFirmware')}</div>
-              ) : null}
-              {!installationInProgress && !firmwareQuery.isLoading && !firmwareQuery.isError && installableFirmwareOptions.length > 0 ? (
-                <div className="space-y-3">
-                  <SelectField
-                    label={t('agents.updateVersionLabel')}
-                    value={otaVersion}
-                    onChange={(event) => setOtaVersionOverride(event.target.value)}
-                    disabled={otaMutation.isPending || otaCancelMutation.isPending || resetInstallationMutation.isPending}
-                  >
-                    {installableFirmwareOptions.map((entry) => (
-                      <option key={entry.version} value={entry.version}>
-                        {entry.version}
-                      </option>
-                    ))}
-                  </SelectField>
-                  <div className="flex justify-end">
-                    <Button
-                      size="sm"
-                      disabled={
-                        !otaVersion ||
-                        saveMutation.isPending ||
-                        otaMutation.isPending ||
-                        otaCancelMutation.isPending ||
-                        resetInstallationMutation.isPending
-                      }
-                      onClick={() => otaMutation.mutate(otaVersion)}
-                    >
-                      {t('agents.updateAction')}
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
-              {installationInProgress ? (
-                <div className="flex justify-end">
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    disabled={saveMutation.isPending || otaMutation.isPending || otaCancelMutation.isPending || resetInstallationMutation.isPending}
-                    onClick={() => otaCancelMutation.mutate()}
-                  >
-                    {t('agents.updateCancelAction')}
-                  </Button>
-                </div>
-              ) : null}
-              {hasInstallationState ? (
-                <div className="flex justify-end">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={saveMutation.isPending || otaMutation.isPending || otaCancelMutation.isPending || resetInstallationMutation.isPending}
-                    onClick={() => resetInstallationMutation.mutate()}
-                  >
-                    {t('agents.updateResetAction')}
-                  </Button>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
 
           <label className="block">
             <div className="mb-1 text-sm font-medium">{t('agents.configurationUrlLabel')}</div>
@@ -345,6 +239,116 @@ export function AgentEditorDrawer({ agent, onClose }) {
             </div>
             <div className="mt-1 text-xs text-[rgb(var(--muted))]">{t('agents.configurationUrlHint')}</div>
           </label>
+
+          {isEsp32 ? (
+            <Tooltip wrapperClassName="block" label={!isOnline ? t('agents.onlyWhenOnline') : undefined}>
+              <div className={!isOnline ? 'cursor-not-allowed' : undefined}>
+                <div className={cn('grid grid-cols-1 md:grid-cols-2 gap-3', !isOnline && 'opacity-50 pointer-events-none')}>
+                  <NumberField
+                    label={t('agents.irRxPinLabel')}
+                    hint={t('agents.irRxPinHint')}
+                    min={0}
+                    max={39}
+                    step={1}
+                    value={irRxPin}
+                    aria-invalid={parsedRxPin == null}
+                    onChange={(event) => setIrRxPin(event.target.value)}
+                    disabled={!isOnline}
+                  />
+                  <NumberField
+                    label={t('agents.irTxPinLabel')}
+                    hint={t('agents.irTxPinHint')}
+                    min={0}
+                    max={39}
+                    step={1}
+                    value={irTxPin}
+                    aria-invalid={parsedTxPin == null}
+                    onChange={(event) => setIrTxPin(event.target.value)}
+                    disabled={!isOnline}
+                  />
+                </div>
+              </div>
+            </Tooltip>
+          ) : null}
+
+          {otaSupported ? (
+            <Tooltip wrapperClassName="block" label={!isOnline ? t('agents.onlyWhenOnline') : undefined}>
+              <div className={!isOnline ? 'cursor-not-allowed' : undefined}>
+                <div className={cn('rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] p-3 space-y-3', !isOnline && 'opacity-50 pointer-events-none')}>
+                  <div className="text-sm font-semibold">{t('agents.updateAction')}</div>
+                  <div className="text-sm text-[rgb(var(--muted))]">{t('agents.updateSelectVersionHint')}</div>
+                  {firmwareQuery.isLoading ? <div className="text-sm text-[rgb(var(--muted))]">{t('common.loading')}</div> : null}
+                  {firmwareQuery.isError ? (
+                    <div className="text-sm text-red-600">{errorMapper.getMessage(firmwareQuery.error, 'common.failed')}</div>
+                  ) : null}
+                  {hasInstallationState ? (
+                    <div className="text-sm text-[rgb(var(--muted))]">
+                      {installation.message || installationStatus.toUpperCase()}
+                    </div>
+                  ) : null}
+                  {!firmwareQuery.isLoading && !firmwareQuery.isError && installableFirmwareOptions.length === 0 ? (
+                    <div className="text-sm text-red-600">{t('agents.updateNoFirmware')}</div>
+                  ) : null}
+                  {!installationInProgress && !firmwareQuery.isLoading && !firmwareQuery.isError && installableFirmwareOptions.length > 0 ? (
+                    <div className="space-y-3">
+                      <SelectField
+                        label={t('agents.updateVersionLabel')}
+                        value={otaVersion}
+                        onChange={(event) => setOtaVersionOverride(event.target.value)}
+                        disabled={otaMutation.isPending || otaCancelMutation.isPending || resetInstallationMutation.isPending}
+                      >
+                        {installableFirmwareOptions.map((entry) => (
+                          <option key={entry.version} value={entry.version}>
+                            {entry.version}
+                          </option>
+                        ))}
+                      </SelectField>
+                      <div className="flex justify-end">
+                        <Button
+                          size="sm"
+                          disabled={
+                            !otaVersion ||
+                            saveMutation.isPending ||
+                            otaMutation.isPending ||
+                            otaCancelMutation.isPending ||
+                            resetInstallationMutation.isPending
+                          }
+                          onClick={() => otaMutation.mutate(otaVersion)}
+                        >
+                          {t('agents.updateAction')}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+                  {installationInProgress ? (
+                    <div className="flex justify-end">
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        disabled={saveMutation.isPending || otaMutation.isPending || otaCancelMutation.isPending || resetInstallationMutation.isPending}
+                        onClick={() => otaCancelMutation.mutate()}
+                      >
+                        {t('agents.updateCancelAction')}
+                      </Button>
+                    </div>
+                  ) : null}
+                  {hasInstallationState ? (
+                    <div className="flex justify-end">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        disabled={saveMutation.isPending || otaMutation.isPending || otaCancelMutation.isPending || resetInstallationMutation.isPending}
+                        onClick={() => resetInstallationMutation.mutate()}
+                      >
+                        {t('agents.updateResetAction')}
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </Tooltip>
+          ) : null}
+
         </div>
       </Drawer>
 
@@ -353,6 +357,7 @@ export function AgentEditorDrawer({ agent, onClose }) {
         title={t('common.icon')}
         initialIconKey={icon || DEFAULT_AGENT_ICON}
         onClose={() => setIconPickerOpen(false)}
+        onBack={() => setIconPickerOpen(false)}
         onSelect={(key) => {
           setIcon(key)
           setIconPickerOpen(false)

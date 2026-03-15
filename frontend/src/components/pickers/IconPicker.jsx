@@ -21,7 +21,7 @@ const normalizeMdiQuery = (value) =>
     .replace(/-+/g, '-')
 const stripMdiPrefix = (value) => (value.startsWith('mdi:') ? value.slice(4) : value)
 
-export function IconPicker({ open, title, initialIconKey, onClose, onSelect }) {
+export function IconPicker({ open, title, initialIconKey, onClose, onSelect, onBack }) {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState(DEFAULT_CATEGORY)
@@ -155,6 +155,7 @@ export function IconPicker({ open, title, initialIconKey, onClose, onSelect }) {
       open={open}
       title={title}
       onClose={onClose}
+      onBack={onBack}
       footer={
         <div className="flex justify-end">
           <Button variant="secondary" onClick={onClose}>

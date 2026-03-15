@@ -4,6 +4,11 @@ from typing import Optional, List, Dict, Any
 
 from database.database_base import DatabaseBase
 
+_SELECT_COLS = (
+    "id, name, icon, assigned_agent_id, carrier_hz, duty_cycle, "
+    "marketplace_source, marketplace_path, created_at, updated_at"
+)
+
 
 class Remotes(DatabaseBase):
     # -----------------------------
@@ -14,14 +19,16 @@ class Remotes(DatabaseBase):
         conn.executescript(
             """
             CREATE TABLE IF NOT EXISTS remotes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL UNIQUE,
-                icon TEXT NULL,
-                assigned_agent_id TEXT NULL,
-                carrier_hz INTEGER NULL,
-                duty_cycle INTEGER NULL,
-                created_at REAL NOT NULL,
-                updated_at REAL NOT NULL
+                id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+                name               TEXT NOT NULL UNIQUE,
+                icon               TEXT NULL,
+                assigned_agent_id  TEXT NULL,
+                carrier_hz         INTEGER NULL,
+                duty_cycle         INTEGER NULL,
+                marketplace_source TEXT NULL,
+                marketplace_path   TEXT NULL,
+                created_at         REAL NOT NULL,
+                updated_at         REAL NOT NULL
             );
             """
         )
@@ -36,6 +43,8 @@ class Remotes(DatabaseBase):
         assigned_agent_id: Optional[str] = None,
         carrier_hz: Optional[int] = None,
         duty_cycle: Optional[int] = None,
+        marketplace_source: Optional[str] = None,
+        marketplace_path: Optional[str] = None,
         conn: Optional[sqlite3.Connection] = None,
     ) -> Dict[str, Any]:
         name = name.strip()
@@ -46,14 +55,17 @@ class Remotes(DatabaseBase):
         try:
             now = time.time()
             c.execute(
-                "INSERT OR IGNORE INTO remotes(name, icon, assigned_agent_id, carrier_hz, duty_cycle, created_at, updated_at) "
-                "VALUES(?, ?, ?, ?, ?, ?, ?)",
-                (name, icon, assigned_agent_id, carrier_hz, duty_cycle, now, now),
+                "INSERT OR IGNORE INTO remotes("
+                "name, icon, assigned_agent_id, carrier_hz, duty_cycle, "
+                "marketplace_source, marketplace_path, created_at, updated_at"
+                ") VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (name, icon, assigned_agent_id, carrier_hz, duty_cycle,
+                 marketplace_source, marketplace_path, now, now),
             )
             c.commit()
 
             row = c.execute(
-                "SELECT id, name, icon, assigned_agent_id, carrier_hz, duty_cycle, created_at, updated_at FROM remotes WHERE name = ?",
+                f"SELECT {_SELECT_COLS} FROM remotes WHERE name = ?",
                 (name,),
             ).fetchone()
             if not row:
@@ -85,13 +97,14 @@ class Remotes(DatabaseBase):
 
             now = time.time()
             c.execute(
-                "UPDATE remotes SET name = ?, icon = ?, assigned_agent_id = ?, carrier_hz = ?, duty_cycle = ?, updated_at = ? WHERE id = ?",
+                "UPDATE remotes SET name = ?, icon = ?, assigned_agent_id = ?, "
+                "carrier_hz = ?, duty_cycle = ?, updated_at = ? WHERE id = ?",
                 (name, icon, assigned_agent_id, carrier_hz, duty_cycle, now, remote_id),
             )
             c.commit()
 
             out = c.execute(
-                "SELECT id, name, icon, assigned_agent_id, carrier_hz, duty_cycle, created_at, updated_at FROM remotes WHERE id = ?",
+                f"SELECT {_SELECT_COLS} FROM remotes WHERE id = ?",
                 (remote_id,),
             ).fetchone()
             if not out:
@@ -105,7 +118,7 @@ class Remotes(DatabaseBase):
         c, close = self._use_conn(conn)
         try:
             row = c.execute(
-                "SELECT id, name, icon, assigned_agent_id, carrier_hz, duty_cycle, created_at, updated_at FROM remotes WHERE id = ?",
+                f"SELECT {_SELECT_COLS} FROM remotes WHERE id = ?",
                 (remote_id,),
             ).fetchone()
             if not row:
@@ -122,7 +135,7 @@ class Remotes(DatabaseBase):
         c, close = self._use_conn(conn)
         try:
             row = c.execute(
-                "SELECT id, name, icon, assigned_agent_id, carrier_hz, duty_cycle, created_at, updated_at FROM remotes WHERE id = ?",
+                f"SELECT {_SELECT_COLS} FROM remotes WHERE id = ?",
                 (remote_id,),
             ).fetchone()
             if not row:
@@ -132,13 +145,49 @@ class Remotes(DatabaseBase):
             if close:
                 c.close()
 
+    def get_by_name(self, name: str, conn: Optional[sqlite3.Connection] = None) -> Optional[Dict[str, Any]]:
+        c, close = self._use_conn(conn)
+        try:
+            row = c.execute(
+                f"SELECT {_SELECT_COLS} FROM remotes WHERE name = ?",
+                (name.strip(),),
+            ).fetchone()
+            return dict(row) if row else None
+        finally:
+            if close:
+                c.close()
+
+    def get_by_marketplace_path(self, path: str, conn: Optional[sqlite3.Connection] = None) -> Optional[Dict[str, Any]]:
+        c, close = self._use_conn(conn)
+        try:
+            row = c.execute(
+                f"SELECT {_SELECT_COLS} FROM remotes WHERE marketplace_path = ?",
+                (path,),
+            ).fetchone()
+            return dict(row) if row else None
+        finally:
+            if close:
+                c.close()
+
     def list(self, conn: Optional[sqlite3.Connection] = None) -> List[Dict[str, Any]]:
         c, close = self._use_conn(conn)
         try:
             rows = c.execute(
-                "SELECT id, name, icon, assigned_agent_id, carrier_hz, duty_cycle, created_at, updated_at FROM remotes ORDER BY name"
+                f"SELECT {_SELECT_COLS} FROM remotes ORDER BY name"
             ).fetchall()
             return [dict(r) for r in rows]
+        finally:
+            if close:
+                c.close()
+
+    def list_marketplace_paths(self, conn: Optional[sqlite3.Connection] = None) -> List[str]:
+        """Return all marketplace_path values of installed remotes."""
+        c, close = self._use_conn(conn)
+        try:
+            rows = c.execute(
+                "SELECT marketplace_path FROM remotes WHERE marketplace_path IS NOT NULL"
+            ).fetchall()
+            return [r[0] for r in rows]
         finally:
             if close:
                 c.close()
@@ -175,7 +224,7 @@ class Remotes(DatabaseBase):
             )
             c.commit()
             out = c.execute(
-                "SELECT id, name, icon, assigned_agent_id, carrier_hz, duty_cycle, created_at, updated_at FROM remotes WHERE id = ?",
+                f"SELECT {_SELECT_COLS} FROM remotes WHERE id = ?",
                 (remote_id,),
             ).fetchone()
             if not out:

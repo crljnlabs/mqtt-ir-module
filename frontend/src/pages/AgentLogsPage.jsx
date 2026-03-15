@@ -3,9 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import Icon from '@mdi/react'
-import { mdiChevronLeft, mdiRefresh } from '@mdi/js'
+import { mdiChevronLeft, mdiDownload, mdiRefresh, mdiTrashCan } from '@mdi/js'
 
-import { getAgent, getAgentDebug, getAgentLogs, setAgentDebug } from '../api/agentsApi.js'
+import { clearAgentLogs, getAgent, getAgentDebug, getAgentLogs, setAgentDebug } from '../api/agentsApi.js'
 import { createAgentLogsSocket } from '../api/agentLogsSocket.js'
 import { Button } from '../components/ui/Button.jsx'
 import { Card, CardBody, CardHeader, CardTitle } from '../components/ui/Card.jsx'
@@ -201,6 +201,24 @@ export function AgentLogsPage() {
     setEnabledLevels((prev) => ({ ...prev, [level]: !prev[level] }))
   }
 
+  const clearLogsMutation = useMutation({
+    mutationFn: () => clearAgentLogs(agentId),
+    onSuccess: () => {
+      setLiveLogsByAgent((prev) => ({ ...prev, [agentId]: [] }))
+      queryClient.setQueryData(['agent-logs', agentId], { items: [] })
+    },
+  })
+
+  const exportLogs = () => {
+    const blob = new Blob([JSON.stringify(filteredLogs, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `agent-logs-${agentId}-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const hasAgent = Boolean(agentQuery.data)
   if (agentQuery.isError || (!agentQuery.isLoading && !hasAgent)) {
     return (
@@ -246,17 +264,37 @@ export function AgentLogsPage() {
       </div>
 
       <Card>
-        <CardHeader className="items-start">
+        <CardHeader>
           <CardTitle>Filters</CardTitle>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => snapshotQuery.refetch()}
-            disabled={snapshotQuery.isFetching}
-          >
-            <Icon path={mdiRefresh} size={0.8} />
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => snapshotQuery.refetch()}
+              disabled={snapshotQuery.isFetching}
+            >
+              <Icon path={mdiRefresh} size={0.8} />
+              Refresh
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={exportLogs}
+              disabled={filteredLogs.length === 0}
+            >
+              <Icon path={mdiDownload} size={0.8} />
+              Export
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => clearLogsMutation.mutate()}
+              disabled={clearLogsMutation.isPending}
+            >
+              <Icon path={mdiTrashCan} size={0.8} />
+              Clear
+            </Button>
+          </div>
         </CardHeader>
         <CardBody className="space-y-3">
           <TextField

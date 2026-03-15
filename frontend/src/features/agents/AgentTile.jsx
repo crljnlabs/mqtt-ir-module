@@ -26,6 +26,7 @@ export function AgentTile({ agent, onEdit, onDelete, onAccept, onUpdate, onReboo
   const { t } = useTranslation()
   const runtime = agent.runtime || {}
   const ota = agent.ota || {}
+  const compatibility = agent.compatibility || {}
   const isOnline = String(agent.status || '').trim().toLowerCase() === 'online'
   const agentType = String(runtime.agent_type || agent.agent_type || '').trim().toLowerCase()
   const typeLabel = agentTypeLabel(agentType, t)
@@ -38,6 +39,9 @@ export function AgentTile({ agent, onEdit, onDelete, onAccept, onUpdate, onReboo
   const installationStatus = normalizeInstallationStatus(installation)
   const installationLabel = installationBadgeLabel(installation)
   const showUpdateAvailable = updateAvailable && installationStatus === 'idle'
+  const incompatibleSystem = isOnline && compatibility.system === false
+  const incompatibleSend = isOnline && compatibility.send === false
+  const incompatibleLearn = isOnline && compatibility.learn === false
 
   return (
     <div
@@ -67,6 +71,9 @@ export function AgentTile({ agent, onEdit, onDelete, onAccept, onUpdate, onReboo
             {installationLabel ? <Badge variant={installationBadgeVariant(installation)}>{installationLabel}</Badge> : null}
             {showUpdateAvailable ? <Badge variant="warning">{t('agents.updateAvailable')}</Badge> : null}
             {rebootRequired ? <Badge variant="warning">{t('agents.rebootRequired')}</Badge> : null}
+            {incompatibleSystem ? <Badge variant="danger">{t('agents.incompatibleSystem')}</Badge> : null}
+            {incompatibleSend ? <Badge variant="warning">{t('agents.incompatibleSend')}</Badge> : null}
+            {incompatibleLearn ? <Badge variant="warning">{t('agents.incompatibleLearn')}</Badge> : null}
           </div>
         </div>
       </div>

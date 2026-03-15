@@ -5,7 +5,7 @@ from typing import Dict, Any, List, Optional
 from database import Database
 
 from .agent import Agent
-from .errors import AgentRoutingError
+from .errors import AgentError
 
 
 class AgentRegistry:
@@ -90,22 +90,22 @@ class AgentRegistry:
 
         active_ids = self._get_active_ids()
         if not active_ids:
-            raise AgentRoutingError(code="no_agents", message="No agents are available", status_code=503)
+            raise AgentError(code="no_agents", message="No agents are available", status_code=503)
         if len(active_ids) == 1:
             selected_id = next(iter(active_ids))
             self._db.remotes.set_assigned_agent(remote_id=remote_id, assigned_agent_id=selected_id)
             return self.get_agent_by_id(selected_id)
 
-        raise AgentRoutingError(code="agent_required", message="Remote must be assigned to an agent", status_code=400)
+        raise AgentError(code="agent_required", message="Remote must be assigned to an agent", status_code=400)
 
     def get_agent_by_id(self, agent_id: str) -> Agent:
         if not agent_id:
-            raise AgentRoutingError(code="agent_required", message="Remote must be assigned to an agent", status_code=400)
+            raise AgentError(code="agent_required", message="Remote must be assigned to an agent", status_code=400)
         with self._lock:
             agent = self._agents.get(agent_id)
             is_online = agent_id in self._online_ids
         if not agent or not is_online:
-            raise AgentRoutingError(code="agent_offline", message="Assigned agent is offline or unavailable", status_code=503)
+            raise AgentError(code="agent_offline", message="Assigned agent is offline or unavailable", status_code=503)
         return agent
 
     def mark_agent_activity(self, agent_id: str) -> None:

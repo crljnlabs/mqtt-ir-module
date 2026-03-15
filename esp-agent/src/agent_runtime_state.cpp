@@ -22,33 +22,54 @@ void publishState() {
   if (!gMqttClient.connected()) {
     return;
   }
-  JsonDocument doc;
-  doc["pairing_hub_id"] = gPairingHubId;
-  doc["debug"] = gDebugEnabled;
-  doc["agent_type"] = kAgentType;
-  doc["protocol_version"] = kProtocolVersion;
-  doc["sw_version"] = kFirmwareVersion;
-  doc["can_send"] = canSend();
-  doc["can_learn"] = canLearn();
-  doc["ota_supported"] = true;
-  doc["reboot_required"] = gRebootRequired;
-  doc["last_reset_reason"] = currentResetReasonText();
-  doc["last_reset_code"] = currentResetReasonCode();
-  doc["last_reset_crash"] = currentResetIndicatesCrash();
-  doc["free_heap"] = ESP.getFreeHeap();
-  doc["ir_tx_pin"] = gRuntimeConfig.irTxPin;
-  doc["ir_rx_pin"] = gRuntimeConfig.irRxPin;
-  doc["power_mode"] = gEcoMode ? "eco" : "active";
-  doc["updated_at"] = nowSecondsText();
-  JsonArray commands = doc["runtime_commands"].to<JsonArray>();
-  commands.add("runtime/debug/get");
-  commands.add("runtime/debug/set");
-  commands.add("runtime/config/get");
-  commands.add("runtime/config/set");
-  commands.add("runtime/reboot");
-  commands.add("runtime/ota/start");
-  commands.add("runtime/ota/cancel");
-  mqttPublishJson(topicState(), doc, true);
+
+  // state/hub — pairing binding (retained)
+  {
+    JsonDocument doc;
+    doc["id"] = gPairingHubId;
+    mqttPublishJson(topicStateHub(), doc, true);
+  }
+
+  // state/version — firmware + protocol versions (retained)
+  {
+    JsonDocument doc;
+    doc["sw_version"] = kFirmwareVersion;
+    doc["system"] = kSystemVersion;
+    doc["send"] = kSendVersion;
+    doc["learn"] = kLearnVersion;
+    mqttPublishJson(topicStateVersion(), doc, true);
+  }
+
+  // state/agent — static capabilities (retained)
+  {
+    JsonDocument doc;
+    doc["agent_type"] = kAgentType;
+    doc["can_send"] = canSend();
+    doc["can_learn"] = canLearn();
+    doc["ota_supported"] = true;
+    mqttPublishJson(topicStateAgent(), doc, true);
+  }
+
+  // state/runtime — mutable operational state (retained)
+  {
+    JsonDocument doc;
+    doc["debug"] = gDebugEnabled;
+    doc["reboot_required"] = gRebootRequired;
+    doc["ir_tx_pin"] = gRuntimeConfig.irTxPin;
+    doc["ir_rx_pin"] = gRuntimeConfig.irRxPin;
+    mqttPublishJson(topicStateRuntime(), doc, true);
+  }
+
+  // state/diagnostics — point-in-time data, not retained
+  {
+    JsonDocument doc;
+    doc["free_heap"] = ESP.getFreeHeap();
+    doc["last_reset_reason"] = currentResetReasonText();
+    doc["last_reset_code"] = currentResetReasonCode();
+    doc["last_reset_crash"] = currentResetIndicatesCrash();
+    mqttPublishJson(topicStateDiagnostics(), doc, false);
+  }
+
   gLastStatePublishMs = millis();
 }
 

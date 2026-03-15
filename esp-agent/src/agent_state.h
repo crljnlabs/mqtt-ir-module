@@ -16,7 +16,10 @@ namespace agent {
 #endif
 
 constexpr const char* kFirmwareVersion = AGENT_FIRMWARE_VERSION;
-constexpr const char* kProtocolVersion = "1";
+// Protocol version integers — increment the relevant constant for any breaking change.
+constexpr int kSystemVersion = 1;
+constexpr int kSendVersion = 1;
+constexpr int kLearnVersion = 1;
 constexpr const char* kPrefsNamespace = "esp32-ir";
 constexpr const char* kAgentType = "esp32";
 constexpr uint16_t kDefaultMqttPort = 1883;
@@ -67,8 +70,13 @@ String normalizeSha256(const String& value);
 bool isHexSha256(const String& value);
 String nowSecondsText();
 
-String topicState();
-String topicStatus();
+// State subtopics (all retained except diagnostics)
+String topicStateAvailability();  // LWT: "online" / "offline"
+String topicStateHub();           // {"id": "..."}
+String topicStateVersion();       // {"sw_version": "...", "system": 1, "send": 1, "learn": 1}
+String topicStateAgent();         // {"agent_type": "...", "can_send": true, ...}
+String topicStateRuntime();       // {"debug": false, "reboot_required": false, "ir_rx_pin": ..., "ir_tx_pin": ...}
+String topicStateDiagnostics();   // {"free_heap": ..., "last_reset_reason": ...} — not retained
 String topicCommands();
 String topicInstallationState();
 String topicLogs();

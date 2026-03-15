@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional
 
 from jmqtt import MQTTMessage, QualityOfService as QoS
 
+from agents.errors import BusyLearningError
 from agents.local_agent import LocalAgent
 from .agent_runtime_state_store import AgentRuntimeStateStore
 from .agent_log_reporter import AgentLogReporter
@@ -47,10 +48,23 @@ class AgentCommandHandler:
             return
 
         topic = f"{self.COMMAND_TOPIC_PREFIX}/{agent_uid}/cmd/#"
+        connection.add_on_connect(self._on_mqtt_connect)
         connection.subscribe(topic, self._on_command, qos=QoS.AtLeastOnce)
         with self._lock:
             self._running = True
             self._subscribed_topic = topic
+
+    def _on_mqtt_connect(self, connection: Any, _client: Any, _userdata: Any, _flags: Any) -> None:
+        with self._lock:
+            if not self._running:
+                return
+            topic = self._subscribed_topic
+        if not topic:
+            return
+        try:
+            connection.subscribe(topic, self._on_command, qos=QoS.AtLeastOnce)
+        except Exception as exc:
+            self._logger.warning(f"Failed to resubscribe command topic {topic}: {exc}")
 
     def stop(self) -> None:
         connection = self._runtime_loader.mqtt_connection()
@@ -161,6 +175,21 @@ class AgentCommandHandler:
                 message=str(exc),
                 status_code=400,
             )
+        except BusyLearningError as exc:
+            duration_ms = int((time.time() - started_at) * 1000)
+            self._log_reporter.warn(
+                category=command_category,
+                message=f"Send rejected: learning session active",
+                request_id=request_id,
+                error_code="send_while_learning",
+                meta={"command": command, "duration_ms": duration_ms},
+            )
+            response = self._error_response(
+                request_id=request_id,
+                code="send_while_learning",
+                message=str(exc),
+                status_code=409,
+            )
         except RuntimeError as exc:
             duration_ms = int((time.time() - started_at) * 1000)
             self._log_reporter.warn(
@@ -174,7 +203,7 @@ class AgentCommandHandler:
                 request_id=request_id,
                 code="runtime_error",
                 message=str(exc),
-                status_code=409,
+                status_code=500,
             )
         except Exception as exc:
             duration_ms = int((time.time() - started_at) * 1000)

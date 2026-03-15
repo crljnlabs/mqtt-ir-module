@@ -1,6 +1,6 @@
 from typing import Any, Dict
 
-from .errors import AgentRoutingError
+from .errors import AgentError
 
 
 class MqttTransport:
@@ -22,7 +22,7 @@ class MqttTransport:
                 payload=payload,
                 timeout_seconds=timeout_seconds,
             )
-        except AgentRoutingError as exc:
+        except AgentError as exc:
             if str(exc.code or "").strip() == "timeout":
                 raise TimeoutError(exc.message) from exc
             raise

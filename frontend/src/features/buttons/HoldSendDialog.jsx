@@ -22,6 +22,7 @@ export function HoldSendDialog({ open, buttonName, defaultMs = 1000, onClose, on
       open={open}
       title={t('button.holdDialogTitle')}
       onClose={onClose}
+      onConfirm={() => { if (!Number.isNaN(Number(holdMs)) && Number(holdMs) > 0) onSend(Number(holdMs)) }}
       footer={
         <div className="flex gap-2 justify-end">
           <Button variant="secondary" onClick={onClose}>

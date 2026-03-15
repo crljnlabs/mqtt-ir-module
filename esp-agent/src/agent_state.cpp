@@ -61,12 +61,28 @@ String nowSecondsText() {
   return String(seconds, 3);
 }
 
-String topicState() {
-  return String("ir/agents/") + gAgentId + "/state";
+String topicStateAvailability() {
+  return String("ir/agents/") + gAgentId + "/state/availability";
 }
 
-String topicStatus() {
-  return String("ir/agents/") + gAgentId + "/status";
+String topicStateHub() {
+  return String("ir/agents/") + gAgentId + "/state/hub";
+}
+
+String topicStateVersion() {
+  return String("ir/agents/") + gAgentId + "/state/version";
+}
+
+String topicStateAgent() {
+  return String("ir/agents/") + gAgentId + "/state/agent";
+}
+
+String topicStateRuntime() {
+  return String("ir/agents/") + gAgentId + "/state/runtime";
+}
+
+String topicStateDiagnostics() {
+  return String("ir/agents/") + gAgentId + "/state/diagnostics";
 }
 
 String topicCommands() {
@@ -107,6 +123,8 @@ void saveRuntimeConfig() {
   gPrefs.putUShort("mqtt_port", gRuntimeConfig.mqttPort);
   gPrefs.putString("mqtt_user", gRuntimeConfig.mqttUser);
   gPrefs.putString("mqtt_pass", gRuntimeConfig.mqttPass);
+  gPrefs.putInt("ir_tx_pin", gRuntimeConfig.irTxPin);
+  gPrefs.putInt("ir_rx_pin", gRuntimeConfig.irRxPin);
   gPrefs.end();
 }
 
@@ -131,6 +149,8 @@ void loadPersistedState() {
   }
   gRuntimeConfig.mqttUser = gPrefs.getString("mqtt_user", "");
   gRuntimeConfig.mqttPass = gPrefs.getString("mqtt_pass", "");
+  gRuntimeConfig.irTxPin = gPrefs.getInt("ir_tx_pin", kDefaultIrTxPin);
+  gRuntimeConfig.irRxPin = gPrefs.getInt("ir_rx_pin", kDefaultIrRxPin);
   gPrefs.end();
 }
 

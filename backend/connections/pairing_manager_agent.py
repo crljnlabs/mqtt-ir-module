@@ -28,7 +28,6 @@ class PairingManagerAgent:
         can_send: bool,
         can_learn: bool,
         agent_type: str = "",
-        protocol_version: str = "",
         ota_supported: bool = False,
         reset_binding: bool = False,
         log_reporter: Optional[AgentLogReporter] = None,
@@ -40,7 +39,6 @@ class PairingManagerAgent:
         self._can_send = bool(can_send)
         self._can_learn = bool(can_learn)
         self._agent_type = str(agent_type or "").strip().lower()
-        self._protocol_version = str(protocol_version or "").strip()
         self._ota_supported = bool(ota_supported)
         self._reset_binding = bool(reset_binding)
 
@@ -79,6 +77,7 @@ class PairingManagerAgent:
                 return
             self._running = True
 
+        connection.add_on_connect(self._on_mqtt_connect)
         connection.subscribe(self._unpair_topic_wildcard(), self._on_unpair_command, qos=QoS.AtLeastOnce)
         with self._lock:
             self._subscribed_unpair = True
@@ -98,6 +97,33 @@ class PairingManagerAgent:
 
         self._start_pairing_listeners(connection)
         self._log_reporter.info(category="pairing", message="Pairing listeners started")
+
+    def _on_mqtt_connect(self, connection: Any, _client: Any, _userdata: Any, _flags: Any) -> None:
+        with self._lock:
+            if not self._running:
+                return
+        # Always re-subscribe to unpair (needed regardless of pairing state).
+        try:
+            connection.subscribe(self._unpair_topic_wildcard(), self._on_unpair_command, qos=QoS.AtLeastOnce)
+        except Exception as exc:
+            self._logger.warning(f"Failed to resubscribe unpair topic: {exc}")
+        # Always re-subscribe to reclaim (needed to recover lost pairing binding).
+        reclaim_topic = self._reclaim_topic()
+        if reclaim_topic:
+            try:
+                connection.subscribe(reclaim_topic, self._on_reclaim_command, qos=QoS.AtLeastOnce)
+            except Exception as exc:
+                self._logger.warning(f"Failed to resubscribe reclaim topic {reclaim_topic}: {exc}")
+        # Re-subscribe to pairing open/accept only when not yet paired.
+        if not self._is_bound():
+            try:
+                connection.subscribe(self.PAIRING_OPEN_TOPIC, self._on_pairing_open, qos=QoS.AtLeastOnce)
+                connection.subscribe(self._accept_topic_wildcard(), self._on_pairing_accept, qos=QoS.AtLeastOnce)
+                with self._lock:
+                    self._subscribed_open = True
+                    self._subscribed_accept = True
+            except Exception as exc:
+                self._logger.warning(f"Failed to resubscribe pairing open/accept topics: {exc}")
 
     def stop(self) -> None:
         connection = self._runtime_loader.mqtt_connection()
@@ -198,8 +224,6 @@ class PairingManagerAgent:
         }
         if self._agent_type:
             offer_payload["agent_type"] = self._agent_type
-        if self._protocol_version:
-            offer_payload["protocol_version"] = self._protocol_version
         offer_payload["ota_supported"] = self._ota_supported
         offer_topic = f"{self.PAIRING_OFFER_TOPIC_PREFIX}/{session_id}/{agent_uid}"
         connection.publish(
@@ -321,9 +345,6 @@ class PairingManagerAgent:
             self._logger.warning(f"Failed to acknowledge unpair command: {exc}")
 
     def _on_reclaim_command(self, connection: Any, client: Any, userdata: Any, message: MQTTMessage) -> None:
-        if self._is_bound():
-            return
-
         expected_agent_uid = self._agent_uid()
         agent_uid_from_topic = self._parse_reclaim_topic(message.topic)
         if not expected_agent_uid or not agent_uid_from_topic or agent_uid_from_topic != expected_agent_uid:
@@ -335,6 +356,12 @@ class PairingManagerAgent:
 
         hub_id = str(payload.get("hub_id") or "").strip()
         if not hub_id:
+            return
+
+        # Accept reclaim only if unbound, or if the reclaiming hub matches the stored binding.
+        # This allows the hub to recover orphaned agents after a data loss without risking
+        # a foreign hub stealing a paired agent.
+        if self._is_bound() and hub_id != self._binding_store.hub_id():
             return
 
         hub_topic = str(payload.get("hub_topic") or "")

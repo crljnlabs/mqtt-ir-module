@@ -13,6 +13,30 @@ from database import Database
 from .runtime_loader import RuntimeLoader
 
 
+_ERROR_DESCRIPTIONS: Dict[str, str] = {
+    # System / boot
+    "reset_panic": "Hardware panic — the ESP crashed and reset.",
+    "reset_watchdog": "Watchdog timer reset — the firmware was unresponsive.",
+    # Transport
+    "agent_offline_lwt": "Agent disconnected unexpectedly (Last Will & Testament).",
+    "agent_timeout": "Agent did not respond within the timeout window.",
+    # Pairing / auth
+    "hub_unauthorized": "Command rejected: hub ID does not match the paired hub.",
+    "command_invalid_envelope": "Command ignored: missing request_id or hub_id.",
+    # Commands
+    "send_while_learning": "IR send blocked: a learning session is currently active.",
+    "validation_error": "Command or parameter validation failed.",
+    "timeout": "Command or capture operation timed out.",
+    "runtime_error": "Agent-side runtime error.",
+    "internal_error": "Hub internal error while processing the command.",
+    "response_publish_failed": "Failed to publish the command response back to the hub.",
+    # OTA
+    "ota_in_progress": "OTA update is already in progress.",
+    "ota_not_in_progress": "OTA cancel requested but no update is in progress.",
+    "ota_cancelled": "OTA update was cancelled before completion.",
+}
+
+
 class AgentLogHub:
     LOG_TOPIC_WILDCARD = "ir/agents/+/logs"
     MAX_LOGS_PER_AGENT = 100
@@ -44,14 +68,23 @@ class AgentLogHub:
         with self._lock:
             if self._running and self._subscribed:
                 return
+        connection.add_on_connect(self._on_mqtt_connect)
+        self._subscribe(connection)
+        with self._lock:
+            self._running = True
+            self._subscribed = True
+
+    def _on_mqtt_connect(self, connection: Any, _client: Any, _userdata: Any, _flags: Any) -> None:
+        with self._lock:
+            if not self._running:
+                return
+        self._subscribe(connection)
+
+    def _subscribe(self, connection: Any) -> None:
         try:
             connection.subscribe(self.LOG_TOPIC_WILDCARD, self._on_agent_log, qos=QoS.AtLeastOnce)
         except Exception as exc:
             self._logger.warning(f"Failed to subscribe agent log topic {self.LOG_TOPIC_WILDCARD}: {exc}")
-            return
-        with self._lock:
-            self._running = True
-            self._subscribed = True
 
     def stop(self) -> None:
         connection = self._runtime_loader.mqtt_connection()
@@ -260,6 +293,9 @@ class AgentLogHub:
         error_code = self._safe_text(payload.get("error_code"), max_length=80, fallback="")
         if error_code:
             event["error_code"] = error_code
+            description = _ERROR_DESCRIPTIONS.get(error_code)
+            if description:
+                event["error_description"] = description
         meta = payload.get("meta")
         if isinstance(meta, dict) and meta:
             event["meta"] = self._sanitize_meta(meta, depth=0)

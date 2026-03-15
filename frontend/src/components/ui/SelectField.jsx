@@ -17,6 +17,8 @@ export function SelectField({
   disabled = false,
   name,
   id,
+  searchable = false,
+  searchPlaceholder = 'Search…',
   ...props
 }) {
   const generatedId = useId()
@@ -25,14 +27,32 @@ export function SelectField({
   const rootRef = useRef(null)
   const buttonRef = useRef(null)
   const listboxRef = useRef(null)
+  const searchInputRef = useRef(null)
   const [open, setOpen] = useState(false)
   const [listboxPosition, setListboxPosition] = useState(null)
+  const [searchQuery, setSearchQuery] = useState('')
 
   const options = useMemo(() => collectOptions(children), [children])
   const selectedValue = value == null ? '' : String(value)
   const selectedOption = options.find((option) => option.value === selectedValue) || options[0] || null
   const selectedLabel = selectedOption ? selectedOption.label : ''
   const isOpen = open && !disabled
+
+  const filteredOptions = useMemo(() => {
+    if (!searchable || !searchQuery) return options
+    const lower = searchQuery.toLowerCase()
+    return options.filter((o) => o.label.toLowerCase().includes(lower))
+  }, [options, searchable, searchQuery])
+
+  useEffect(() => {
+    if (!isOpen) setSearchQuery('')
+  }, [isOpen])
+
+  useEffect(() => {
+    if (isOpen && searchable && listboxPosition) {
+      searchInputRef.current?.focus()
+    }
+  }, [isOpen, searchable, listboxPosition])
 
   useEffect(() => {
     if (!isOpen) return
@@ -149,12 +169,9 @@ export function SelectField({
       </div>
       {isOpen && listboxPosition && typeof document !== 'undefined'
         ? createPortal(
-          <ul
-            id={listboxId}
+          <div
             ref={listboxRef}
-            role="listbox"
-            aria-labelledby={label ? `${selectId}-label` : undefined}
-            className="fixed z-[70] overflow-auto rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--card))] p-1 shadow-[var(--shadow)]"
+            className="fixed z-[70] flex flex-col rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--card))] shadow-[var(--shadow)]"
             style={{
               top: `${listboxPosition.top}px`,
               left: `${listboxPosition.left}px`,
@@ -162,30 +179,49 @@ export function SelectField({
               maxHeight: `${listboxPosition.maxHeight}px`,
             }}
           >
-            {options.map((option, index) => {
-              const isSelected = option.value === selectedValue
-              return (
-                <li key={`${option.value}-${index}`} role="presentation">
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={isSelected}
-                    disabled={option.disabled}
-                    className={cn(
-                      'w-full rounded-lg px-3 py-2 text-left text-sm',
-                      option.disabled ? 'cursor-not-allowed text-[rgb(var(--muted))] opacity-70' : 'cursor-pointer',
-                      isSelected
-                        ? 'bg-[rgb(var(--primary))] text-[rgb(var(--primary-contrast))]'
-                        : 'text-[rgb(var(--fg))] hover:bg-[rgb(var(--bg))]',
-                    )}
-                    onClick={() => selectOption(option)}
-                  >
-                    {option.label}
-                  </button>
-                </li>
-              )
-            })}
-          </ul>,
+            {searchable && (
+              <div className="shrink-0 p-1 border-b border-[rgb(var(--border))]">
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={searchPlaceholder}
+                  className="w-full rounded-lg px-3 py-1.5 text-sm outline-none bg-[rgb(var(--bg))] text-[rgb(var(--fg))] placeholder:text-[rgb(var(--muted))]"
+                />
+              </div>
+            )}
+            <ul
+              id={listboxId}
+              role="listbox"
+              aria-labelledby={label ? `${selectId}-label` : undefined}
+              className="overflow-auto p-1 min-h-0"
+            >
+              {filteredOptions.map((option, index) => {
+                const isSelected = option.value === selectedValue
+                return (
+                  <li key={`${option.value}-${index}`} role="presentation">
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={isSelected}
+                      disabled={option.disabled}
+                      className={cn(
+                        'w-full rounded-lg px-3 py-2 text-left text-sm',
+                        option.disabled ? 'cursor-not-allowed text-[rgb(var(--muted))] opacity-70' : 'cursor-pointer',
+                        isSelected
+                          ? 'bg-[rgb(var(--primary))] text-[rgb(var(--primary-contrast))]'
+                          : 'text-[rgb(var(--fg))] hover:bg-[rgb(var(--bg))]',
+                      )}
+                      onClick={() => selectOption(option)}
+                    >
+                      {option.label}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>,
           document.body,
         )
         : null}

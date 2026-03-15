@@ -21,7 +21,6 @@ void publishPairingOffer(const String& sessionId, const String& nonce) {
   doc["can_send"] = canSend();
   doc["can_learn"] = canLearn();
   doc["agent_type"] = kAgentType;
-  doc["protocol_version"] = kProtocolVersion;
   doc["ota_supported"] = true;
   doc["offered_at"] = nowSecondsText();
 

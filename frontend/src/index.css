@@ -69,7 +69,7 @@ body,
 
 html,
 body {
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
 body {
@@ -104,6 +104,31 @@ body {
 :where(button, input[type="button"], input[type="submit"], input[type="reset"]):disabled,
 :where(button, input[type="button"], input[type="submit"], input[type="reset"])[aria-disabled="true"] {
   cursor: not-allowed;
+}
+
+/* Styled scrollbar using theme tokens */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--muted) / 0.45);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--muted) / 0.75);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--muted) / 0.45) transparent;
 }
 
 a[href] {

@@ -2,6 +2,7 @@
 
 #include "agent_state.h"
 
+#include <IRremoteESP8266.h>
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -42,11 +43,13 @@ void initIrHardware() {
     gIrSender = nullptr;
   }
   if (gIrReceiver) {
+    if (gIrReceiverEnabled) {
+      gIrReceiver->disableIRIn();
+      gIrReceiverEnabled = false;
+    }
     delete gIrReceiver;
     gIrReceiver = nullptr;
-    gIrReceiverEnabled = false;
   }
-
   if (isValidPin(gRuntimeConfig.irTxPin)) {
     gIrSender = new IRsend(static_cast<uint16_t>(gRuntimeConfig.irTxPin));
     gIrSender->begin();
@@ -138,6 +141,149 @@ bool sendFrameRaw(const std::vector<uint16_t>& frame, uint16_t carrierHz) {
   const uint16_t khz = static_cast<uint16_t>(std::max<uint16_t>(1, carrierHz / 1000));
   gIrSender->sendRaw(frame.data(), static_cast<uint16_t>(frame.size()), khz);
   return true;
+}
+
+// Parse space-separated hex byte tokens (e.g. "20 00") into a byte vector.
+// Returns false if any token is malformed or the result is empty.
+static bool parseHexBytes(const String& input, std::vector<uint8_t>& out) {
+  out.clear();
+  String text = input;
+  text.trim();
+  if (text.isEmpty()) {
+    return false;
+  }
+  int start = 0;
+  while (start < static_cast<int>(text.length())) {
+    while (start < static_cast<int>(text.length()) && text.charAt(start) == ' ') {
+      start++;
+    }
+    if (start >= static_cast<int>(text.length())) {
+      break;
+    }
+    int end = text.indexOf(' ', start);
+    if (end < 0) {
+      end = static_cast<int>(text.length());
+    }
+    const String token = text.substring(start, end);
+    char* endPtr = nullptr;
+    const long val = strtol(token.c_str(), &endPtr, 16);
+    if (endPtr == token.c_str() || *endPtr != '\0') {
+      return false;
+    }
+    out.push_back(static_cast<uint8_t>(val & 0xFF));
+    start = end + 1;
+  }
+  return !out.empty();
+}
+
+bool sendFrameProtocol(const String& protocol, const String& addressStr, const String& commandStr) {
+  if (!gIrSender) {
+    return false;
+  }
+
+  std::vector<uint8_t> addr;
+  std::vector<uint8_t> cmd;
+  if (!parseHexBytes(addressStr, addr) || !parseHexBytes(commandStr, cmd)) {
+    return false;
+  }
+  if (addr.empty() || cmd.empty()) {
+    return false;
+  }
+
+  // Helper to safely index into byte vectors with a fallback.
+  auto b = [](const std::vector<uint8_t>& v, size_t i, uint8_t fallback = 0) -> uint8_t {
+    return i < v.size() ? v[i] : fallback;
+  };
+
+  if (protocol == "NEC") {
+    gIrSender->sendNEC(
+        gIrSender->encodeNEC(static_cast<uint16_t>(b(addr, 0)), static_cast<uint16_t>(b(cmd, 0))),
+        kNECBits);
+    return true;
+  }
+
+  if (protocol == "NECext") {
+    // 16-bit address: address[0] = high byte, address[1] = low byte (Flipper little-endian byte order).
+    const uint16_t addr16 = static_cast<uint16_t>(b(addr, 0)) |
+                            (static_cast<uint16_t>(b(addr, 1)) << 8);
+    gIrSender->sendNEC(
+        gIrSender->encodeNEC(addr16, static_cast<uint16_t>(b(cmd, 0))),
+        kNECBits);
+    return true;
+  }
+
+  if (protocol == "Samsung32") {
+    gIrSender->sendSAMSUNG(
+        gIrSender->encodeSAMSUNG(b(addr, 0), b(cmd, 0)),
+        kSamsungBits);
+    return true;
+  }
+
+  if (protocol == "SIRC") {
+    // Sony 12-bit: 7-bit command, 5-bit address.
+    gIrSender->sendSony(
+        gIrSender->encodeSony(kSony12Bits, b(cmd, 0), b(addr, 0) & 0x1Fu),
+        kSony12Bits,
+        kSonyMinRepeat);
+    return true;
+  }
+
+  if (protocol == "SIRC15") {
+    // Sony 15-bit: 7-bit command, 8-bit address.
+    gIrSender->sendSony(
+        gIrSender->encodeSony(kSony15Bits, b(cmd, 0), b(addr, 0)),
+        kSony15Bits,
+        kSonyMinRepeat);
+    return true;
+  }
+
+  if (protocol == "SIRC20") {
+    // Sony 20-bit: 7-bit command, 5-bit device address, 8-bit sub-device.
+    // Flipper stores device in addr[0] (low 5 bits) and sub-device in addr[1].
+    gIrSender->sendSony(
+        gIrSender->encodeSony(kSony20Bits, b(cmd, 0), b(addr, 0) & 0x1Fu, b(addr, 1)),
+        kSony20Bits,
+        kSonyMinRepeat);
+    return true;
+  }
+
+  if (protocol == "RC5") {
+    gIrSender->sendRC5(
+        gIrSender->encodeRC5(b(addr, 0) & 0x1Fu, b(cmd, 0) & 0x3Fu),
+        kRC5Bits);
+    return true;
+  }
+
+  if (protocol == "RC6") {
+    gIrSender->sendRC6(
+        gIrSender->encodeRC6(static_cast<uint32_t>(b(addr, 0)), b(cmd, 0)),
+        kRC6Mode0Bits);
+    return true;
+  }
+
+  if (protocol == "Kaseikyo") {
+    // Flipper stores: addr[0..1] = manufacturer code (little-endian),
+    // addr[2] = device, addr[3] = sub-device, cmd[0] = function.
+    const uint16_t manufacturer = static_cast<uint16_t>(b(addr, 0)) |
+                                  (static_cast<uint16_t>(b(addr, 1)) << 8);
+    const uint64_t encoded = gIrSender->encodePanasonic(
+        manufacturer, b(addr, 2), b(addr, 3), b(cmd, 0));
+    // sendPanasonic takes the 16-bit OEM code and the 32-bit data word separately.
+    const uint16_t pa_address = static_cast<uint16_t>(encoded >> 32);
+    const uint32_t pa_data = static_cast<uint32_t>(encoded & 0xFFFFFFFFULL);
+    gIrSender->sendPanasonic(pa_address, pa_data);
+    return true;
+  }
+
+  if (protocol == "JVC") {
+    gIrSender->sendJVC(
+        gIrSender->encodeJVC(b(addr, 0), b(cmd, 0)),
+        kJvcBits,
+        1);
+    return true;
+  }
+
+  return false;  // Protocol not supported by this firmware version.
 }
 
 }  // namespace agent
