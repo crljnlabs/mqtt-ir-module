@@ -1,12 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Drawer } from '../../components/ui/Drawer.jsx'
 import { Button } from '../../components/ui/Button.jsx'
 import { TextField } from '../../components/ui/TextField.jsx'
-import { installMarketplaceRemote } from '../../api/marketplaceApi.js'
-import { useToast } from '../../components/ui/ToastProvider.jsx'
-import { ApiErrorMapper } from '../../utils/apiErrorMapper.js'
 
 function SignalTypeBadge({ type, protocol }) {
   if (type === 'parsed') {
@@ -23,10 +19,8 @@ function SignalTypeBadge({ type, protocol }) {
   )
 }
 
-export function MarketplaceInstallDrawer({ open, remote, onClose, onSuccess }) {
+export function MarketplaceInstallDrawer({ open, remote, onClose, onInstall }) {
   const { t } = useTranslation()
-  const toast = useToast()
-  const errorMapper = new ApiErrorMapper(t)
 
   const [remoteName, setRemoteName] = useState('')
 
@@ -35,37 +29,28 @@ export function MarketplaceInstallDrawer({ open, remote, onClose, onSuccess }) {
     setRemoteName(remote.model || '')
   }, [open, remote])
 
-  const mutation = useMutation({
-    mutationFn: () => installMarketplaceRemote({ path: remote.path, remote_name: remoteName.trim() }),
-    onSuccess: () => {
-      toast.show({ title: t('marketplace.installTitle'), message: t('marketplace.installSuccess') })
-      onSuccess?.()
-    },
-    onError: (e) =>
-      toast.show({ title: t('marketplace.installTitle'), message: errorMapper.getMessage(e, 'marketplace.installFailed') }),
-  })
-
   if (!remote) return null
 
   const buttons = remote.buttons || []
 
-  function handleClose() {
-    if (!mutation.isPending) onClose()
+  function handleConfirm() {
+    onInstall({ path: remote.path, remote_name: remoteName.trim() })
+    onClose()
   }
 
   return (
     <Drawer
       open={open}
       title={t('marketplace.installTitle')}
-      onClose={handleClose}
+      onClose={onClose}
       footer={
         <div className="flex gap-2 justify-end">
-          <Button variant="secondary" disabled={mutation.isPending} onClick={handleClose}>
+          <Button variant="secondary" onClick={onClose}>
             {t('common.cancel')}
           </Button>
           <Button
-            disabled={!remoteName.trim() || mutation.isPending}
-            onClick={() => mutation.mutate()}
+            disabled={!remoteName.trim()}
+            onClick={handleConfirm}
           >
             {t('marketplace.installConfirm')}
           </Button>
