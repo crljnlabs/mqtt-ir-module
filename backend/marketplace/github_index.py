@@ -101,7 +101,12 @@ class GitHubMarketplaceIndex:
         if resp.status_code != 200:
             raise RuntimeError(f"GitHub Trees API returned {resp.status_code}: {resp.text[:200]}")
 
-        tree = resp.json().get("tree", [])
+        response_data = resp.json()
+        tree = response_data.get("tree", [])
+
+        if response_data.get("truncated"):
+            logger.warning("GitHub Trees API returned truncated result — fetching per-category subtrees")
+            tree = self._fetch_tree_by_subtrees()
 
         # Step 2 — filter to valid .ir files with exactly 3 path segments (category/brand/file.ir)
         ir_files = [
@@ -137,6 +142,7 @@ class GitHubMarketplaceIndex:
             self._db.marketplace.delete_by_paths(to_delete)
 
         # Step 5 — download and parse new/changed files in parallel
+        failed = 0
         if to_update:
             with ThreadPoolExecutor(max_workers=20, thread_name_prefix="mkt-dl") as executor:
                 futures = {executor.submit(self._fetch_file, item): item for item in to_update}
@@ -147,10 +153,14 @@ class GitHubMarketplaceIndex:
                         if entry:
                             self._db.marketplace.upsert(**entry)
                     except Exception as exc:
-                        logger.debug(f"Skipping {item.get('path')}: {exc}")
+                        failed += 1
+                        logger.warning(f"Failed to fetch {item.get('path')}: {exc}")
                     finally:
                         with self._lock:
                             self._status["done"] += 1
+
+        if failed:
+            logger.warning(f"Marketplace sync: {failed}/{len(to_update)} files failed to download")
 
         with self._lock:
             self._status["status"] = "idle"
@@ -158,7 +168,56 @@ class GitHubMarketplaceIndex:
             self._status["error"] = None
             self._running = False
 
-        logger.info("Marketplace sync: complete")
+        logger.info(f"Marketplace sync: complete ({failed} download failures)")
+
+    def _fetch_tree_by_subtrees(self) -> List[Dict]:
+        """Fetch the complete file tree by fetching each top-level category subtree individually.
+
+        Used as fallback when the recursive tree fetch is truncated by GitHub (>100k entries / >7MB).
+        Makes one request per top-level directory instead of one recursive request.
+        """
+        root_resp = requests.get(
+            f"https://api.github.com/repos/{_REPO}/git/trees/{_BRANCH}",
+            headers={"Accept": "application/vnd.github+json"},
+            timeout=30,
+        )
+        if root_resp.status_code != 200:
+            raise RuntimeError(f"GitHub Trees API (root) returned {root_resp.status_code}: {root_resp.text[:200]}")
+
+        root_data = root_resp.json()
+        category_dirs = [
+            item for item in root_data.get("tree", [])
+            if item.get("type") == "tree"
+            and not any(item["path"].startswith(p.rstrip("/")) for p in _EXCLUDED_PREFIXES)
+        ]
+
+        logger.info(f"Marketplace sync: fetching {len(category_dirs)} category subtrees")
+
+        all_blobs: List[Dict] = []
+        for category_dir in category_dirs:
+            category = category_dir["path"]
+            sub_resp = requests.get(
+                f"https://api.github.com/repos/{_REPO}/git/trees/{category_dir['sha']}?recursive=1",
+                headers={"Accept": "application/vnd.github+json"},
+                timeout=30,
+            )
+            if sub_resp.status_code != 200:
+                logger.warning(f"Failed to fetch subtree for category '{category}': {sub_resp.status_code}")
+                continue
+
+            sub_data = sub_resp.json()
+            if sub_data.get("truncated"):
+                logger.warning(f"Subtree for category '{category}' is also truncated — skipping")
+                continue
+
+            for item in sub_data.get("tree", []):
+                if item.get("type") == "blob":
+                    blob = dict(item)
+                    blob["path"] = f"{category}/{item['path']}"
+                    all_blobs.append(blob)
+
+        logger.info(f"Marketplace sync: fetched {len(all_blobs)} blobs via subtree strategy")
+        return all_blobs
 
     def _fetch_file(self, item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Download and parse a single .ir file. Returns the entry dict or None on failure."""
