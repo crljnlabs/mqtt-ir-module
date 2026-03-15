@@ -298,8 +298,10 @@ class PairingManagerHub:
         if connection is None:
             return False
 
+        # Block reclaim for pending agents (mid-pairing), but allow for unknown agents
+        # so the hub can recover after a data loss.
         agent = self._database.agents.get(normalized_agent_id)
-        if not agent or bool(agent.get("pending")):
+        if agent and bool(agent.get("pending")):
             return False
 
         mqtt_status = self._runtime_loader.status()

@@ -345,9 +345,6 @@ class PairingManagerAgent:
             self._logger.warning(f"Failed to acknowledge unpair command: {exc}")
 
     def _on_reclaim_command(self, connection: Any, client: Any, userdata: Any, message: MQTTMessage) -> None:
-        if self._is_bound():
-            return
-
         expected_agent_uid = self._agent_uid()
         agent_uid_from_topic = self._parse_reclaim_topic(message.topic)
         if not expected_agent_uid or not agent_uid_from_topic or agent_uid_from_topic != expected_agent_uid:
@@ -359,6 +356,12 @@ class PairingManagerAgent:
 
         hub_id = str(payload.get("hub_id") or "").strip()
         if not hub_id:
+            return
+
+        # Accept reclaim only if unbound, or if the reclaiming hub matches the stored binding.
+        # This allows the hub to recover orphaned agents after a data loss without risking
+        # a foreign hub stealing a paired agent.
+        if self._is_bound() and hub_id != self._binding_store.hub_id():
             return
 
         hub_topic = str(payload.get("hub_topic") or "")

@@ -147,7 +147,29 @@ class AgentRuntimeStateHub:
     def _sync_agent_capabilities(self, agent_id: str, state: Dict[str, Any]) -> None:
         agent = self._database.agents.get(agent_id)
         if not agent:
-            return
+            # Create a stub entry for agents recovered via reclaim after hub data loss.
+            with self._lock:
+                was_reclaimed = agent_id in self._reclaim_sent
+            if not was_reclaimed:
+                return
+            try:
+                agent = self._database.agents.upsert(
+                    agent_id=agent_id,
+                    name=agent_id,
+                    icon=None,
+                    transport="mqtt",
+                    status="online",
+                    can_send=self._parse_bool(state.get("can_send"), default=True),
+                    can_learn=self._parse_bool(state.get("can_learn"), default=False),
+                    sw_version=str(state.get("sw_version") or "") or None,
+                    agent_topic=None,
+                    last_seen=state.get("state_seen_at"),
+                    pending=False,
+                )
+                self._logger.info(f"Created stub DB entry for reclaim-recovered agent {agent_id}")
+            except Exception as exc:
+                self._logger.warning(f"Failed to create recovered agent entry for {agent_id}: {exc}")
+                return
         can_send = self._parse_bool(state.get("can_send"), default=bool(agent.get("can_send")))
         can_learn = self._parse_bool(state.get("can_learn"), default=bool(agent.get("can_learn")))
         sw_version = str(state.get("sw_version") or "").strip() or str(agent.get("sw_version") or "")
@@ -175,9 +197,25 @@ class AgentRuntimeStateHub:
             return
         pairing_hub_id = str(state.get("pairing_hub_id") or "").strip()
         if pairing_hub_id:
+            # Agent is bound to this hub but not in DB → hub lost its data, reclaim to recover.
+            if pairing_hub_id == self._hub_id():
+                agent = self._database.agents.get(agent_id)
+                if not agent:
+                    with self._lock:
+                        if agent_id in self._reclaim_sent:
+                            return
+                        self._reclaim_sent.add(agent_id)
+                    try:
+                        self._pairing_manager.reclaim_agent(agent_id)
+                    except Exception as exc:
+                        self._logger.warning(f"Failed to reclaim orphaned agent {agent_id}: {exc}")
+                        with self._lock:
+                            self._reclaim_sent.discard(agent_id)
+                    return
             with self._lock:
                 self._reclaim_sent.discard(agent_id)
             return
+        # Agent lost its binding → reclaim if known in DB.
         with self._lock:
             if agent_id in self._reclaim_sent:
                 return
@@ -192,6 +230,10 @@ class AgentRuntimeStateHub:
             self._logger.warning(f"Failed to reclaim agent {agent_id}: {exc}")
             with self._lock:
                 self._reclaim_sent.discard(agent_id)
+
+    def _hub_id(self) -> str:
+        mqtt_status = self._runtime_loader.status()
+        return str(mqtt_status.get("node_id") or "").strip() or str(self._runtime_loader.technical_name or "").strip()
 
     def _parse_agent_id_and_subtopic(self, topic: str) -> Tuple[str, str]:
         # Topic pattern: ir/agents/{id}/state/{subtopic}
