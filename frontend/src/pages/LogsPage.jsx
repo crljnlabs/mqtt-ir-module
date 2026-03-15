@@ -59,6 +59,8 @@ export function LogsPage() {
   const [autoScroll, setAutoScroll] = useState(true)
   const [confirmClearOpen, setConfirmClearOpen] = useState(false)
   const [openDropdown, setOpenDropdown] = useState(null)  // 'level' | 'source' | 'category' | null
+  const [toTsEditing, setToTsEditing] = useState(false)
+  const toTsInputRef = useRef(null)
   const logContainerRef = useRef(null)
   const dropdownRef = useRef(null)
 
@@ -209,6 +211,14 @@ export function LogsPage() {
   const filteredLogs = useMemo(() => {
     const query = search.trim().toLowerCase()
     return allLogs.filter((entry) => {
+      // Apply level/source/category client-side — needed for live WS logs which arrive unfiltered
+      if (selectedLevels.length > 0 && !selectedLevels.includes(entry.level)) return false
+      if (selectedSources.length > 0) {
+        const matchesHub = entry.source_type === 'hub' && selectedSources.includes('hub')
+        const matchesAgent = entry.source_type === 'agent' && selectedSources.includes(String(entry.source_id || ''))
+        if (!matchesHub && !matchesAgent) return false
+      }
+      if (selectedCategories.length > 0 && !selectedCategories.includes(entry.category)) return false
       if (!query) return true
       const haystack = [
         entry.message,
@@ -221,7 +231,7 @@ export function LogsPage() {
       ].join(' ').toLowerCase()
       return haystack.includes(query)
     })
-  }, [allLogs, search])
+  }, [allLogs, search, selectedLevels, selectedSources, selectedCategories])
 
   // ── Auto-scroll ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -324,7 +334,6 @@ export function LogsPage() {
               variant="secondary"
               size="sm"
               onClick={() => {
-                setLiveLogs([])
                 queryClient.invalidateQueries({ queryKey: ['logs'] })
               }}
               disabled={snapshotQuery.isFetching}
@@ -401,16 +410,30 @@ export function LogsPage() {
               />
             </div>
             <div>
-              <label className="block text-xs text-[rgb(var(--muted))] mb-1">
-                To
-                <span className="ml-2 text-[rgb(var(--muted))]">(empty = live)</span>
-              </label>
-              <input
-                type="datetime-local"
-                value={toTs}
-                onChange={(e) => setToTs(e.target.value)}
-                className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] px-3 py-2 text-sm text-[rgb(var(--fg))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--primary))]"
-              />
+              <label className="block text-xs text-[rgb(var(--muted))] mb-1">To</label>
+              {toTs || toTsEditing ? (
+                <input
+                  ref={toTsInputRef}
+                  type="datetime-local"
+                  value={toTs}
+                  onChange={(e) => setToTs(e.target.value)}
+                  onBlur={() => { if (!toTs) setToTsEditing(false) }}
+                  className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] px-3 py-2 text-sm text-[rgb(var(--fg))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--primary))]"
+                />
+              ) : (
+                <div
+                  onClick={() => {
+                    setToTsEditing(true)
+                    requestAnimationFrame(() => {
+                      toTsInputRef.current?.focus()
+                      toTsInputRef.current?.showPicker?.()
+                    })
+                  }}
+                  className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] px-3 py-2 text-sm text-[rgb(var(--muted))] cursor-pointer select-none"
+                >
+                  Live
+                </div>
+              )}
             </div>
             <div className="flex items-end">
               <Button
@@ -423,10 +446,10 @@ export function LogsPage() {
               </Button>
               {toTs ? (
                 <Button
-                  variant="ghost"
+                  variant="secondary"
                   size="sm"
                   className="ml-2 h-[2.625rem]"
-                  onClick={() => setToTs('')}
+                  onClick={() => { setToTs(''); setToTsEditing(false) }}
                 >
                   Back to live
                 </Button>

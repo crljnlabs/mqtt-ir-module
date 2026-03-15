@@ -278,7 +278,13 @@ class AgentLogHub:
 
     def _safe_ts(self, value: Any) -> float:
         try:
-            return float(value)
+            parsed = float(value)
+            # A value below 1e9 cannot be a real epoch timestamp — it is a
+            # boot-based counter (e.g. millis()/1000 from ESP firmware).
+            # Replace with server time so DB timestamp filtering works correctly.
+            if parsed < 1_000_000_000:
+                return float(time.time())
+            return parsed
         except Exception:
             return float(time.time())
 
