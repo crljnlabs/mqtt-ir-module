@@ -10,6 +10,7 @@ Strategy:
 The sync runs in a daemon thread so it never blocks the FastAPI server.
 """
 import logging
+import socket
 import threading
 import time
 import urllib.parse
@@ -33,12 +34,16 @@ _EXCLUDED_PREFIXES = ("_Converted_/",)
 _DOWNLOAD_RETRIES = 3
 _RETRY_BACKOFF = (2, 4)  # seconds before 2nd and 3rd attempts
 
+# Sync retry config when connectivity fails
+_SYNC_RETRY_DELAYS = (5 * 60, 10 * 60, 20 * 60, 40 * 60)  # 5 min, 10 min, 20 min, 40 min
+
 
 class GitHubMarketplaceIndex:
     def __init__(self, database: Any) -> None:
         self._db = database
         self._lock = threading.Lock()
         self._running = False
+        self._retry_count = 0
         self._status: Dict[str, Any] = {
             "status": "idle",
             "last_synced": None,
@@ -91,6 +96,43 @@ class GitHubMarketplaceIndex:
                 self._status["status"] = "error"
                 self._status["error"] = str(exc)
                 self._running = False
+            self._schedule_retry()
+
+    def _check_connectivity(self) -> bool:
+        """DNS probe for raw.githubusercontent.com before batch downloads."""
+        try:
+            socket.getaddrinfo("raw.githubusercontent.com", 443, socket.AF_INET, socket.SOCK_STREAM)
+            return True
+        except socket.gaierror:
+            return False
+
+    def _schedule_retry(self) -> None:
+        """Schedule a sync retry with exponential backoff. Gives up after all delays are exhausted."""
+        idx = self._retry_count
+        if idx >= len(_SYNC_RETRY_DELAYS):
+            logger.error("Marketplace sync: max retries exhausted, giving up until next startup")
+            return
+
+        delay = _SYNC_RETRY_DELAYS[idx]
+        self._retry_count += 1
+        logger.info(
+            f"Marketplace sync: retry {self._retry_count}/{len(_SYNC_RETRY_DELAYS)} "
+            f"scheduled in {delay // 60} min"
+        )
+        thread = threading.Thread(
+            target=self._retry_worker,
+            daemon=True,
+            args=(delay,),
+            name=f"marketplace-retry-{self._retry_count}",
+        )
+        thread.start()
+
+    def _retry_worker(self, delay: int) -> None:
+        time.sleep(delay)
+        with self._lock:
+            if self._running:
+                return  # a manual trigger happened in the meantime
+        self.trigger_sync()
 
     def _run_sync(self) -> None:
         logger.info("Marketplace sync: fetching GitHub tree")
@@ -147,7 +189,19 @@ class GitHubMarketplaceIndex:
         # Step 5 — download and parse new/changed files in parallel
         failed = 0
         if to_update:
-            with ThreadPoolExecutor(max_workers=20, thread_name_prefix="mkt-dl") as executor:
+            if not self._check_connectivity():
+                logger.warning(
+                    f"Marketplace sync: DNS resolution failed for raw.githubusercontent.com — "
+                    f"{len(to_update)} files pending, rescheduling"
+                )
+                with self._lock:
+                    self._status["status"] = "idle"
+                    self._status["error"] = "DNS resolution failed — sync rescheduled"
+                    self._running = False
+                self._schedule_retry()
+                return
+
+            with ThreadPoolExecutor(max_workers=10, thread_name_prefix="mkt-dl") as executor:
                 futures = {executor.submit(self._fetch_file, item): item for item in to_update}
                 for future in as_completed(futures):
                     item = futures[future]
@@ -165,6 +219,7 @@ class GitHubMarketplaceIndex:
         if failed:
             logger.warning(f"Marketplace sync: {failed}/{len(to_update)} files failed to download")
 
+        self._retry_count = 0
         with self._lock:
             self._status["status"] = "idle"
             self._status["last_synced"] = time.time()

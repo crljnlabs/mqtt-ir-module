@@ -91,6 +91,15 @@ services:
     container_name: mqtt-ir-module
     restart: unless-stopped
 
+    # Required for marketplace sync (GitHub raw file downloads).
+    # Many home-server hosts (e.g. Raspberry Pi with systemd-resolved) use
+    # 127.0.0.53 as their nameserver, which Docker containers cannot reach.
+    # Explicitly setting a public DNS resolver fixes "Temporary failure in
+    # name resolution" errors inside the container.
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+
     devices:
       - "/dev/lirc0:/dev/lirc0"
       - "/dev/lirc1:/dev/lirc1"
