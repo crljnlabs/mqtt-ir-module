@@ -141,6 +141,11 @@ const CODE_MAP = {
     titleKey: 'errors.agentIncompatibleLearnTitle',
     bodyKey: 'errors.agentIncompatibleLearnBody',
   },
+  runtime_error: {
+    kind: 'generic',
+    titleKey: 'errors.genericTitle',
+    bodyKey: 'errors.genericBody',
+  },
 }
 
 // Match backend detail strings to friendly categories when no structured code is provided.

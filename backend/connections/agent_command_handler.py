@@ -203,7 +203,7 @@ class AgentCommandHandler:
                 request_id=request_id,
                 code="runtime_error",
                 message=str(exc),
-                status_code=409,
+                status_code=500,
             )
         except Exception as exc:
             duration_ms = int((time.time() - started_at) * 1000)

@@ -76,12 +76,12 @@ export function RemotesPage() {
             placeholder={t('common.search')}
           />
         </div>
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => navigate('/marketplace')}>
+        <div className="flex gap-2 sm:w-auto w-full">
+          <Button variant="secondary" className="flex-1 sm:flex-none" onClick={() => navigate('/marketplace')}>
             <Icon path={mdiStore} size={0.85} />
             {t('marketplace.nav')}
           </Button>
-          <Button onClick={() => setCreateOpen(true)}>{t('remotes.create')}</Button>
+          <Button className="flex-1 sm:flex-none" onClick={() => setCreateOpen(true)}>{t('remotes.create')}</Button>
         </div>
       </div>
 

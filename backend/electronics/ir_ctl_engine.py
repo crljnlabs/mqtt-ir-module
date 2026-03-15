@@ -66,11 +66,13 @@ class IrCtlEngine:
         emitters: Optional[str] = None,
     ) -> Tuple[str, str]:
         """Send an IR signal using a decoded protocol via ir-ctl --protocol/--scancode."""
+        # Use combined --scancode=protocol:hex format (supported since v4l-utils 1.18,
+        # including Debian Bookworm 1.22.1). The split --protocol/--scancode flags
+        # were introduced in a later version and are not universally available.
         cmd: List[str] = [
             "ir-ctl",
             "-d", self._ir_tx_device,
-            f"--protocol={ir_ctl_protocol}",
-            f"--scancode={hex(scancode)}",
+            f"--scancode={ir_ctl_protocol}:{hex(scancode)}",
         ]
         if emitters:
             cmd.append(f"--emitters={emitters}")
