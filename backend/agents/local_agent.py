@@ -18,6 +18,7 @@ class LocalAgent:
         self._name = name
         self._log_reporter = log_reporter
         self._learning_active = False
+        self._online = False
         self._lock = threading.Lock()
         self._capabilities = {
             "canLearn": True,
@@ -41,6 +42,15 @@ class LocalAgent:
     @property
     def capabilities(self) -> Dict[str, Any]:
         return dict(self._capabilities)
+
+    @property
+    def online(self) -> bool:
+        with self._lock:
+            return self._online
+
+    def set_online(self, value: bool) -> None:
+        with self._lock:
+            self._online = bool(value)
 
     def set_log_reporter(self, log_reporter: Optional[Any]) -> None:
         with self._lock:

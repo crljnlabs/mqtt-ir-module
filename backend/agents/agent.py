@@ -18,6 +18,13 @@ class Agent(Protocol):
     def capabilities(self) -> Dict[str, Any]:
         ...
 
+    @property
+    def online(self) -> bool:
+        ...
+
+    def set_online(self, value: bool) -> None:
+        ...
+
     def send(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         ...
 
