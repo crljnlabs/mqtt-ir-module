@@ -142,10 +142,6 @@ void handlePairingReclaim(const String& topic, const byte* payload, unsigned int
   if (topic != topicPairingReclaim()) {
     return;
   }
-  if (!gPairingHubId.isEmpty()) {
-    logDebug("pairing", "Reclaim ignored because agent is already paired");
-    return;
-  }
   JsonDocument doc;
   if (!parsePayloadObject(payload, length, doc)) {
     return;
@@ -153,6 +149,13 @@ void handlePairingReclaim(const String& topic, const byte* payload, unsigned int
   const String hubId = String(doc["hub_id"] | "");
   if (hubId.isEmpty()) {
     logWarn("pairing", "Reclaim payload missing hub_id", "pairing_payload_invalid");
+    return;
+  }
+  // Accept reclaim only if unbound, or if the reclaiming hub matches the stored binding.
+  // This allows the hub to recover orphaned agents after a data loss without risking
+  // a foreign hub stealing a paired agent.
+  if (!gPairingHubId.isEmpty() && hubId != gPairingHubId) {
+    logDebug("pairing", "Reclaim ignored because agent is paired to a different hub");
     return;
   }
 

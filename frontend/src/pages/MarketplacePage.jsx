@@ -191,7 +191,7 @@ const syncStatusQuery = useQuery({
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="flex flex-col h-[calc(100%+6rem)] md:h-full">
       <div className="flex flex-col gap-2 pb-3 border-b border-[rgb(var(--border))]">
         <div className="flex items-center gap-2">
           <div className="flex-1">
@@ -290,7 +290,7 @@ const syncStatusQuery = useQuery({
         ) : items.length === 0 && !listQuery.isFetching ? (
           <p className="text-sm text-[rgb(var(--muted))] py-8 text-center">{t('marketplace.noResults')}</p>
         ) : (
-          <div className="grid grid-cols-1 gap-3 pb-3">
+          <div className="grid grid-cols-1 gap-3 pb-16 md:pb-4">
             {items.map((remote) => (
               <MarketplaceTile
                 key={remote.id}
