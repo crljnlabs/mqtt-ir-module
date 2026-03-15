@@ -1,6 +1,6 @@
 # Scripts Feature
 
-**Status:** Definition only — not yet implemented.
+**Status:** DB schema implemented. API, runner, and frontend pending.
 
 ## Goal
 
@@ -138,7 +138,7 @@ Resulting script_run_steps rows for one run (sequential position):
 
 ## What to Implement
 
-### Backend — Database
+### Backend — Database ✅ DONE
 
 - `backend/database/schemas/scripts.py` — `Scripts` class
   - `_create_schema`, `create`, `get`, `list`, `update`, `delete`
@@ -148,14 +148,15 @@ Resulting script_run_steps rows for one run (sequential position):
 - `backend/database/schemas/script_runs.py` — `ScriptRuns` class
   - `create(script_id)` → returns run row with `status='running'`
   - `finish(run_id, status)` → sets `status` + `finished_at`
-  - `list(script_id)` → ordered by `started_at DESC`
+  - `get(run_id)`, `list(script_id)` → ordered by `started_at DESC`
   - `prune(script_id, max_runs)` → delete oldest runs beyond the limit
 - `backend/database/schemas/script_run_steps.py` — `ScriptRunSteps` class
-  - `create(run_id, position, label, type, params)` → creates with `status='pending'`
+  - `create_batch(run_id, steps)` → inserts all expanded step rows in one transaction
   - `start(step_id)` → sets `status='running'`, `started_at`
   - `finish(step_id, status, error=None)` → sets `status`, `finished_at`, `error`
   - `list(run_id)` → ordered by `position`
-- Register all four in `Database` init.
+- All four registered in `Database.__init__` and `Database.init()`.
+- `script_max_runs` added to `Settings.get_script_settings()`, included in `get_ui_settings()` and `update_ui_settings()` (default: 10, range: 1–100).
 
 ### Backend — API Endpoints
 
