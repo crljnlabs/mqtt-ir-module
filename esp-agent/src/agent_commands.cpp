@@ -119,7 +119,7 @@ bool executeSendCommand(JsonObjectConst payload, JsonObject result,
   const String normalizedMode = mode.length() ? mode : "press";
 
   // Protocol-encoded signals (NEC, Samsung32, SIRC, RC5, RC6, Kaseikyo, JVC).
-  const String signalType = String(payload["signal_type"] | "raw");
+  const String signalType = String(payload["encoding"] | "raw");
   if (signalType == "protocol") {
     const String protocolName = String(payload["protocol"] | "");
     const String addressStr = String(payload["address"] | "");

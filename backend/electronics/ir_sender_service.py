@@ -28,7 +28,6 @@ class IrSenderService:
     # ------------------------------------------------------------------
 
     def _send_protocol(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        button_id = payload.get("button_id")
         mode = str(payload.get("mode") or "press").strip().lower()
         protocol = str(payload.get("protocol") or "").strip()
         address = str(payload.get("address") or "").strip()
@@ -45,7 +44,6 @@ class IrSenderService:
         stdout, stderr = self._engine.send_protocol(ir_ctl_protocol, scancode)
 
         return {
-            "button_id": button_id,
             "mode": mode,
             "carrier_hz": None,
             "duty_cycle": None,
@@ -60,7 +58,6 @@ class IrSenderService:
     # ------------------------------------------------------------------
 
     def _send_raw(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        button_id = payload.get("button_id")
         mode = str(payload.get("mode") or "").strip().lower()
 
         hold_ms = payload.get("hold_ms")
@@ -84,7 +81,6 @@ class IrSenderService:
                 )
 
                 return {
-                    "button_id": button_id,
                     "mode": "press",
                     "carrier_hz": carrier_hz,
                     "duty_cycle": duty_cycle,
@@ -132,7 +128,6 @@ class IrSenderService:
             )
 
             return {
-                "button_id": button_id,
                 "mode": "hold",
                 "hold_ms": int(hold_ms),
                 "carrier_hz": carrier_hz,

@@ -69,12 +69,11 @@ class LocalAgent:
             raise BusyLearningError("Cannot send while learning is active")
         mode = str(payload.get("mode") or "press").strip().lower() or "press"
         hold_ms = int(payload.get("hold_ms") or 0)
-        button_id = int(payload.get("button_id") or 0)
         self._log(
             level="info",
             category="send",
             message="Send started",
-            meta={"mode": mode, "hold_ms": hold_ms, "button_id": button_id},
+            meta={"mode": mode, "hold_ms": hold_ms},
         )
         try:
             result = self._transport.send(payload)
@@ -82,7 +81,7 @@ class LocalAgent:
                 level="info",
                 category="send",
                 message="Send finished",
-                meta={"mode": mode, "hold_ms": hold_ms, "button_id": button_id},
+                meta={"mode": mode, "hold_ms": hold_ms},
             )
             return result
         except Exception as exc:
@@ -91,7 +90,7 @@ class LocalAgent:
                 category="send",
                 message=f"Send failed: {exc}",
                 error_code="send_failed",
-                meta={"mode": mode, "hold_ms": hold_ms, "button_id": button_id},
+                meta={"mode": mode, "hold_ms": hold_ms},
             )
             raise
 

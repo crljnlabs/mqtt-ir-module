@@ -1262,24 +1262,27 @@ def send_ir(body: SendRequest, x_api_key: Optional[str] = Header(default=None)) 
             raise AgentError(code="send_while_learning", message="Cannot send while learning is active", status_code=409)
 
         encoding = str(signals.get("encoding") or "raw").strip().lower()
-        payload = {
-            "button_id": body.button_id,
-            "mode": body.mode,
-            "hold_ms": body.hold_ms,
-            "encoding": encoding,
-            "signal_type": "protocol" if encoding == "protocol" else "raw",
-            # Raw signal fields
-            "press_initial": signals.get("press_initial"),
-            "hold_initial": signals.get("hold_initial"),
-            "hold_repeat": signals.get("hold_repeat"),
-            "hold_gap_us": signals.get("hold_gap_us"),
-            "carrier_hz": remote.get("carrier_hz") if encoding != "protocol" else None,
-            "duty_cycle": remote.get("duty_cycle") if encoding != "protocol" else None,
-            # Protocol signal fields (populated for encoding='protocol', None otherwise)
-            "protocol": signals.get("protocol"),
-            "address": signals.get("address"),
-            "command_hex": signals.get("command_hex"),
-        }
+        if encoding == "protocol":
+            payload = {
+                "mode": body.mode,
+                "hold_ms": body.hold_ms,
+                "encoding": "protocol",
+                "protocol": signals.get("protocol"),
+                "address": signals.get("address"),
+                "command_hex": signals.get("command_hex"),
+            }
+        else:
+            payload = {
+                "mode": body.mode,
+                "hold_ms": body.hold_ms,
+                "encoding": encoding,
+                "press_initial": signals.get("press_initial"),
+                "hold_initial": signals.get("hold_initial"),
+                "hold_repeat": signals.get("hold_repeat"),
+                "hold_gap_us": signals.get("hold_gap_us"),
+                "carrier_hz": remote.get("carrier_hz"),
+                "duty_cycle": remote.get("duty_cycle"),
+            }
 
         result = agent.send(payload)
         agent_registry.mark_agent_activity(agent.agent_id)

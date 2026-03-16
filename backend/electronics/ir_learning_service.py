@@ -263,7 +263,7 @@ class IrLearningService:
             press_repeat=None,
             sample_count_press=len(used_indices),
             quality_score_press=score,
-            encoding="signed_us_v1",
+            encoding="raw",
         )
 
         session.last_button_id = button_id
