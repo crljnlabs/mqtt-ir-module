@@ -696,7 +696,8 @@ def ota_update_agent(
 ) -> Dict[str, Any]:
     require_api_key(x_api_key)
     agent = _require_mqtt_agent(agent_id)
-    _require_agent_not_installing(str(agent.get("agent_id") or agent_id))
+    normalized_agent_id = str(agent.get("agent_id") or agent_id)
+    _require_agent_not_installing(normalized_agent_id)
     decorated = _decorate_agent_payload(agent)
     runtime = decorated.get("runtime") if isinstance(decorated.get("runtime"), dict) else {}
     if str(runtime.get("agent_type") or "").strip().lower() != "esp32":
@@ -713,6 +714,26 @@ def ota_update_agent(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
+    # Reboot the agent before OTA to ensure a clean WiFi stack and fresh RAM.
+    last_seen_before = float(agent.get("last_seen") or 0)
+    command_client.runtime_reboot(agent_id=normalized_agent_id)
+
+    reboot_timeout = 45
+    reboot_deadline = time.time() + reboot_timeout
+    came_back_online = False
+    while time.time() < reboot_deadline:
+        time.sleep(1)
+        current = agent_registry.get_agent(normalized_agent_id)
+        if (
+            current
+            and str(current.get("status") or "").strip().lower() == "online"
+            and float(current.get("last_seen") or 0) > last_seen_before
+        ):
+            came_back_online = True
+            break
+    if not came_back_online:
+        raise HTTPException(status_code=503, detail="Agent did not come back online after reboot")
+
     ota_file = str(firmware.get("ota_file") or "").strip()
     ota_url = firmware_catalog.build_firmware_url(
         request=request,
@@ -724,10 +745,10 @@ def ota_update_agent(
         "url": ota_url,
         "sha256": str(firmware.get("ota_sha256") or ""),
     }
-    result = command_client.runtime_ota_start(agent_id=agent_id, payload=payload)
-    agent_registry.mark_agent_activity(agent_id)
+    result = command_client.runtime_ota_start(agent_id=normalized_agent_id, payload=payload)
+    agent_registry.mark_agent_activity(normalized_agent_id)
     return {
-        "agent_id": str(agent.get("agent_id") or agent_id),
+        "agent_id": normalized_agent_id,
         "requested_version": payload["version"],
         "url": ota_url,
         "result": result,

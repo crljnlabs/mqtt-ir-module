@@ -14,7 +14,7 @@ class AgentInstallationStateHub:
     IN_PROGRESS_STATUSES = {"started", "downloading", "installing"}
     TERMINAL_CLEAR_STATUSES = {"finished", "cancelled"}
     FINISH_CLEAR_DELAY_SECONDS = 20.0
-    STALE_PROGRESS_TIMEOUT_SECONDS = 300.0
+    STALE_PROGRESS_TIMEOUT_SECONDS = 60.0
 
     def __init__(self, runtime_loader: RuntimeLoader) -> None:
         self._runtime_loader = runtime_loader
