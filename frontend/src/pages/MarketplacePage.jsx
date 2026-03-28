@@ -11,11 +11,14 @@ import {
   getMarketplaceSyncStatus,
   triggerMarketplaceSync,
   getInstalledMarketplacePaths,
+  installMarketplaceRemote,
 } from '../api/marketplaceApi.js'
 import { TextField } from '../components/ui/TextField.jsx'
 import { Button } from '../components/ui/Button.jsx'
 import { SelectField } from '../components/ui/SelectField.jsx'
 import { MarketplaceInstallDrawer } from '../features/marketplace/MarketplaceInstallDrawer.jsx'
+import { useToast } from '../components/ui/ToastProvider.jsx'
+import { ApiErrorMapper } from '../utils/apiErrorMapper.js'
 
 function SignalBadge({ type, protocol }) {
   if (type === 'parsed') {
@@ -32,7 +35,13 @@ function SignalBadge({ type, protocol }) {
   )
 }
 
-function MarketplaceTile({ remote, installed, onInstall }) {
+function stripBrandPrefix(brand, model) {
+  const normalized = brand.replace(/_/g, ' ')
+  const prefix = normalized + ' '
+  return model.startsWith(prefix) ? model.slice(prefix.length) : model
+}
+
+function MarketplaceTile({ remote, installed, installing, onInstall }) {
   const { t } = useTranslation()
   const protocols = [
     ...new Set(
@@ -41,13 +50,15 @@ function MarketplaceTile({ remote, installed, onInstall }) {
   ]
   const hasRaw = remote.buttons.some((b) => b.signal_type === 'raw')
   const githubUrl = `https://github.com/Lucaslhm/Flipper-IRDB/blob/main/${remote.path.split('/').map(encodeURIComponent).join('/')}`
+  const displayModel = stripBrandPrefix(remote.brand, remote.model)
 
   return (
     <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--card))] p-4 flex items-center gap-4">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-semibold">
-            {remote.brand} {remote.model !== remote.brand ? remote.model : ''}
+          <span className="font-semibold">{displayModel}</span>
+          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[rgb(var(--bg))] border border-[rgb(var(--border))] text-[rgb(var(--muted))]">
+            {remote.brand.replace(/_/g, ' ')}
           </span>
           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[rgb(var(--bg))] border border-[rgb(var(--border))] text-[rgb(var(--muted))]">
             {remote.category.replace(/_/g, ' ')}
@@ -73,7 +84,11 @@ function MarketplaceTile({ remote, installed, onInstall }) {
         >
           <Icon path={mdiGithub} size={0.85} />
         </a>
-        {installed ? (
+        {installing ? (
+          <div className="w-[4.5rem] flex items-center justify-center">
+            <div className="w-4 h-4 border-2 border-[rgb(var(--primary))] border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : installed ? (
           <span className="text-xs font-semibold text-[rgb(var(--primary))]">
             ✓ {t('marketplace.installedBadge')}
           </span>
@@ -90,6 +105,8 @@ function MarketplaceTile({ remote, installed, onInstall }) {
 export function MarketplacePage() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const toast = useToast()
+  const errorMapper = new ApiErrorMapper(t)
   const prevSyncStatusRef = useRef(null)
 
   const [q, setQ] = useState('')
@@ -98,6 +115,7 @@ export function MarketplacePage() {
   const [brand, setBrand] = useState('')
   const [installTarget, setInstallTarget] = useState(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [installingPaths, setInstallingPaths] = useState(() => new Set())
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQ(q), 400)
@@ -166,6 +184,26 @@ const syncStatusQuery = useQuery({
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['marketplace-sync-status'] }),
   })
 
+  const installMutation = useMutation({
+    mutationFn: installMarketplaceRemote,
+    onSuccess: (_, { path }) => {
+      setInstallingPaths((prev) => { const next = new Set(prev); next.delete(path); return next })
+      toast.show({ title: t('marketplace.installTitle'), message: t('marketplace.installSuccess') })
+      queryClient.invalidateQueries({ queryKey: ['remotes'] })
+      queryClient.invalidateQueries({ queryKey: ['marketplace-installed'] })
+      queryClient.invalidateQueries({ queryKey: ['marketplace', debouncedQ, category, brand] })
+    },
+    onError: (e, { path }) => {
+      setInstallingPaths((prev) => { const next = new Set(prev); next.delete(path); return next })
+      toast.show({ title: t('marketplace.installTitle'), message: errorMapper.getMessage(e, 'marketplace.installFailed') })
+    },
+  })
+
+  function handleInstall({ path, remote_name }) {
+    setInstallingPaths((prev) => new Set([...prev, path]))
+    installMutation.mutate({ path, remote_name })
+  }
+
   const installedPaths = new Set(installedQuery.data || [])
   const items = listQuery.data || []
   const categories = Array.isArray(categoriesQuery.data) ? categoriesQuery.data : []
@@ -191,7 +229,7 @@ const syncStatusQuery = useQuery({
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="flex flex-col h-[calc(100%+6rem)] md:h-full">
       <div className="flex flex-col gap-2 pb-3 border-b border-[rgb(var(--border))]">
         <div className="flex items-center gap-2">
           <div className="flex-1">
@@ -290,12 +328,13 @@ const syncStatusQuery = useQuery({
         ) : items.length === 0 && !listQuery.isFetching ? (
           <p className="text-sm text-[rgb(var(--muted))] py-8 text-center">{t('marketplace.noResults')}</p>
         ) : (
-          <div className="grid grid-cols-1 gap-3 pb-3">
+          <div className="grid grid-cols-1 gap-3 pb-16 md:pb-4">
             {items.map((remote) => (
               <MarketplaceTile
                 key={remote.id}
                 remote={remote}
                 installed={installedPaths.has(remote.path)}
+                installing={installingPaths.has(remote.path)}
                 onInstall={setInstallTarget}
               />
             ))}
@@ -307,12 +346,7 @@ const syncStatusQuery = useQuery({
         open={Boolean(installTarget)}
         remote={installTarget}
         onClose={() => setInstallTarget(null)}
-        onSuccess={() => {
-          setInstallTarget(null)
-          queryClient.invalidateQueries({ queryKey: ['remotes'] })
-          queryClient.invalidateQueries({ queryKey: ['marketplace-installed'] })
-          queryClient.invalidateQueries({ queryKey: ['marketplace', debouncedQ, category, brand] })
-        }}
+        onInstall={handleInstall}
       />
     </div>
   )

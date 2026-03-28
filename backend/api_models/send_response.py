@@ -4,7 +4,6 @@ from pydantic import BaseModel, Field
 
 
 class SendResponse(BaseModel):
-    button_id: Optional[int] = Field(default=None, description="Button id that was sent")
     mode: str = Field(..., description="Send mode (press/hold)")
     hold_ms: Optional[int] = Field(default=None, description="Requested hold duration in milliseconds")
     carrier_hz: Optional[int] = Field(default=None, description="Carrier frequency used for transmission")

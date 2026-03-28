@@ -2,7 +2,7 @@ import json
 import logging
 import threading
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from jmqtt import MQTTMessage, QualityOfService as QoS
 
@@ -11,19 +11,34 @@ from .runtime_loader import RuntimeLoader
 
 class AgentInstallationStateHub:
     STATE_TOPIC_WILDCARD = "ir/agents/+/installation/state"
+    AVAILABILITY_TOPIC_WILDCARD = "ir/agents/+/state/availability"
     IN_PROGRESS_STATUSES = {"started", "downloading", "installing"}
     TERMINAL_CLEAR_STATUSES = {"finished", "cancelled"}
     FINISH_CLEAR_DELAY_SECONDS = 20.0
-    STALE_PROGRESS_TIMEOUT_SECONDS = 300.0
+    STALE_PROGRESS_TIMEOUT_SECONDS = 120.0
+    # How long the device may stay offline during active OTA before declaring failure.
+    OFFLINE_FAILURE_TIMEOUT_SECONDS = 15.0
+    # Delay after "online" before querying version; gives device time to publish its state topics.
+    ONLINE_VERSION_CHECK_DELAY_SECONDS = 3.0
 
-    def __init__(self, runtime_loader: RuntimeLoader) -> None:
+    def __init__(
+        self,
+        runtime_loader: RuntimeLoader,
+        version_provider: Optional[Callable[[str], str]] = None,
+    ) -> None:
         self._runtime_loader = runtime_loader
+        self._version_provider = version_provider
         self._logger = logging.getLogger("agent_installation_state_hub")
         self._lock = threading.Lock()
         self._running = False
         self._subscribed = False
         self._states: Dict[str, Dict[str, Any]] = {}
         self._clear_timers: Dict[str, threading.Timer] = {}
+        # Tracks agents whose OTA was declared failure because they went offline.
+        # Maps agent_id → target_version so we can correct to "finished" if they return
+        # on the right firmware version.
+        self._offline_failed: Dict[str, str] = {}
+        self._offline_timers: Dict[str, threading.Timer] = {}
 
     def start(self) -> None:
         connection = self._runtime_loader.mqtt_connection()
@@ -49,6 +64,10 @@ class AgentInstallationStateHub:
             connection.subscribe(self.STATE_TOPIC_WILDCARD, self._on_state, qos=QoS.AtLeastOnce)
         except Exception as exc:
             self._logger.warning(f"Failed to subscribe installation state topic {self.STATE_TOPIC_WILDCARD}: {exc}")
+        try:
+            connection.subscribe(self.AVAILABILITY_TOPIC_WILDCARD, self._on_availability, qos=QoS.AtLeastOnce)
+        except Exception as exc:
+            self._logger.warning(f"Failed to subscribe availability topic {self.AVAILABILITY_TOPIC_WILDCARD}: {exc}")
 
     def stop(self) -> None:
         connection = self._runtime_loader.mqtt_connection()
@@ -57,8 +76,10 @@ class AgentInstallationStateHub:
             self._running = False
             self._subscribed = False
             self._states.clear()
-            timers = list(self._clear_timers.values())
+            self._offline_failed.clear()
+            timers = list(self._clear_timers.values()) + list(self._offline_timers.values())
             self._clear_timers.clear()
+            self._offline_timers.clear()
         for timer in timers:
             try:
                 timer.cancel()
@@ -70,6 +91,10 @@ class AgentInstallationStateHub:
             connection.unsubscribe(self.STATE_TOPIC_WILDCARD)
         except Exception as exc:
             self._logger.warning(f"Failed to unsubscribe installation state topic {self.STATE_TOPIC_WILDCARD}: {exc}")
+        try:
+            connection.unsubscribe(self.AVAILABILITY_TOPIC_WILDCARD)
+        except Exception as exc:
+            self._logger.warning(f"Failed to unsubscribe availability topic {self.AVAILABILITY_TOPIC_WILDCARD}: {exc}")
 
     def get_state(self, agent_id: str) -> Optional[Dict[str, Any]]:
         normalized_agent_id = str(agent_id or "").strip()
@@ -157,6 +182,116 @@ class AgentInstallationStateHub:
         if should_publish and payload is not None:
             self._publish_retained_state(normalized_agent_id, payload)
         return payload
+
+    def _on_availability(self, connection: Any, client: Any, userdata: Any, message: MQTTMessage) -> None:
+        del connection
+        del client
+        del userdata
+        agent_id = self._parse_availability_agent_id(message.topic)
+        if not agent_id:
+            return
+        status = str(message.text or "").strip().lower()
+        if status == "offline":
+            if self.is_in_progress(agent_id):
+                self._start_offline_timer(agent_id)
+        elif status == "online":
+            self._cancel_offline_timer(agent_id)
+            with self._lock:
+                has_offline_failed = agent_id in self._offline_failed
+            if has_offline_failed:
+                # Device came back after failure was declared — check version after a short
+                # delay so the device has time to publish its state/runtime topic.
+                timer = threading.Timer(
+                    self.ONLINE_VERSION_CHECK_DELAY_SECONDS,
+                    self._try_version_reconcile_after_offline,
+                    args=(agent_id,),
+                )
+                timer.daemon = True
+                timer.start()
+
+    def _start_offline_timer(self, agent_id: str) -> None:
+        self._cancel_offline_timer(agent_id)
+        timer = threading.Timer(
+            self.OFFLINE_FAILURE_TIMEOUT_SECONDS,
+            self._on_offline_timer,
+            args=(agent_id,),
+        )
+        timer.daemon = True
+        with self._lock:
+            self._offline_timers[agent_id] = timer
+        timer.start()
+
+    def _cancel_offline_timer(self, agent_id: str) -> None:
+        with self._lock:
+            timer = self._offline_timers.pop(agent_id, None)
+        if timer is None:
+            return
+        try:
+            timer.cancel()
+        except Exception:
+            pass
+
+    def _on_offline_timer(self, agent_id: str) -> None:
+        recovered_payload: Optional[Dict[str, Any]] = None
+        target_version = ""
+        now = time.time()
+        with self._lock:
+            self._offline_timers.pop(agent_id, None)
+            state = self._states.get(agent_id)
+            if isinstance(state, dict) and bool(state.get("in_progress")):
+                target_version = str(state.get("target_version") or "")
+                recovered = dict(state)
+                recovered["status"] = "failure"
+                recovered["in_progress"] = False
+                recovered["message"] = f"Device went offline for more than {self.OFFLINE_FAILURE_TIMEOUT_SECONDS:.0f}s during OTA"
+                recovered["error_code"] = "ota_device_offline"
+                recovered["updated_at"] = now
+                recovered["_state_seen_at"] = now
+                self._states[agent_id] = recovered
+                recovered_payload = self._public_payload(recovered)
+            if target_version:
+                self._offline_failed[agent_id] = target_version
+        if recovered_payload is None:
+            return
+        self._logger.warning(
+            f"OTA failure for {agent_id}: device went offline and did not recover within "
+            f"{self.OFFLINE_FAILURE_TIMEOUT_SECONDS:.0f}s"
+        )
+        self._publish_retained_state(agent_id, recovered_payload)
+
+    def _try_version_reconcile_after_offline(self, agent_id: str) -> None:
+        """Called after device comes back online following an offline-triggered OTA failure.
+        Corrects state to 'finished' if the device is now on the target version."""
+        with self._lock:
+            target_version = self._offline_failed.pop(agent_id, "")
+        if not target_version or not self._version_provider:
+            return
+        current_version = self._version_provider(agent_id)
+        if not current_version or current_version != target_version:
+            return
+        # Version matches — OTA actually succeeded despite the offline event.
+        now = time.time()
+        payload: Optional[Dict[str, Any]] = None
+        with self._lock:
+            state = self._states.get(agent_id)
+            if not isinstance(state, dict):
+                return
+            updated = dict(state)
+            updated["status"] = "finished"
+            updated["in_progress"] = False
+            updated["progress_pct"] = 100
+            updated["current_version"] = current_version
+            updated["message"] = "OTA update completed"
+            updated["error_code"] = ""
+            updated["updated_at"] = now
+            updated["_state_seen_at"] = now
+            self._states[agent_id] = updated
+            payload = self._public_payload(updated)
+        if payload is None:
+            return
+        self._logger.info(f"OTA for {agent_id} corrected to finished after device returned on target version {target_version}")
+        self._schedule_finished_clear(agent_id)
+        self._publish_retained_state(agent_id, payload)
 
     def _on_state(self, connection: Any, client: Any, userdata: Any, message: MQTTMessage) -> None:
         del connection
@@ -272,6 +407,14 @@ class AgentInstallationStateHub:
         if len(parts) != 5:
             return ""
         if parts[0] != "ir" or parts[1] != "agents" or parts[3] != "installation" or parts[4] != "state":
+            return ""
+        return parts[2].strip()
+
+    def _parse_availability_agent_id(self, topic: str) -> str:
+        parts = str(topic or "").split("/")
+        if len(parts) != 5:
+            return ""
+        if parts[0] != "ir" or parts[1] != "agents" or parts[3] != "state" or parts[4] != "availability":
             return ""
         return parts[2].strip()
 

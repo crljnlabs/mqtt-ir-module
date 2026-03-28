@@ -255,7 +255,7 @@ export function AgentPage() {
           <div className="flex gap-2">
             <IconButton
               label="Logs"
-              onClick={() => navigate(`/agent/${agent.agent_id}/logs`, { state: { from: location.pathname } })}
+              onClick={() => navigate(`/logs?source_id=${encodeURIComponent(agent.agent_id)}`, { state: { from: location.pathname } })}
             >
               <Icon path={mdiTextBoxSearchOutline} size={1} />
             </IconButton>

@@ -1,12 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Card, CardBody, CardHeader, CardTitle } from '../components/ui/Card.jsx'
 import { getAppConfig } from '../utils/appConfig.js'
 import { getElectronicsStatus, getMqttStatus } from '../api/statusApi.js'
 import { getSettings, updateSettings } from '../api/settingsApi.js'
 import { getFirmwareCatalog } from '../api/firmwareApi.js'
+import Icon from '@mdi/react'
+import { mdiTextBoxSearchOutline } from '@mdi/js'
 import { Button } from '../components/ui/Button.jsx'
+import { IconButton } from '../components/ui/IconButton.jsx'
 import { Modal } from '../components/ui/Modal.jsx'
 import { NumberField } from '../components/ui/NumberField.jsx'
 import { SelectField } from '../components/ui/SelectField.jsx'
@@ -17,6 +21,7 @@ import { ApiErrorMapper } from '../utils/apiErrorMapper.js'
 
 export function SettingsPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const toast = useToast()
   const queryClient = useQueryClient()
   const errorMapper = new ApiErrorMapper(t)
@@ -46,6 +51,8 @@ export function SettingsPage() {
   const [holdIdleTimeoutMs, setHoldIdleTimeoutMs] = useState('')
   const [aggregateRoundToUs, setAggregateRoundToUs] = useState('')
   const [aggregateMinMatchPercent, setAggregateMinMatchPercent] = useState('')
+  const [logRetentionDays, setLogRetentionDays] = useState('7')
+  const [logDirty, setLogDirty] = useState(false)
   const [mqttDirty, setMqttDirty] = useState(false)
   const [mqttHost, setMqttHost] = useState('')
   const [mqttPort, setMqttPort] = useState('1883')
@@ -77,6 +84,11 @@ export function SettingsPage() {
   }, [settingsQuery.data, learningDirty])
 
   useEffect(() => {
+    if (!settingsQuery.data || logDirty) return
+    setLogRetentionDays(String(settingsQuery.data.log_retention_days ?? 7))
+  }, [settingsQuery.data, logDirty])
+
+  useEffect(() => {
     if (!settingsQuery.data || mqttDirty) return
     const defaults = getMqttDefaults(settingsQuery.data)
     setMqttHost(defaults.host)
@@ -86,6 +98,16 @@ export function SettingsPage() {
     setMqttPassword('')
     setHomeassistantEnabled(Boolean(settingsQuery.data.homeassistant_enabled ?? false))
   }, [settingsQuery.data, mqttDirty])
+
+  const logMutation = useMutation({
+    mutationFn: updateSettings,
+    onSuccess: (data) => {
+      queryClient.setQueryData(['settings'], data)
+      setLogDirty(false)
+      toast.show({ title: 'Logs', message: 'Log settings saved.' })
+    },
+    onError: (e) => toast.show({ title: 'Logs', message: errorMapper.getMessage(e, 'settings.learningSaveFailed') }),
+  })
 
   const updateMutation = useMutation({
     mutationFn: updateSettings,
@@ -160,10 +182,17 @@ export function SettingsPage() {
     hasMqttPasswordInput
   )
 
+  const logRetentionValue = parseNumberInput(logRetentionDays)
+  const isLogRetentionValid = isNumberInRange(logRetentionValue, 1, 365)
+  const logRetentionDefault = settingsQuery.data?.log_retention_days ?? 7
+  const hasLogChanges = Boolean(settingsQuery.data) && isLogRetentionValid && logRetentionValue !== logRetentionDefault
+
   const isSaving = updateMutation.isPending
   const isSavingMqtt = mqttMutation.isPending
+  const isSavingLog = logMutation.isPending
   const disableLearningForm = !settingsQuery.data || isSaving
   const disableMqttForm = !settingsQuery.data || isSavingMqtt
+  const disableLogForm = !settingsQuery.data || isSavingLog
   const mqttPasswordStored = Boolean(settingsQuery.data?.mqtt_password_set)
   const showMasterKeyWarning = !hasMasterKey
   const mqttConfigured = Boolean(mqttStatusQuery.data?.configured)
@@ -192,6 +221,11 @@ export function SettingsPage() {
       aggregate_round_to_us: aggregateRoundValue,
       aggregate_min_match_ratio: Number((matchPercentValue / 100).toFixed(2)),
     })
+  }
+
+  const handleSaveLog = () => {
+    if (!isLogRetentionValid || logRetentionValue == null) return
+    logMutation.mutate({ log_retention_days: logRetentionValue })
   }
 
   const handleSaveMqtt = () => {
@@ -429,6 +463,38 @@ export function SettingsPage() {
           </div>
           <div className="mt-4 flex justify-end">
             <Button onClick={handleSaveLearning} disabled={disableLearningForm || hasInvalid || !hasChanges}>
+              {t('common.save')}
+            </Button>
+          </div>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Logs</CardTitle>
+          <IconButton label="View Logs" onClick={() => navigate('/logs', { state: { from: '/settings' } })}>
+            <Icon path={mdiTextBoxSearchOutline} size={1} />
+          </IconButton>
+        </CardHeader>
+        <CardBody>
+          <div className="text-sm text-[rgb(var(--muted))]">
+            Log entries older than the retention window are automatically removed on startup and every hour.
+          </div>
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <NumberField
+              label="Retention (days)"
+              hint="Number of days to keep log entries (1–365)."
+              value={logRetentionDays}
+              min={1}
+              max={365}
+              step={1}
+              disabled={disableLogForm}
+              aria-invalid={!isLogRetentionValid}
+              onChange={(e) => { setLogDirty(true); setLogRetentionDays(e.target.value) }}
+            />
+          </div>
+          <div className="mt-4 flex justify-end">
+            <Button onClick={handleSaveLog} disabled={disableLogForm || !isLogRetentionValid || !hasLogChanges}>
               {t('common.save')}
             </Button>
           </div>

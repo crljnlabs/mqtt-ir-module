@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next'
 import { getSettings, updateSettings } from '../../api/settingsApi.js'
 import { IconButton } from '../ui/IconButton.jsx'
 import { Drawer } from '../ui/Drawer.jsx'
-import { Button } from '../ui/Button.jsx'
 import { useToast } from '../ui/ToastProvider.jsx'
 import { ApiErrorMapper } from '../../utils/apiErrorMapper.js'
 
@@ -25,7 +24,7 @@ const LANGUAGES = [
 ]
 
 export function LanguagePicker() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const toast = useToast()
   const queryClient = useQueryClient()
   const errorMapper = new ApiErrorMapper(t)
@@ -40,7 +39,8 @@ export function LanguagePicker() {
     mutationFn: updateSettings,
     onSuccess: (data) => {
       queryClient.setQueryData(['settings'], data)
-      toast.show({ title: t('settings.language'), message: t('common.saved') })
+      const tNew = i18n.getFixedT(data.language)
+      toast.show({ title: tNew('settings.language'), message: tNew('common.saved') })
     },
     onError: (e) => toast.show({ title: t('settings.language'), message: errorMapper.getMessage(e, 'common.failed') }),
   })
@@ -55,13 +55,6 @@ export function LanguagePicker() {
         open={open}
         title={t('settings.language')}
         onClose={() => setOpen(false)}
-        footer={
-          <div className="flex justify-end">
-            <Button variant="secondary" onClick={() => setOpen(false)}>
-              {t('common.close')}
-            </Button>
-          </div>
-        }
       >
         <div className="space-y-2">
           {LANGUAGES.map((lang) => (

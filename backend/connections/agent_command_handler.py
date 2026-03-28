@@ -1,3 +1,4 @@
+import base64
 import json
 import logging
 import threading
@@ -11,6 +12,8 @@ from agents.local_agent import LocalAgent
 from .agent_runtime_state_store import AgentRuntimeStateStore
 from .agent_log_reporter import AgentLogReporter
 from .runtime_loader import RuntimeLoader
+
+_CHUNK_SIZE = 15000
 
 
 class AgentCommandHandler:
@@ -37,6 +40,8 @@ class AgentCommandHandler:
         self._lock = threading.Lock()
         self._running = False
         self._subscribed_topic = ""
+        self._transfers_lock = threading.Lock()
+        self._pending_transfers: Dict[str, Dict[str, Any]] = {}
 
     def start(self) -> None:
         connection = self._runtime_loader.mqtt_connection()
@@ -105,6 +110,12 @@ class AgentCommandHandler:
         payload = self._parse_payload(message)
         if payload is None:
             return
+
+        # If this is a chunk piece, accumulate and wait until the transfer is complete.
+        if payload.get("chunk_count") is not None:
+            payload = self._accumulate_chunk(command, payload)
+            if payload is None:
+                return  # Not all chunks received yet.
 
         request_id = str(payload.get("request_id") or "").strip()
         request_hub_id = str(payload.get("hub_id") or "").strip()
@@ -222,12 +233,7 @@ class AgentCommandHandler:
             )
 
         try:
-            connection.publish(
-                response_topic,
-                json.dumps(response, separators=(",", ":")),
-                qos=QoS.AtLeastOnce,
-                retain=False,
-            )
+            self._publish_response(connection, response_topic, request_id, response)
         except Exception as exc:
             self._log_reporter.warn(
                 category=command_category,
@@ -237,6 +243,58 @@ class AgentCommandHandler:
                 meta={"command": command},
             )
             self._logger.warning(f"Failed to publish command response topic={response_topic}: {exc}")
+
+    def _publish_response(self, connection: Any, topic: str, request_id: str, response: Dict[str, Any]) -> None:
+        response_bytes = json.dumps(response, separators=(",", ":")).encode()
+        if len(response_bytes) <= _CHUNK_SIZE:
+            connection.publish(topic, response_bytes, qos=QoS.AtLeastOnce, retain=False)
+            return
+        b64 = base64.b64encode(response_bytes).decode()
+        chunks = [b64[i:i + _CHUNK_SIZE] for i in range(0, len(b64), _CHUNK_SIZE)]
+        for idx, chunk in enumerate(chunks):
+            connection.publish(
+                topic,
+                json.dumps(
+                    {"transfer_id": request_id, "chunk_index": idx, "chunk_count": len(chunks), "chunk_data": chunk},
+                    separators=(",", ":"),
+                ),
+                qos=QoS.AtLeastOnce,
+                retain=False,
+            )
+
+    def _accumulate_chunk(self, command: str, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        transfer_id = str(payload.get("transfer_id") or "").strip()
+        chunk_data = str(payload.get("chunk_data") or "")
+        try:
+            chunk_index = int(payload["chunk_index"])
+            chunk_count = int(payload["chunk_count"])
+        except (KeyError, TypeError, ValueError):
+            return None
+        if not transfer_id or not chunk_data or chunk_count <= 0 or not (0 <= chunk_index < chunk_count):
+            return None
+
+        with self._transfers_lock:
+            if transfer_id not in self._pending_transfers:
+                self._pending_transfers[transfer_id] = {
+                    "command": command,
+                    "chunks": [None] * chunk_count,
+                }
+            state = self._pending_transfers[transfer_id]
+            if state["chunks"][chunk_index] is None:
+                state["chunks"][chunk_index] = chunk_data
+            if any(c is None for c in state["chunks"]):
+                return None  # Still waiting.
+            assembled_chunks = state["chunks"]
+            del self._pending_transfers[transfer_id]
+
+        try:
+            full_bytes = base64.b64decode("".join(assembled_chunks))
+            assembled = json.loads(full_bytes)
+        except Exception:
+            return None
+        if not isinstance(assembled, dict):
+            return None
+        return assembled
 
     def _execute_command(self, command: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         if command == "send":

@@ -35,12 +35,39 @@ class Marketplace(DatabaseBase):
 
             CREATE INDEX IF NOT EXISTS ix_marketplace_buttons_remote_id
                 ON marketplace_buttons(remote_id);
+
+            CREATE TABLE IF NOT EXISTS marketplace_meta (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
             """
         )
 
     # ------------------------------------------------------------------
     # Sync helpers
     # ------------------------------------------------------------------
+
+    def get_meta(self, key: str, conn: Optional[sqlite3.Connection] = None) -> Optional[str]:
+        c, close = self._use_conn(conn)
+        try:
+            row = c.execute("SELECT value FROM marketplace_meta WHERE key = ?", (key,)).fetchone()
+            return row[0] if row else None
+        finally:
+            if close:
+                c.close()
+
+    def set_meta(self, key: str, value: str, conn: Optional[sqlite3.Connection] = None) -> None:
+        c, close = self._use_conn(conn)
+        try:
+            c.execute(
+                "INSERT INTO marketplace_meta(key, value) VALUES(?,?) "
+                "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                (key, value),
+            )
+            c.commit()
+        finally:
+            if close:
+                c.close()
 
     def count(self, conn: Optional[sqlite3.Connection] = None) -> int:
         c, close = self._use_conn(conn)
@@ -51,10 +78,19 @@ class Marketplace(DatabaseBase):
             if close:
                 c.close()
 
-    def list_paths_and_shas(self, conn: Optional[sqlite3.Connection] = None) -> List[Dict[str, Any]]:
+    def list_paths_and_shas(
+        self,
+        source: Optional[str] = None,
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> List[Dict[str, Any]]:
         c, close = self._use_conn(conn)
         try:
-            rows = c.execute("SELECT path, sha FROM marketplace_remotes").fetchall()
+            if source:
+                rows = c.execute(
+                    "SELECT path, sha FROM marketplace_remotes WHERE source = ?", (source,)
+                ).fetchall()
+            else:
+                rows = c.execute("SELECT path, sha FROM marketplace_remotes").fetchall()
             return [dict(r) for r in rows]
         finally:
             if close:

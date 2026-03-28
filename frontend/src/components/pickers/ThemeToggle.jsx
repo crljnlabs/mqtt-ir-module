@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getSettings, updateSettings } from '../../api/settingsApi.js'
 import { IconButton } from '../ui/IconButton.jsx'
 import { Drawer } from '../ui/Drawer.jsx'
-import { Button } from '../ui/Button.jsx'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../ui/ToastProvider.jsx'
 import { ApiErrorMapper } from '../../utils/apiErrorMapper.js'
@@ -46,13 +45,6 @@ export function ThemeToggle() {
         open={open}
         title={t('settings.theme')}
         onClose={() => setOpen(false)}
-        footer={
-          <div className="flex justify-end">
-            <Button variant="secondary" onClick={() => setOpen(false)}>
-              {t('common.close')}
-            </Button>
-          </div>
-        }
       >
         <div className="space-y-2">
           {options.map((opt) => (

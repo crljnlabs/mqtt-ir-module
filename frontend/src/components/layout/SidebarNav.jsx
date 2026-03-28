@@ -13,6 +13,13 @@ function isActive(pathname, to) {
   return pathname === to
 }
 
+// When on /logs, resolve the parent nav item from navigation state
+function logsParentNav(locationState) {
+  const from = locationState?.from || ''
+  if (from === '/agents' || from.startsWith('/agent/')) return '/agents'
+  return '/settings'
+}
+
 function Item({ to, icon, label, active }) {
   return (
     <NavLink
@@ -34,6 +41,10 @@ export function SidebarNav() {
   const { t } = useTranslation()
   const location = useLocation()
 
+  const onLogs = location.pathname === '/logs'
+  const logsParent = onLogs ? logsParentNav(location.state) : null
+  const active = (to) => logsParent ? logsParent === to : isActive(location.pathname, to)
+
   const appIconSrc = useMemo(() => {
     const { publicBaseUrl } = getAppConfig()
     return `${publicBaseUrl}logos/app-icon-1024.png`
@@ -53,10 +64,10 @@ export function SidebarNav() {
         </div>
 
         <nav className="flex flex-col gap-2">
-          <Item to="/" icon={mdiHomeOutline} label={t('nav.home')} active={isActive(location.pathname, '/')} />
-          <Item to="/remotes" icon={mdiRemoteTv} label={t('nav.remotes')} active={isActive(location.pathname, '/remotes')} />
-          <Item to="/agents" icon={mdiAccountGroupOutline} label={t('nav.agents')} active={isActive(location.pathname, '/agents')} />
-          <Item to="/settings" icon={mdiCogOutline} label={t('nav.settings')} active={isActive(location.pathname, '/settings')} />
+          <Item to="/" icon={mdiHomeOutline} label={t('nav.home')} active={active('/')} />
+          <Item to="/remotes" icon={mdiRemoteTv} label={t('nav.remotes')} active={active('/remotes')} />
+          <Item to="/agents" icon={mdiAccountGroupOutline} label={t('nav.agents')} active={active('/agents')} />
+          <Item to="/settings" icon={mdiCogOutline} label={t('nav.settings')} active={active('/settings')} />
         </nav>
       </div>
     </aside>

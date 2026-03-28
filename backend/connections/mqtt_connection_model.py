@@ -39,7 +39,7 @@ class MQTTConnectionModel:
 
     @property
     def availability_topic(self) -> str:
-        return f"{self.base_topic}/status"
+        return f"{self.base_topic}/state/availability"
 
     @property
     def is_mqtt_configured(self) -> bool:

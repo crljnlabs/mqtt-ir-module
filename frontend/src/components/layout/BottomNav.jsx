@@ -12,6 +12,12 @@ function isActive(pathname, to) {
   return pathname === to
 }
 
+function logsParentNav(locationState) {
+  const from = locationState?.from || ''
+  if (from === '/agents' || from.startsWith('/agent/')) return '/agents'
+  return '/settings'
+}
+
 function Tab({ to, icon, label, active }) {
   return (
     <NavLink
@@ -33,13 +39,17 @@ export function BottomNav() {
   const { t } = useTranslation()
   const location = useLocation()
 
+  const onLogs = location.pathname === '/logs'
+  const logsParent = onLogs ? logsParentNav(location.state) : null
+  const active = (to) => logsParent ? logsParent === to : isActive(location.pathname, to)
+
   return (
     <div className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-[rgb(var(--border))] bg-[rgb(var(--card))]">
       <div className="flex">
-        <Tab to="/" icon={mdiHomeOutline} label={t('nav.home')} active={isActive(location.pathname, '/')} />
-        <Tab to="/remotes" icon={mdiRemoteTv} label={t('nav.remotes')} active={isActive(location.pathname, '/remotes')} />
-        <Tab to="/agents" icon={mdiAccountGroupOutline} label={t('nav.agents')} active={isActive(location.pathname, '/agents')} />
-        <Tab to="/settings" icon={mdiCogOutline} label={t('nav.settings')} active={isActive(location.pathname, '/settings')} />
+        <Tab to="/" icon={mdiHomeOutline} label={t('nav.home')} active={active('/')} />
+        <Tab to="/remotes" icon={mdiRemoteTv} label={t('nav.remotes')} active={active('/remotes')} />
+        <Tab to="/agents" icon={mdiAccountGroupOutline} label={t('nav.agents')} active={active('/agents')} />
+        <Tab to="/settings" icon={mdiCogOutline} label={t('nav.settings')} active={active('/settings')} />
       </div>
     </div>
   )

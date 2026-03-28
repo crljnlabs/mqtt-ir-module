@@ -9,11 +9,14 @@
 
 #include <cmath>
 #include <functional>
+#include <mbedtls/base64.h>
 #include <vector>
 
 namespace agent {
 
 namespace {
+
+constexpr size_t kMqttChunkSize = 15000;
 
 struct PendingOtaRequest {
   bool active = false;
@@ -27,14 +30,10 @@ struct PendingOtaRequest {
 
 PendingOtaRequest gPendingOtaRequest;
 
-void sendCommandResponse(
-    const String& hubId,
-    const String& requestId,
-    bool ok,
-    std::function<void(JsonObject)> fillResult,
-    const String& errorCode,
-    const String& errorMessage,
-    int statusCode) {
+void sendCommandResponse(const String &hubId, const String &requestId, bool ok,
+                         std::function<void(JsonObject)> fillResult,
+                         const String &errorCode, const String &errorMessage,
+                         int statusCode) {
   JsonDocument responseDoc;
   responseDoc["request_id"] = requestId;
   responseDoc["ok"] = ok;
@@ -48,15 +47,61 @@ void sendCommandResponse(
     errorObject["status_code"] = statusCode;
   }
   responseDoc["responded_at"] = nowSecondsText();
-  mqttPublishJson(topicResponse(hubId, requestId), responseDoc, false);
+
+  String fullJson;
+  fullJson.reserve(512);
+  serializeJson(responseDoc, fullJson);
+
+  if (!gMqttClient.connected()) {
+    return;
+  }
+
+  const String responseTopic = topicResponse(hubId, requestId);
+
+  if (fullJson.length() <= kMqttChunkSize) {
+    gMqttClient.publish(responseTopic.c_str(), fullJson.c_str(), false);
+    return;
+  }
+
+  // Payload exceeds threshold — base64-encode and send as individual chunk
+  // messages.
+  const size_t inputLen = fullJson.length();
+  const size_t b64MaxLen = ((inputLen + 2) / 3) * 4 + 1;
+  std::vector<unsigned char> b64Buf(b64MaxLen);
+  size_t b64Len = 0;
+  if (mbedtls_base64_encode(
+          b64Buf.data(), b64MaxLen, &b64Len,
+          reinterpret_cast<const unsigned char *>(fullJson.c_str()),
+          inputLen) != 0) {
+    // Encoding failed — publish as-is and let the broker handle it.
+    gMqttClient.publish(responseTopic.c_str(), fullJson.c_str(), false);
+    return;
+  }
+
+  const uint8_t chunkCount =
+      static_cast<uint8_t>((b64Len + kMqttChunkSize - 1) / kMqttChunkSize);
+  for (uint8_t i = 0; i < chunkCount; i++) {
+    const size_t chunkStart = static_cast<size_t>(i) * kMqttChunkSize;
+    const size_t chunkLen =
+        std::min<size_t>(kMqttChunkSize, b64Len - chunkStart);
+    const String chunkData(
+        reinterpret_cast<const char *>(b64Buf.data()) + chunkStart, chunkLen);
+
+    JsonDocument chunkDoc;
+    chunkDoc["transfer_id"] = requestId;
+    chunkDoc["chunk_index"] = i;
+    chunkDoc["chunk_count"] = chunkCount;
+    chunkDoc["chunk_data"] = chunkData;
+
+    String chunkPayload;
+    serializeJson(chunkDoc, chunkPayload);
+    gMqttClient.publish(responseTopic.c_str(), chunkPayload.c_str(), false);
+  }
 }
 
-bool executeSendCommand(
-    JsonObjectConst payload,
-    JsonObject result,
-    String& errorCode,
-    String& errorMessage,
-    int& statusCode) {
+bool executeSendCommand(JsonObjectConst payload, JsonObject result,
+                        String &errorCode, String &errorMessage,
+                        int &statusCode) {
   if (gLearningActive) {
     errorCode = "send_while_learning";
     errorMessage = "Cannot send while learning is active";
@@ -74,21 +119,24 @@ bool executeSendCommand(
   const String normalizedMode = mode.length() ? mode : "press";
 
   // Protocol-encoded signals (NEC, Samsung32, SIRC, RC5, RC6, Kaseikyo, JVC).
-  const String signalType = String(payload["signal_type"] | "raw");
+  const String signalType = String(payload["encoding"] | "raw");
   if (signalType == "protocol") {
     const String protocolName = String(payload["protocol"] | "");
     const String addressStr = String(payload["address"] | "");
     const String commandHexStr = String(payload["command_hex"] | "");
-    if (protocolName.isEmpty() || addressStr.isEmpty() || commandHexStr.isEmpty()) {
+    if (protocolName.isEmpty() || addressStr.isEmpty() ||
+        commandHexStr.isEmpty()) {
       errorCode = "validation_error";
-      errorMessage = "protocol, address, and command_hex are required for protocol signals";
+      errorMessage = "protocol, address, and command_hex are required for "
+                     "protocol signals";
       statusCode = 400;
       return false;
     }
     markActivity();
     if (!sendFrameProtocol(protocolName, addressStr, commandHexStr)) {
       errorCode = "runtime_error";
-      errorMessage = String("Unsupported or invalid IR protocol: ") + protocolName;
+      errorMessage =
+          String("Unsupported or invalid IR protocol: ") + protocolName;
       statusCode = 409;
       return false;
     }
@@ -98,7 +146,8 @@ bool executeSendCommand(
     return true;
   }
 
-  const uint16_t carrierHz = static_cast<uint16_t>(payload["carrier_hz"] | 38000);
+  const uint16_t carrierHz =
+      static_cast<uint16_t>(payload["carrier_hz"] | 38000);
   const String pressInitial = String(payload["press_initial"] | "");
   if (pressInitial.isEmpty()) {
     errorCode = "validation_error";
@@ -157,7 +206,8 @@ bool executeSendCommand(
 
   std::vector<uint16_t> holdInitialFrame;
   std::vector<uint16_t> holdRepeatFrame;
-  if (!parseRawSignal(holdInitial, holdInitialFrame) || !parseRawSignal(holdRepeat, holdRepeatFrame)) {
+  if (!parseRawSignal(holdInitial, holdInitialFrame) ||
+      !parseRawSignal(holdRepeat, holdRepeatFrame)) {
     errorCode = "validation_error";
     errorMessage = "Invalid hold frame format";
     statusCode = 400;
@@ -175,10 +225,12 @@ bool executeSendCommand(
   const uint32_t initialUs = frameDurationUs(holdInitialFrame);
   const uint32_t repeatUs = frameDurationUs(holdRepeatFrame);
   const uint32_t periodUs = repeatUs + static_cast<uint32_t>(holdGapUs);
-  const uint32_t remainingUs = (targetUs > initialUs) ? (targetUs - initialUs) : 0;
+  const uint32_t remainingUs =
+      (targetUs > initialUs) ? (targetUs - initialUs) : 0;
   uint32_t repeatCount = 1;
   if (periodUs > 0 && remainingUs > 0) {
-    repeatCount = static_cast<uint32_t>(std::ceil(static_cast<float>(remainingUs) / static_cast<float>(periodUs)));
+    repeatCount = static_cast<uint32_t>(std::ceil(
+        static_cast<float>(remainingUs) / static_cast<float>(periodUs)));
     if (repeatCount == 0) {
       repeatCount = 1;
     }
@@ -201,12 +253,9 @@ bool executeSendCommand(
   return true;
 }
 
-bool executeLearnCaptureCommand(
-    JsonObjectConst payload,
-    JsonObject result,
-    String& errorCode,
-    String& errorMessage,
-    int& statusCode) {
+bool executeLearnCaptureCommand(JsonObjectConst payload, JsonObject result,
+                                String &errorCode, String &errorMessage,
+                                int &statusCode) {
   if (!gLearningActive) {
     errorCode = "runtime_error";
     errorMessage = "Learning session is not running";
@@ -250,12 +299,9 @@ bool executeLearnCaptureCommand(
   return false;
 }
 
-bool executeRuntimeConfigSet(
-    JsonObjectConst payload,
-    JsonObject result,
-    String& errorCode,
-    String& errorMessage,
-    int& statusCode) {
+bool executeRuntimeConfigSet(JsonObjectConst payload, JsonObject result,
+                             String &errorCode, String &errorMessage,
+                             int &statusCode) {
   const JsonVariantConst rxPin = payload["ir_rx_pin"];
   const JsonVariantConst txPin = payload["ir_tx_pin"];
   bool hasRx = !rxPin.isUnbound();
@@ -300,14 +346,16 @@ bool executeRuntimeConfigSet(
     }
   }
 
-  const bool changed = (nextRx != gRuntimeConfig.irRxPin) || (nextTx != gRuntimeConfig.irTxPin);
+  const bool changed =
+      (nextRx != gRuntimeConfig.irRxPin) || (nextTx != gRuntimeConfig.irTxPin);
   gRuntimeConfig.irRxPin = nextRx;
   gRuntimeConfig.irTxPin = nextTx;
   saveRebootRequired(false);
   if (changed) {
-    // RMT hardware teardown (rmt_driver_uninstall) is not safe at runtime regardless of context.
-    // Persist the new pins to NVS and publish the updated state before rebooting so setup()
-    // initialises IR hardware with the correct pins on the next boot.
+    // RMT hardware teardown (rmt_driver_uninstall) is not safe at runtime
+    // regardless of context. Persist the new pins to NVS and publish the
+    // updated state before rebooting so setup() initialises IR hardware with
+    // the correct pins on the next boot.
     saveRuntimeConfig();
     publishState();
     scheduleReboot(kRebootDelayMs);
@@ -321,13 +369,9 @@ bool executeRuntimeConfigSet(
   return true;
 }
 
-void publishInstallationStatus(
-    const String& requestId,
-    const String& status,
-    int progressPct,
-    const String& targetVersion,
-    const String& message,
-    const String& errorCode) {
+void publishInstallationStatus(const String &requestId, const String &status,
+                               int progressPct, const String &targetVersion,
+                               const String &message, const String &errorCode) {
   JsonDocument statusDoc;
   statusDoc["request_id"] = requestId;
   statusDoc["status"] = status;
@@ -352,12 +396,9 @@ void clearPendingOtaRequest() {
   gPendingOtaRequest.expectedSha256 = "";
 }
 
-bool executeRuntimeOtaStart(
-    JsonObjectConst payload,
-    JsonObject result,
-    String& errorCode,
-    String& errorMessage,
-    int& statusCode) {
+bool executeRuntimeOtaStart(JsonObjectConst payload, JsonObject result,
+                            String &errorCode, String &errorMessage,
+                            int &statusCode) {
   if (gPendingOtaRequest.active) {
     errorCode = "ota_in_progress";
     errorMessage = "OTA update is already in progress";
@@ -396,18 +437,16 @@ bool executeRuntimeOtaStart(
   gPendingOtaRequest.url = url;
   gPendingOtaRequest.expectedSha256 = expectedSha;
 
-  publishInstallationStatus(requestId, "started", 0, version, "OTA started", "");
+  publishInstallationStatus(requestId, "started", 0, version, "OTA started",
+                            "");
   result["accepted"] = true;
   result["request_id"] = requestId;
   result["target_version"] = version;
   return true;
 }
 
-bool executeRuntimeOtaCancel(
-    JsonObject result,
-    String& errorCode,
-    String& errorMessage,
-    int& statusCode) {
+bool executeRuntimeOtaCancel(JsonObject result, String &errorCode,
+                             String &errorMessage, int &statusCode) {
   if (!gPendingOtaRequest.active) {
     errorCode = "ota_not_in_progress";
     errorMessage = "No OTA update is in progress";
@@ -419,7 +458,8 @@ bool executeRuntimeOtaCancel(
     const String requestId = gPendingOtaRequest.requestId;
     const String targetVersion = gPendingOtaRequest.targetVersion;
     clearPendingOtaRequest();
-    publishInstallationStatus(requestId, "cancelled", -1, targetVersion, "OTA update cancelled", "ota_cancelled");
+    publishInstallationStatus(requestId, "cancelled", -1, targetVersion,
+                              "OTA update cancelled", "ota_cancelled");
     result["cancel_requested"] = true;
     result["running"] = false;
     return true;
@@ -439,13 +479,15 @@ void processPendingOtaRequest() {
   gPendingOtaRequest.running = true;
   markActivity();
   const bool wasEcoMode = gEcoMode;
-  applyPowerMode();  // Switch WiFi to active mode now — modem sleep stalls HTTP+MQTT during blocking OTA download.
+  applyPowerMode(); // Switch WiFi to active mode now — modem sleep stalls
+                    // HTTP+MQTT during blocking OTA download.
   if (wasEcoMode && !gEcoMode) {
-    // WiFi PS mode change is asynchronous — the radio needs time to fully wake up.
-    // Without this, the HTTP stream starts during the transition and drops partway through.
+    // WiFi PS mode change is asynchronous — the radio needs time to fully wake
+    // up. Without this, the HTTP stream starts during the transition and drops
+    // partway through.
     for (int i = 0; i < 10; i++) {
       gMqttClient.loop();
-      delay(30);  // 300ms total
+      delay(30); // 300ms total
     }
   }
 
@@ -454,55 +496,59 @@ void processPendingOtaRequest() {
   const String url = gPendingOtaRequest.url;
   const String expectedSha256 = gPendingOtaRequest.expectedSha256;
   OtaResult ota = performOta(
-      url,
-      expectedSha256,
-      [&](const String& phase, int progressPct, const String& phaseMessage) {
-        publishInstallationStatus(requestId, phase, progressPct, targetVersion, phaseMessage, "");
+      url, expectedSha256,
+      [&](const String &phase, int progressPct, const String &phaseMessage) {
+        publishInstallationStatus(requestId, phase, progressPct, targetVersion,
+                                  phaseMessage, "");
       },
-      [&]() {
-        return gPendingOtaRequest.cancelRequested;
-      });
+      [&]() { return gPendingOtaRequest.cancelRequested; });
 
   if (!ota.ok) {
     if (ota.errorCode == "ota_cancelled") {
-      publishInstallationStatus(requestId, "cancelled", -1, targetVersion, "OTA update cancelled", "ota_cancelled");
-      logWarn("runtime", String("OTA cancelled request_id=") + requestId, "ota_cancelled");
+      publishInstallationStatus(requestId, "cancelled", -1, targetVersion,
+                                "OTA update cancelled", "ota_cancelled");
+      logWarn("runtime", String("OTA cancelled request_id=") + requestId,
+              "ota_cancelled");
     } else {
-      const String code = ota.errorCode.length() ? ota.errorCode : "runtime_error";
-      const String message = ota.message.length() ? ota.message : "OTA update failed";
-      publishInstallationStatus(requestId, "failure", -1, targetVersion, message, code);
-      logWarn(
-          "runtime",
-          String("OTA failed request_id=") + requestId + " error=" + code + " message=" + message,
-          code);
+      const String code =
+          ota.errorCode.length() ? ota.errorCode : "runtime_error";
+      const String message =
+          ota.message.length() ? ota.message : "OTA update failed";
+      publishInstallationStatus(requestId, "failure", -1, targetVersion,
+                                message, code);
+      logWarn("runtime",
+              String("OTA failed request_id=") + requestId + " error=" + code +
+                  " message=" + message,
+              code);
     }
     clearPendingOtaRequest();
     return;
   }
 
   saveRebootRequired(false);
-  publishInstallationStatus(requestId, "finished", 100, targetVersion, "OTA update completed", "");
-  logInfo(
-      "runtime",
-      String("OTA update completed request_id=") + requestId + " target_version=" + targetVersion);
+  publishInstallationStatus(requestId, "finished", 100, targetVersion,
+                            "OTA update completed", "");
+  logInfo("runtime", String("OTA update completed request_id=") + requestId +
+                         " target_version=" + targetVersion);
   clearPendingOtaRequest();
   scheduleReboot(kRebootDelayMs);
 }
 
-}  // namespace
+} // namespace
 
-void handleCommand(const String& command, JsonObjectConst payload) {
+void handleCommand(const String &command, JsonObjectConst payload) {
   const String requestId = String(payload["request_id"] | "");
   const String hubId = String(payload["hub_id"] | "");
   if (requestId.isEmpty() || hubId.isEmpty()) {
-    logWarn("runtime", "Ignoring command without request_id or hub_id", "command_invalid_envelope");
+    logWarn("runtime", "Ignoring command without request_id or hub_id",
+            "command_invalid_envelope");
     return;
   }
   if (!isHubAuthorized(hubId)) {
-    logWarn(
-        "runtime",
-        String("Ignoring unauthorized command hub_id=") + hubId + " pairing_hub_id=" + gPairingHubId,
-        "hub_unauthorized");
+    logWarn("runtime",
+            String("Ignoring unauthorized command hub_id=") + hubId +
+                " pairing_hub_id=" + gPairingHubId,
+            "hub_unauthorized");
     return;
   }
 
@@ -515,7 +561,8 @@ void handleCommand(const String& command, JsonObjectConst payload) {
   JsonObject result = resultDoc.to<JsonObject>();
 
   if (command == "send") {
-    commandOk = executeSendCommand(payload, result, errorCode, errorMessage, statusCode);
+    commandOk = executeSendCommand(payload, result, errorCode, errorMessage,
+                                   statusCode);
   } else if (command == "learn/start") {
     gLearningActive = true;
     markActivity();
@@ -528,7 +575,8 @@ void handleCommand(const String& command, JsonObjectConst payload) {
     result["ok"] = true;
     commandOk = true;
   } else if (command == "learn/capture") {
-    commandOk = executeLearnCaptureCommand(payload, result, errorCode, errorMessage, statusCode);
+    commandOk = executeLearnCaptureCommand(payload, result, errorCode,
+                                           errorMessage, statusCode);
   } else if (command == "runtime/debug/get") {
     result["debug"] = gDebugEnabled;
     commandOk = true;
@@ -551,7 +599,8 @@ void handleCommand(const String& command, JsonObjectConst payload) {
     result["reboot_required"] = gRebootRequired;
     commandOk = true;
   } else if (command == "runtime/config/set") {
-    commandOk = executeRuntimeConfigSet(payload, result, errorCode, errorMessage, statusCode);
+    commandOk = executeRuntimeConfigSet(payload, result, errorCode,
+                                        errorMessage, statusCode);
   } else if (command == "runtime/reboot") {
     saveRebootRequired(false);
     publishState();
@@ -559,9 +608,11 @@ void handleCommand(const String& command, JsonObjectConst payload) {
     shouldReboot = true;
     commandOk = true;
   } else if (command == "runtime/ota/start") {
-    commandOk = executeRuntimeOtaStart(payload, result, errorCode, errorMessage, statusCode);
+    commandOk = executeRuntimeOtaStart(payload, result, errorCode, errorMessage,
+                                       statusCode);
   } else if (command == "runtime/ota/cancel") {
-    commandOk = executeRuntimeOtaCancel(result, errorCode, errorMessage, statusCode);
+    commandOk =
+        executeRuntimeOtaCancel(result, errorCode, errorMessage, statusCode);
   } else {
     commandOk = false;
     errorCode = "validation_error";
@@ -570,26 +621,19 @@ void handleCommand(const String& command, JsonObjectConst payload) {
   }
 
   sendCommandResponse(
-      hubId,
-      requestId,
-      commandOk,
-      [&](JsonObject responseResult) {
-        responseResult.set(result);
-      },
-      errorCode,
-      errorMessage,
-      statusCode);
+      hubId, requestId, commandOk,
+      [&](JsonObject responseResult) { responseResult.set(result); }, errorCode,
+      errorMessage, statusCode);
 
   if (commandOk) {
-    logDebug(
-        "runtime",
-        String("Command handled command=") + command + " request_id=" + requestId + " ok=true");
+    logDebug("runtime", String("Command handled command=") + command +
+                            " request_id=" + requestId + " ok=true");
   } else {
     const String code = errorCode.length() ? errorCode : "runtime_error";
-    logWarn(
-        "runtime",
-        String("Command failed command=") + command + " request_id=" + requestId + " error=" + code,
-        code);
+    logWarn("runtime",
+            String("Command failed command=") + command +
+                " request_id=" + requestId + " error=" + code,
+            code);
   }
 
   if (commandOk && shouldReboot) {
@@ -597,8 +641,6 @@ void handleCommand(const String& command, JsonObjectConst payload) {
   }
 }
 
-void processBackgroundTasks() {
-  processPendingOtaRequest();
-}
+void processBackgroundTasks() { processPendingOtaRequest(); }
 
-}  // namespace agent
+} // namespace agent

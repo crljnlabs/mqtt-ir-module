@@ -1,3 +1,4 @@
+import threading
 from typing import Dict, Any
 
 from .mqtt_transport import MqttTransport
@@ -9,6 +10,8 @@ class MqttAgent:
         self._agent_id = agent_id
         self._name = name
         self._capabilities = dict(capabilities or {})
+        self._online = False
+        self._lock = threading.Lock()
 
     @property
     def agent_id(self) -> str:
@@ -25,6 +28,15 @@ class MqttAgent:
     @property
     def capabilities(self) -> Dict[str, Any]:
         return dict(self._capabilities)
+
+    @property
+    def online(self) -> bool:
+        with self._lock:
+            return self._online
+
+    def set_online(self, value: bool) -> None:
+        with self._lock:
+            self._online = bool(value)
 
     def send(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         return self._transport.send(payload)

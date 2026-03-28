@@ -90,7 +90,9 @@ class Buttons(DatabaseBase):
                 """
                 SELECT b.id, b.remote_id, b.name, b.icon, b.created_at, b.updated_at,
                        CASE WHEN s.button_id IS NULL THEN 0 ELSE 1 END AS has_press,
-                       CASE WHEN s.hold_initial IS NULL OR s.hold_initial = '' THEN 0 ELSE 1 END AS has_hold
+                       CASE WHEN s.hold_initial IS NULL OR s.hold_initial = '' THEN 0 ELSE 1 END AS has_hold,
+                       s.encoding,
+                       s.protocol
                 FROM buttons b
                 LEFT JOIN button_signals s ON s.button_id = b.id
                 WHERE b.remote_id = ?

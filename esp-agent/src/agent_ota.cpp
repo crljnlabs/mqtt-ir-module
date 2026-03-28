@@ -5,6 +5,7 @@
 #include <HTTPClient.h>
 #include <Update.h>
 #include <WiFi.h>
+#include <esp_task_wdt.h>
 #include <mbedtls/sha256.h>
 
 #include <algorithm>
@@ -146,6 +147,8 @@ OtaResult performOta(
 
     lastDataAtMs = millis();
     const size_t bytesWritten = Update.write(buffer, static_cast<size_t>(bytesRead));
+    gMqttClient.loop();     // Keep MQTT alive immediately after the flash write stall.
+    esp_task_wdt_reset();   // Explicitly feed the watchdog; flash sector erases can block interrupts briefly.
     if (bytesWritten != static_cast<size_t>(bytesRead)) {
       Update.abort();
       mbedtls_sha256_free(&shaCtx);

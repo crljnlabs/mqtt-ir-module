@@ -19,13 +19,6 @@ export function setAgentDebug(agentId, debug) {
   })
 }
 
-export function getAgentLogs(agentId, limit = 100) {
-  return requestJson(`/agents/${encodeURIComponent(agentId)}/logs?limit=${encodeURIComponent(String(limit))}`)
-}
-
-export function clearAgentLogs(agentId) {
-  return requestJson(`/agents/${encodeURIComponent(agentId)}/logs`, { method: 'DELETE' })
-}
 
 export function updateAgent(agentId, payload) {
   return requestJson(`/agents/${agentId}`, {

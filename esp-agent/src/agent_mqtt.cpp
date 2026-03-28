@@ -8,6 +8,7 @@
 #include "agent_state.h"
 
 #include <algorithm>
+#include <mbedtls/base64.h>
 
 namespace agent {
 
@@ -17,6 +18,79 @@ namespace {
 bool gRetainedHubStateReceived = false;
 bool gRetainedRuntimeStateReceived = false;
 constexpr unsigned long kRetainedStateTimeoutMs = 1200;
+
+struct PendingTransfer {
+  bool active = false;
+  String transferId;
+  String command;
+  uint8_t chunkCount = 0;
+  uint8_t receivedCount = 0;
+  std::vector<String> chunks;
+};
+
+PendingTransfer gPendingTransfer;
+
+// Accumulates a chunk and, when all chunks are received, reassembles and dispatches the command.
+void handleCommandChunk(const String& command, JsonObjectConst payload) {
+  const String transferId = String(payload["transfer_id"] | "");
+  const int rawIndex = payload["chunk_index"] | -1;
+  const int rawCount = payload["chunk_count"] | 0;
+  const String chunkData = String(payload["chunk_data"] | "");
+
+  if (transferId.isEmpty() || rawIndex < 0 || rawCount <= 0 || rawCount > 255 || chunkData.isEmpty()) {
+    return;
+  }
+  const uint8_t chunkCount = static_cast<uint8_t>(rawCount);
+  const uint8_t chunkIndex = static_cast<uint8_t>(rawIndex);
+
+  // Start a new transfer or discard a stale one if the transfer_id changed.
+  if (!gPendingTransfer.active || gPendingTransfer.transferId != transferId) {
+    gPendingTransfer.active = true;
+    gPendingTransfer.transferId = transferId;
+    gPendingTransfer.command = command;
+    gPendingTransfer.chunkCount = chunkCount;
+    gPendingTransfer.receivedCount = 0;
+    gPendingTransfer.chunks.assign(chunkCount, "");
+  }
+
+  if (chunkIndex < gPendingTransfer.chunkCount && gPendingTransfer.chunks[chunkIndex].isEmpty()) {
+    gPendingTransfer.chunks[chunkIndex] = chunkData;
+    gPendingTransfer.receivedCount++;
+  }
+
+  if (gPendingTransfer.receivedCount < gPendingTransfer.chunkCount) {
+    return;  // Still waiting for remaining chunks.
+  }
+
+  // All chunks received — reassemble.
+  String fullB64;
+  for (const String& c : gPendingTransfer.chunks) {
+    fullB64 += c;
+  }
+  const String savedCommand = gPendingTransfer.command;
+  gPendingTransfer.active = false;
+  gPendingTransfer.chunks.clear();
+  gPendingTransfer.receivedCount = 0;
+
+  const size_t b64Len = fullB64.length();
+  const size_t maxDecoded = (b64Len / 4) * 3 + 4;
+  std::vector<unsigned char> decoded(maxDecoded);
+  size_t decodedLen = 0;
+  if (mbedtls_base64_decode(decoded.data(), maxDecoded, &decodedLen,
+                              reinterpret_cast<const unsigned char*>(fullB64.c_str()),
+                              b64Len) != 0) {
+    return;
+  }
+
+  JsonDocument assembledDoc;
+  const DeserializationError err =
+      deserializeJson(assembledDoc, decoded.data(), decodedLen);
+  if (err != DeserializationError::Ok) {
+    return;
+  }
+
+  handleCommand(savedCommand, assembledDoc.as<JsonObjectConst>());
+}
 
 void waitForRetainedStateSnapshot() {
   // Wait until both retained subtopics are received or the timeout expires.
@@ -86,6 +160,13 @@ void onMqttMessage(char* topicChars, byte* payload, unsigned int length) {
   if (!parsePayloadObject(payload, length, doc)) {
     return;
   }
+
+  // If the payload carries chunk metadata, accumulate and reassemble before dispatching.
+  if (!doc["chunk_count"].isNull()) {
+    handleCommandChunk(command, doc.as<JsonObjectConst>());
+    return;
+  }
+
   handleCommand(command, doc.as<JsonObjectConst>());
 }
 

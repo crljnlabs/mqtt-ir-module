@@ -18,6 +18,7 @@ class LocalAgent:
         self._name = name
         self._log_reporter = log_reporter
         self._learning_active = False
+        self._online = False
         self._lock = threading.Lock()
         self._capabilities = {
             "canLearn": True,
@@ -42,6 +43,15 @@ class LocalAgent:
     def capabilities(self) -> Dict[str, Any]:
         return dict(self._capabilities)
 
+    @property
+    def online(self) -> bool:
+        with self._lock:
+            return self._online
+
+    def set_online(self, value: bool) -> None:
+        with self._lock:
+            self._online = bool(value)
+
     def set_log_reporter(self, log_reporter: Optional[Any]) -> None:
         with self._lock:
             self._log_reporter = log_reporter
@@ -59,12 +69,11 @@ class LocalAgent:
             raise BusyLearningError("Cannot send while learning is active")
         mode = str(payload.get("mode") or "press").strip().lower() or "press"
         hold_ms = int(payload.get("hold_ms") or 0)
-        button_id = int(payload.get("button_id") or 0)
         self._log(
             level="info",
             category="send",
             message="Send started",
-            meta={"mode": mode, "hold_ms": hold_ms, "button_id": button_id},
+            meta={"mode": mode, "hold_ms": hold_ms},
         )
         try:
             result = self._transport.send(payload)
@@ -72,7 +81,7 @@ class LocalAgent:
                 level="info",
                 category="send",
                 message="Send finished",
-                meta={"mode": mode, "hold_ms": hold_ms, "button_id": button_id},
+                meta={"mode": mode, "hold_ms": hold_ms},
             )
             return result
         except Exception as exc:
@@ -81,7 +90,7 @@ class LocalAgent:
                 category="send",
                 message=f"Send failed: {exc}",
                 error_code="send_failed",
-                meta={"mode": mode, "hold_ms": hold_ms, "button_id": button_id},
+                meta={"mode": mode, "hold_ms": hold_ms},
             )
             raise
 

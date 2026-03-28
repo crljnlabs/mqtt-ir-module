@@ -124,6 +124,42 @@ class Settings(DatabaseBase):
             "mqtt_password_set": self._has_mqtt_password(conn=conn),
         }
 
+    def get_script_settings(self, conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any]:
+        return {
+            "script_max_runs": self._read_int_setting(
+                "script_max_runs",
+                default=10,
+                min_value=1,
+                max_value=100,
+                conn=conn,
+            ),
+        }
+
+    def get_log_settings(self, conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any]:
+        return {
+            "log_retention_days": self._read_int_setting(
+                "log_retention_days",
+                default=7,
+                min_value=1,
+                max_value=365,
+                conn=conn,
+            ),
+        }
+
+    def update_log_settings(
+        self,
+        log_retention_days: Optional[int] = None,
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> Dict[str, Any]:
+        c, close = self._use_conn(conn)
+        try:
+            if log_retention_days is not None:
+                self.set("log_retention_days", str(log_retention_days), conn=c)
+            return self.get_log_settings(conn=c)
+        finally:
+            if close:
+                c.close()
+
     def get_ui_settings(self, conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any]:
         settings = {
             "theme": self._read_text_setting("theme", default="system", conn=conn),
@@ -133,6 +169,8 @@ class Settings(DatabaseBase):
         }
         settings.update(self.get_mqtt_settings(conn=conn))
         settings.update(self.get_learning_settings(conn=conn))
+        settings.update(self.get_script_settings(conn=conn))
+        settings.update(self.get_log_settings(conn=conn))
         return settings
 
     def get_runtime_settings(self, settings_cipher: SettingsCipher, conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any]:
@@ -173,6 +211,8 @@ class Settings(DatabaseBase):
         mqtt_username: Optional[str] = None,
         mqtt_password: Optional[str] = None,
         mqtt_instance: Optional[str] = None,
+        script_max_runs: Optional[int] = None,
+        log_retention_days: Optional[int] = None,
         settings_cipher: Optional[SettingsCipher] = None,
         conn: Optional[sqlite3.Connection] = None,
     ) -> Dict[str, Any]:
@@ -212,6 +252,10 @@ class Settings(DatabaseBase):
                     settings_cipher=settings_cipher,
                     conn=c,
                 )
+            if script_max_runs is not None:
+                self.set("script_max_runs", str(script_max_runs), conn=c)
+            if log_retention_days is not None:
+                self.set("log_retention_days", str(log_retention_days), conn=c)
 
             return self.get_ui_settings(conn=c)
         finally:

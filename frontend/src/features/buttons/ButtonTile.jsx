@@ -6,6 +6,23 @@ import { IconButton } from '../../components/ui/IconButton.jsx'
 import { findIconPath, DEFAULT_BUTTON_ICON } from '../../icons/iconRegistry.js'
 import { mdiDotsHorizontal } from '@mdi/js'
 import { ButtonEditorDrawer } from './ButtonEditorDrawer.jsx'
+import { Tooltip } from '../../components/ui/Tooltip.jsx'
+
+function SignalTypeBadge({ encoding, protocol }) {
+  if (!encoding) return null
+  if (encoding === 'protocol') {
+    return (
+      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[rgb(var(--primary))] text-[rgb(var(--primary-contrast))]">
+        {protocol || 'Protocol'}
+      </span>
+    )
+  }
+  return (
+    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[rgb(var(--border))] text-[rgb(var(--muted))]">
+      Raw
+    </span>
+  )
+}
 
 export function ButtonTile({
   button,
@@ -33,8 +50,11 @@ export function ButtonTile({
           </IconButton>
         </div>
 
-        <div className="min-w-0">
-          <div className="font-semibold truncate">{button.name}</div>
+        <div className="min-w-0 flex items-center gap-2">
+          <Tooltip label={button.name} wrapperClassName="min-w-0">
+            <div className="font-semibold truncate">{button.name}</div>
+          </Tooltip>
+          <SignalTypeBadge encoding={button.encoding} protocol={button.protocol} />
         </div>
 
         <div className="mt-auto grid grid-cols-2 gap-2">

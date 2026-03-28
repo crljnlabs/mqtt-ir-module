@@ -15,17 +15,8 @@ function buildWebSocketUrl(path) {
   return `${protocol}//${window.location.host}${base}${cleanPath}`
 }
 
-export function createAgentLogsSocket(
-  agentId,
-  {
-    onOpen,
-    onClose,
-    onError,
-    onMessage,
-  } = {},
-) {
-  const safeAgentId = encodeURIComponent(String(agentId || '').trim())
-  const socket = new WebSocket(buildWebSocketUrl(`/agents/${safeAgentId}/logs/ws`))
+export function createLogsSocket({ onOpen, onClose, onError, onMessage } = {}) {
+  const socket = new WebSocket(buildWebSocketUrl('/logs/ws'))
 
   socket.onopen = () => onOpen?.()
   socket.onclose = () => onClose?.()
