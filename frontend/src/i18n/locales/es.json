@@ -153,6 +153,7 @@
     "mqttDisconnected": "Desconectado",
     "mqttNotConfigured": "Sin configurar",
     "mqttLastErrorLabel": "Último error",
+    "mqttRetry": "Reintentar",
     "hubIsAgentReadonlyHint": "Solo lectura. Se define mediante LOCAL_AGENT_ENABLED en variables de entorno.",
     "helpLocalAgentTitle": "LOCAL_AGENT_ENABLED",
     "helpLocalAgentBody": "Controla si el Hub se registra como agente local para acceso directo al hardware IR. Activado por defecto.",

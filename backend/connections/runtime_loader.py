@@ -1,3 +1,6 @@
+import logging
+import threading
+import time
 from typing import Any, Dict, Literal, Optional
 
 from jmqtt import client_identity as mqtt_client_identity
@@ -14,6 +17,9 @@ from .mqtt_handler import MqttHandler
 
 ConnectionRole = Literal["hub", "agent"]
 
+# Exponential backoff delays in seconds: 10s → 1min → 10min → 1h
+_RETRY_DELAYS = [10, 60, 600, 3600]
+
 
 class RuntimeLoader:
     def __init__(
@@ -22,13 +28,18 @@ class RuntimeLoader:
         settings_cipher: Optional[SettingsCipher],
         role: ConnectionRole,
         environment: Environment,
+        database=None,
     ) -> None:
         self._settings_store = settings_store
         self._settings_cipher = settings_cipher
         self._role = role
         self._environment = environment
+        self._database = database
         self._mqtt_handler = MqttHandler(role=role)
         self._homeassistant_handler = HomeAssistantHandler()
+        self._logger = logging.getLogger("connections.runtime_loader")
+        self._retry_stop_event = threading.Event()
+        self._retry_thread: Optional[threading.Thread] = None
 
     @property
     def technical_name(self) -> str:
@@ -42,10 +53,13 @@ class RuntimeLoader:
         self.reload()
 
     def stop(self) -> None:
+        self._cancel_retry()
         self._homeassistant_handler.stop()
         self._mqtt_handler.stop()
 
     def reload(self) -> None:
+        # Cancel any running retry before attempting a fresh connect.
+        self._cancel_retry()
         try:
             runtime_settings = self._load_runtime_settings()
             mqtt_model = self._build_mqtt_model(runtime_settings)
@@ -57,6 +71,7 @@ class RuntimeLoader:
             self._mqtt_handler.stop()
             self._homeassistant_handler.stop()
             self._mqtt_handler.mark_error(str(exc))
+            self._start_retry_loop()
 
     def _load_runtime_settings(self) -> Dict[str, Any]:
         if self._settings_store is None or self._settings_cipher is None:
@@ -122,6 +137,85 @@ class RuntimeLoader:
             retain=retain,
             wait_for_publish=wait_for_publish,
         )
+
+    def _cancel_retry(self) -> None:
+        self._retry_stop_event.set()
+        thread = self._retry_thread
+        if thread is not None and thread.is_alive():
+            thread.join(timeout=1)
+        self._retry_stop_event.clear()
+        self._retry_thread = None
+
+    def _start_retry_loop(self) -> None:
+        thread = threading.Thread(
+            target=self._retry_loop,
+            daemon=True,
+            name="mqtt-retry",
+        )
+        self._retry_thread = thread
+        thread.start()
+
+    def _retry_loop(self) -> None:
+        total = len(_RETRY_DELAYS)
+        for attempt, delay in enumerate(_RETRY_DELAYS, start=1):
+            next_delay_msg = f" Next retry in {delay}s." if attempt < total else ""
+            self._log_hub_event(
+                "warn", "mqtt",
+                f"MQTT connection failed, retrying in {delay}s (attempt {attempt}/{total}).",
+            )
+            self._logger.warning(f"MQTT retry {attempt}/{total} scheduled in {delay}s")
+
+            if self._retry_stop_event.wait(delay):
+                # Cancelled by stop() or a manual reload()
+                return
+
+            self._log_hub_event(
+                "info", "mqtt",
+                f"MQTT reconnect attempt {attempt}/{total}.",
+            )
+            self._logger.info(f"MQTT reconnect attempt {attempt}/{total}")
+            try:
+                runtime_settings = self._load_runtime_settings()
+                mqtt_model = self._build_mqtt_model(runtime_settings)
+                homeassistant_model = self._build_homeassistant_model(runtime_settings)
+                self._mqtt_handler.start(mqtt_model)
+                self._homeassistant_handler.configure(homeassistant_model, self._mqtt_handler.connection())
+                self._homeassistant_handler.start()
+                self._log_hub_event(
+                    "info", "mqtt",
+                    f"MQTT reconnected successfully after {attempt} attempt(s).",
+                )
+                self._logger.info(f"MQTT reconnected on retry {attempt}/{total}")
+                return
+            except Exception as exc:
+                self._mqtt_handler.mark_error(str(exc))
+                self._log_hub_event(
+                    "warn", "mqtt",
+                    f"MQTT retry {attempt}/{total} failed: {exc}",
+                )
+                self._logger.warning(f"MQTT retry {attempt}/{total} failed: {exc}")
+
+        self._log_hub_event(
+            "error", "mqtt",
+            "MQTT connection failed after all retry attempts — use the manual retry button.",
+        )
+        self._logger.error("MQTT connection failed after all retry attempts")
+
+    def _log_hub_event(self, level: str, category: str, message: str, meta: Optional[Dict[str, Any]] = None) -> None:
+        if self._database is None:
+            return
+        try:
+            event: Dict[str, Any] = {
+                "ts": time.time(),
+                "level": level,
+                "category": category,
+                "message": message,
+            }
+            if meta:
+                event["meta"] = meta
+            self._database.logs.insert(source_type="hub", source_id="hub", event=event)
+        except Exception as exc:
+            self._logger.warning(f"Failed to write hub log event: {exc}")
 
     def _build_mqtt_model(self, runtime: Dict[str, Any]) -> MQTTConnectionModel:
         host = str(runtime.get("mqtt_host") or "").strip()

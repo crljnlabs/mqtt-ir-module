@@ -11,3 +11,7 @@ export function getLearningStatus() {
 export function getMqttStatus() {
   return requestJson('/status/mqtt')
 }
+
+export function retryMqttConnection() {
+  return requestJson('/mqtt/retry', { method: 'POST' })
+}

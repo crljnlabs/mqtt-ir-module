@@ -146,6 +146,7 @@
     "mqttDisconnected": "Getrennt",
     "mqttNotConfigured": "Nicht konfiguriert",
     "mqttLastErrorLabel": "Letzter Fehler",
+    "mqttRetry": "Erneut versuchen",
     "mqttMasterKeyMissing": "SETTINGS_MASTER_KEY fehlt. Das Speichern von MQTT-Passwörtern ist gesperrt.",
     "mqttSaved": "MQTT-Einstellungen gespeichert.",
     "mqttSaveFailed": "MQTT-Einstellungen konnten nicht gespeichert werden.",

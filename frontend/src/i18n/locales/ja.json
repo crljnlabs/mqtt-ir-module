@@ -153,6 +153,7 @@
     "mqttDisconnected": "未接続",
     "mqttNotConfigured": "未設定",
     "mqttLastErrorLabel": "最新エラー",
+    "mqttRetry": "再試行",
     "hubIsAgentReadonlyHint": "読み取り専用。環境変数 LOCAL_AGENT_ENABLED で設定されます。",
     "helpLocalAgentTitle": "LOCAL_AGENT_ENABLED",
     "helpLocalAgentBody": "Hub が IR ハードウェアに直接アクセスするためのローカルエージェントとして登録するかどうかを制御します。デフォルトは有効です。",

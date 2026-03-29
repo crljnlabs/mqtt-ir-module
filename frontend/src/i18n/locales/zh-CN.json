@@ -153,6 +153,7 @@
     "mqttDisconnected": "未连接",
     "mqttNotConfigured": "未配置",
     "mqttLastErrorLabel": "最近错误",
+    "mqttRetry": "重试",
     "hubIsAgentReadonlyHint": "只读。通过环境变量 LOCAL_AGENT_ENABLED 设置。",
     "helpLocalAgentTitle": "LOCAL_AGENT_ENABLED",
     "helpLocalAgentBody": "控制 Hub 是否注册为本地代理以直接访问红外硬件。默认启用。",

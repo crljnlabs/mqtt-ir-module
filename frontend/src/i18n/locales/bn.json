@@ -153,6 +153,7 @@
     "mqttDisconnected": "সংযোগ নেই",
     "mqttNotConfigured": "কনফিগার করা হয়নি",
     "mqttLastErrorLabel": "সর্বশেষ ত্রুটি",
+    "mqttRetry": "পুনরায় চেষ্টা করুন",
     "hubIsAgentReadonlyHint": "শুধু পড়ার জন্য। পরিবেশ ভেরিয়েবল LOCAL_AGENT_ENABLED দিয়ে নির্ধারিত।",
     "helpLocalAgentTitle": "LOCAL_AGENT_ENABLED",
     "helpLocalAgentBody": "Hub সরাসরি IR হার্ডওয়ার অ্যাক্সেসের জন্য লোকাল এজেন্ট হিসেবে নিবন্ধন করবে কিনা তা নিয়ন্ত্রণ করে। ডিফল্টরূপে সক্রিয়।",

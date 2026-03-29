@@ -153,6 +153,7 @@
     "mqttDisconnected": "Terputus",
     "mqttNotConfigured": "Belum dikonfigurasi",
     "mqttLastErrorLabel": "Error terakhir",
+    "mqttRetry": "Coba lagi",
     "hubIsAgentReadonlyHint": "Hanya-baca. Diatur melalui LOCAL_AGENT_ENABLED pada variabel lingkungan.",
     "helpLocalAgentTitle": "LOCAL_AGENT_ENABLED",
     "helpLocalAgentBody": "Mengontrol apakah Hub mendaftar sebagai agen lokal untuk akses perangkat keras IR langsung. Default: aktif.",

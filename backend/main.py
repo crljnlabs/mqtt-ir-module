@@ -96,6 +96,7 @@ runtime_loader = RuntimeLoader(
     settings_cipher=settings_cipher,
     role="hub",
     environment=env,
+    database=database,
 )
 agent_log_hub = AgentLogHub(runtime_loader=runtime_loader, database=database, local_agent_id=local_agent.agent_id)
 local_agent_log_reporter = AgentLogReporter(
@@ -390,7 +391,7 @@ def _setup_app_logging() -> None:
     sub-package so their messages appear with level + name instead of a bare
     message string.
     """
-    fmt = logging.Formatter("%(levelname)-9s %(name)s - %(message)s")
+    fmt = logging.Formatter("%(asctime)s %(levelname)-9s%(name)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
     handler = logging.StreamHandler()
     handler.setFormatter(fmt)
     for name in _APP_LOG_MODULES:
@@ -401,6 +402,7 @@ def _setup_app_logging() -> None:
 
 
 _prune_logger = logging.getLogger("connections.log_retention")
+_api_logger = logging.getLogger("connections.api")
 _LOG_PRUNE_INTERVAL_SECONDS = 3600
 
 
@@ -512,26 +514,45 @@ def version() -> Dict[str, Any]:
 
 @api.get("/status/electronics")
 def status_electronics() -> Dict[str, Any]:
-    return {
-        "ir_device": env.ir_rx_device,
-        "ir_rx_device": env.ir_rx_device,
-        "ir_tx_device": env.ir_tx_device,
-        "debug": env.debug,
-    }
+    try:
+        return {
+            "ir_device": env.ir_rx_device,
+            "ir_rx_device": env.ir_rx_device,
+            "ir_tx_device": env.ir_tx_device,
+            "debug": env.debug,
+        }
+    except Exception as exc:
+        _api_logger.error(f"GET /status/electronics failed: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve electronics status")
 
 
 @api.get("/status/learning")
 def status_learning() -> Dict[str, Any]:
-    return {
-        "learn_enabled": learning.is_learning,
-        "learn_remote_id": learning.remote_id,
-        "learn_remote_name": learning.remote_name,
-        "learn_agent_id": learning.agent_id,
-    }
+    try:
+        return {
+            "learn_enabled": learning.is_learning,
+            "learn_remote_id": learning.remote_id,
+            "learn_remote_name": learning.remote_name,
+            "learn_agent_id": learning.agent_id,
+        }
+    except Exception as exc:
+        _api_logger.error(f"GET /status/learning failed: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve learning status")
 
 
 @api.get("/status/mqtt")
 def status_mqtt() -> Dict[str, Any]:
+    return runtime_loader.status()
+
+
+@api.post("/mqtt/retry")
+def mqtt_retry() -> Dict[str, Any]:
+    try:
+        runtime_loader.reload()
+    except Exception as exc:
+        # reload() already marks the error and starts the retry loop internally;
+        # we still return the current status so the UI can reflect the error.
+        _api_logger.warning(f"MQTT manual retry triggered, initial attempt failed: {exc}")
     return runtime_loader.status()
 
 
@@ -542,7 +563,11 @@ def status_pairing() -> Dict[str, Any]:
 
 @api.get("/agents")
 def list_agents() -> List[Dict[str, Any]]:
-    return [_decorate_agent_payload(agent) for agent in agent_registry.list_agents()]
+    try:
+        return [_decorate_agent_payload(agent) for agent in agent_registry.list_agents()]
+    except Exception as exc:
+        _api_logger.error(f"GET /agents failed: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve agents")
 
 
 @api.get("/agents/{agent_id}")
@@ -570,12 +595,18 @@ def _require_mqtt_agent(agent_id: str) -> Dict[str, Any]:
 
 @api.get("/agents/{agent_id}/debug")
 def get_agent_debug(agent_id: str) -> Dict[str, Any]:
-    agent = _require_mqtt_agent(agent_id)
-    result = command_client.runtime_debug_get(agent_id=agent_id)
-    return {
-        "agent_id": str(agent.get("agent_id") or agent_id),
-        "debug": bool(result.get("debug")),
-    }
+    try:
+        agent = _require_mqtt_agent(agent_id)
+        result = command_client.runtime_debug_get(agent_id=agent_id)
+        return {
+            "agent_id": str(agent.get("agent_id") or agent_id),
+            "debug": bool(result.get("debug")),
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        _api_logger.error(f"GET /agents/{agent_id}/debug failed: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve agent debug state")
 
 
 @api.put("/agents/{agent_id}/debug")
@@ -585,25 +616,37 @@ def update_agent_debug(
     x_api_key: Optional[str] = Header(default=None),
 ) -> Dict[str, Any]:
     require_api_key(x_api_key)
-    agent = _require_mqtt_agent(agent_id)
-    _require_agent_not_installing(str(agent.get("agent_id") or agent_id))
-    result = command_client.runtime_debug_set(agent_id=agent_id, debug=body.debug)
-    return {
-        "agent_id": str(agent.get("agent_id") or agent_id),
-        "debug": bool(result.get("debug")),
-    }
+    try:
+        agent = _require_mqtt_agent(agent_id)
+        _require_agent_not_installing(str(agent.get("agent_id") or agent_id))
+        result = command_client.runtime_debug_set(agent_id=agent_id, debug=body.debug)
+        return {
+            "agent_id": str(agent.get("agent_id") or agent_id),
+            "debug": bool(result.get("debug")),
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        _api_logger.error(f"PUT /agents/{agent_id}/debug failed: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to update agent debug state")
 
 
 @api.get("/agents/{agent_id}/runtime-config")
 def get_agent_runtime_config(agent_id: str) -> Dict[str, Any]:
-    agent = _require_mqtt_agent(agent_id)
-    result = command_client.runtime_config_get(agent_id=agent_id)
-    return {
-        "agent_id": str(agent.get("agent_id") or agent_id),
-        "ir_rx_pin": result.get("ir_rx_pin"),
-        "ir_tx_pin": result.get("ir_tx_pin"),
-        "reboot_required": bool(result.get("reboot_required")),
-    }
+    try:
+        agent = _require_mqtt_agent(agent_id)
+        result = command_client.runtime_config_get(agent_id=agent_id)
+        return {
+            "agent_id": str(agent.get("agent_id") or agent_id),
+            "ir_rx_pin": result.get("ir_rx_pin"),
+            "ir_tx_pin": result.get("ir_tx_pin"),
+            "reboot_required": bool(result.get("reboot_required")),
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        _api_logger.error(f"GET /agents/{agent_id}/runtime-config failed: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve agent runtime config")
 
 
 @api.put("/agents/{agent_id}/runtime-config")
@@ -740,19 +783,25 @@ def ota_cancel_agent(
     x_api_key: Optional[str] = Header(default=None),
 ) -> Dict[str, Any]:
     require_api_key(x_api_key)
-    agent = _require_mqtt_agent(agent_id)
-    decorated = _decorate_agent_payload(agent)
-    runtime = decorated.get("runtime") if isinstance(decorated.get("runtime"), dict) else {}
-    if str(runtime.get("agent_type") or "").strip().lower() != "esp32":
-        raise HTTPException(status_code=400, detail="OTA is supported only for esp32 agents")
-    if not bool(runtime.get("ota_supported")):
-        raise HTTPException(status_code=400, detail="Agent does not report OTA support")
-    result = command_client.runtime_ota_cancel(agent_id=agent_id)
-    agent_registry.mark_agent_activity(agent_id)
-    return {
-        "agent_id": str(agent.get("agent_id") or agent_id),
-        "result": result,
-    }
+    try:
+        agent = _require_mqtt_agent(agent_id)
+        decorated = _decorate_agent_payload(agent)
+        runtime = decorated.get("runtime") if isinstance(decorated.get("runtime"), dict) else {}
+        if str(runtime.get("agent_type") or "").strip().lower() != "esp32":
+            raise HTTPException(status_code=400, detail="OTA is supported only for esp32 agents")
+        if not bool(runtime.get("ota_supported")):
+            raise HTTPException(status_code=400, detail="Agent does not report OTA support")
+        result = command_client.runtime_ota_cancel(agent_id=agent_id)
+        agent_registry.mark_agent_activity(agent_id)
+        return {
+            "agent_id": str(agent.get("agent_id") or agent_id),
+            "result": result,
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        _api_logger.error(f"POST /agents/{agent_id}/ota/cancel failed: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to cancel OTA update")
 
 
 @api.post("/agents/{agent_id}/installation/reset")
@@ -780,20 +829,24 @@ def get_logs(
     to_ts: Optional[float] = None,
     limit: int = 200,
 ) -> Dict[str, Any]:
-    levels = _split_csv_param(level)
-    source_types = _split_csv_param(source_type)
-    source_ids = _split_csv_param(source_id)
-    categories = _split_csv_param(category)
-    items = database.logs.query(
-        levels=levels or None,
-        source_types=source_types or None,
-        source_ids=source_ids or None,
-        categories=categories or None,
-        from_ts=from_ts,
-        to_ts=to_ts,
-        limit=limit,
-    )
-    return {"items": items, "count": len(items)}
+    try:
+        levels = _split_csv_param(level)
+        source_types = _split_csv_param(source_type)
+        source_ids = _split_csv_param(source_id)
+        categories = _split_csv_param(category)
+        items = database.logs.query(
+            levels=levels or None,
+            source_types=source_types or None,
+            source_ids=source_ids or None,
+            categories=categories or None,
+            from_ts=from_ts,
+            to_ts=to_ts,
+            limit=limit,
+        )
+        return {"items": items, "count": len(items)}
+    except Exception as exc:
+        _api_logger.error(f"GET /logs failed: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve logs")
 
 
 @api.delete("/logs")
@@ -807,19 +860,23 @@ def delete_logs(
     x_api_key: Optional[str] = Header(default=None),
 ) -> Dict[str, Any]:
     require_api_key(x_api_key)
-    levels = _split_csv_param(level)
-    source_types = _split_csv_param(source_type)
-    source_ids = _split_csv_param(source_id)
-    categories = _split_csv_param(category)
-    deleted = database.logs.delete(
-        levels=levels or None,
-        source_types=source_types or None,
-        source_ids=source_ids or None,
-        categories=categories or None,
-        from_ts=from_ts,
-        to_ts=to_ts,
-    )
-    return {"deleted": deleted}
+    try:
+        levels = _split_csv_param(level)
+        source_types = _split_csv_param(source_type)
+        source_ids = _split_csv_param(source_id)
+        categories = _split_csv_param(category)
+        deleted = database.logs.delete(
+            levels=levels or None,
+            source_types=source_types or None,
+            source_ids=source_ids or None,
+            categories=categories or None,
+            from_ts=from_ts,
+            to_ts=to_ts,
+        )
+        return {"deleted": deleted}
+    except Exception as exc:
+        _api_logger.error(f"DELETE /logs failed: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to delete logs")
 
 
 @api.websocket("/logs/ws")
@@ -1058,7 +1115,11 @@ def create_remote(body: RemoteCreate, x_api_key: Optional[str] = Header(default=
 
 @api.get("/remotes")
 def list_remotes() -> List[Dict[str, Any]]:
-    return database.remotes.list()
+    try:
+        return database.remotes.list()
+    except Exception as exc:
+        _api_logger.error(f"GET /remotes failed: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve remotes")
 
 
 @api.put("/remotes/{remote_id}")
@@ -1193,7 +1254,11 @@ def learn_capture(body: LearnCapture, x_api_key: Optional[str] = Header(default=
 @api.post("/learn/stop")
 def learn_stop(x_api_key: Optional[str] = Header(default=None)) -> Dict[str, Any]:
     require_api_key(x_api_key)
-    return learning.stop()
+    try:
+        return learning.stop()
+    except Exception as exc:
+        _api_logger.error(f"POST /learn/stop failed: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to stop learning session")
 
 
 @api.get("/learn/status", response_model=LearnStartResponse)

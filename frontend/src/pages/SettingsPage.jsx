@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Card, CardBody, CardHeader, CardTitle } from '../components/ui/Card.jsx'
 import { getAppConfig } from '../utils/appConfig.js'
-import { getElectronicsStatus, getMqttStatus } from '../api/statusApi.js'
+import { getElectronicsStatus, getMqttStatus, retryMqttConnection } from '../api/statusApi.js'
 import { getSettings, updateSettings } from '../api/settingsApi.js'
 import { getFirmwareCatalog } from '../api/firmwareApi.js'
 import Icon from '@mdi/react'
@@ -127,6 +127,14 @@ export function SettingsPage() {
       setMqttDirty(false)
       setMqttPassword('')
       toast.show({ title: t('settings.mqttTitle'), message: t('settings.mqttSaved') })
+    },
+    onError: (e) => toast.show({ title: t('settings.mqttTitle'), message: errorMapper.getMessage(e, 'settings.mqttSaveFailed') }),
+  })
+
+  const mqttRetryMutation = useMutation({
+    mutationFn: retryMqttConnection,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['status-mqtt'] })
     },
     onError: (e) => toast.show({ title: t('settings.mqttTitle'), message: errorMapper.getMessage(e, 'settings.mqttSaveFailed') }),
   })
@@ -320,8 +328,20 @@ export function SettingsPage() {
             )}
           </div>
           {mqttLastError ? (
-            <div className="mt-2 text-sm text-red-600">
-              {t('settings.mqttLastErrorLabel')}: {mqttLastError}
+            <div className="mt-2 flex items-center gap-3">
+              <div className="text-sm text-red-600 flex-1">
+                {t('settings.mqttLastErrorLabel')}: {mqttLastError}
+              </div>
+              {!mqttConnected ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={mqttRetryMutation.isPending}
+                  onClick={() => mqttRetryMutation.mutate()}
+                >
+                  {t('settings.mqttRetry')}
+                </Button>
+              ) : null}
             </div>
           ) : null}
           {showMasterKeyWarning ? (

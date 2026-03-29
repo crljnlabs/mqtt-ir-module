@@ -153,6 +153,7 @@
     "mqttDisconnected": "غير متصل",
     "mqttNotConfigured": "غير مهيأ",
     "mqttLastErrorLabel": "آخر خطأ",
+    "mqttRetry": "إعادة المحاولة",
     "hubIsAgentReadonlyHint": "للقراءة فقط. يتم تحديده عبر LOCAL_AGENT_ENABLED في متغيرات البيئة.",
     "helpLocalAgentTitle": "LOCAL_AGENT_ENABLED",
     "helpLocalAgentBody": "يتحكم في ما إذا كان Hub يسجّل نفسه كوكيل محلي للوصول المباشر لأجهزة الأشعة تحت الحمراء. مفعّل بشكل افتراضي.",

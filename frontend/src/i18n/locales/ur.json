@@ -153,6 +153,7 @@
     "mqttDisconnected": "منقطع",
     "mqttNotConfigured": "کنفیگر نہیں",
     "mqttLastErrorLabel": "آخری خرابی",
+    "mqttRetry": "دوبارہ کوشش کریں",
     "hubIsAgentReadonlyHint": "صرف پڑھنے کے لیے۔ یہ LOCAL_AGENT_ENABLED ماحولاتی متغیر سے سیٹ ہوتا ہے۔",
     "helpLocalAgentTitle": "LOCAL_AGENT_ENABLED",
     "helpLocalAgentBody": "کنٹرول کرتا ہے کہ آیا Hub براہ راست IR ہارڈویئر تک رسائی کے لیے لوکل ایجنٹ کے طور پر رجسٹر ہوتا ہے۔ ڈیفالٹ: فعال۔",

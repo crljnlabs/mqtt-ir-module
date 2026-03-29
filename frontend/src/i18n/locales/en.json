@@ -207,6 +207,7 @@
     "mqttDisconnected": "Disconnected",
     "mqttNotConfigured": "Not configured",
     "mqttLastErrorLabel": "Last error",
+    "mqttRetry": "Retry",
     "mqttMasterKeyMissing": "SETTINGS_MASTER_KEY is missing. Storing MQTT passwords is blocked.",
     "mqttSaved": "MQTT settings saved.",
     "mqttSaveFailed": "Failed to save MQTT settings.",

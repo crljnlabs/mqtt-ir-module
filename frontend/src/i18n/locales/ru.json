@@ -153,6 +153,7 @@
     "mqttDisconnected": "Отключено",
     "mqttNotConfigured": "Не настроено",
     "mqttLastErrorLabel": "Последняя ошибка",
+    "mqttRetry": "Повторить",
     "hubIsAgentReadonlyHint": "Только чтение. Значение задается через LOCAL_AGENT_ENABLED в переменных окружения.",
     "helpLocalAgentTitle": "LOCAL_AGENT_ENABLED",
     "helpLocalAgentBody": "Определяет, регистрирует ли Hub себя как локальный агент для прямого доступа к ИК-оборудованию. По умолчанию включено.",
