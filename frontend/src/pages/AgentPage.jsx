@@ -468,7 +468,7 @@ export function AgentPage() {
           {assignableRemotes.length === 0 ? (
             <div className="text-sm text-[rgb(var(--muted))]">{t('agents.assignExistingRemoteEmpty')}</div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
               {assignableRemoteGroups.map((group) => (
                 <div key={group.key} className="space-y-2">
                   <div className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--muted))]">{group.title}</div>
