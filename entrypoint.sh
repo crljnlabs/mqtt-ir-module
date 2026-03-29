@@ -23,7 +23,7 @@ case "${start_mode}" in
         exec python3 agent_main.py
         ;;
     hub|"")
-        exec uvicorn main:app --host 0.0.0.0 --port 80 --ws websockets --ws-ping-interval 15 --ws-ping-timeout 15
+        exec uvicorn main:app --host 0.0.0.0 --port 80 --ws websockets --ws-ping-interval 15 --ws-ping-timeout 15 --log-config /opt/app/log_config.json
         ;;
     *)
         echo "Unsupported START_MODE: ${start_mode}" >&2

@@ -357,6 +357,7 @@ export function SettingsPage() {
             />
             <TextField
               type="password"
+              showToggle
               label={t('settings.mqttPasswordLabel')}
               hint={mqttPasswordStored ? t('settings.mqttPasswordStoredHint') : t('settings.mqttPasswordHint')}
               value={mqttPassword}
