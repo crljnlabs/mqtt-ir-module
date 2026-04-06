@@ -42,7 +42,7 @@ For first install on a blank device, use the merged `factory` image.
 
 | Version | Factory download | SHA-256 | Flash usage (`ESP32-WROOM-32D`, `esp32dev`) | RAM usage (`ESP32-WROOM-32D`, `esp32dev`) |
 | --- | --- | --- | --- | --- |
-| `v0.1.0` | [Download](https://github.com/Dev-CorliJoni/mqtt-ir-module/raw/refs/heads/main/backend/firmware_template/files/esp32-ir-client-v0.1.0.factory.bin) | `c7eb2f9c9f51068828de97b61590addb66b65c41b0e59da24a2a5204bf877109` | `89.5%` (used `1173009` bytes from `1310720` bytes) | `15.1%` (used `49608` bytes from `327680` bytes) |
+| `v1.0.0` | [Download](https://github.com/Dev-CorliJoni/mqtt-ir-module/raw/refs/tags/v1.0.0/backend/firmware_template/files/esp32-ir-client-v1.0.0.factory.bin) | `2ea18c2f96da79764b7b12ac7bcba2edcbf03f3e8f0e08852614184b2bbb2062` | `90.4%` (used `1184793` bytes from `1310720` bytes) | `15.2%` (used `49664` bytes from `327680` bytes) |
 
 ## 2. USB driver selection and installation
 

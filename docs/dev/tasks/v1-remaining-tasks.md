@@ -18,8 +18,6 @@ deployments.
 
 ---
 
----
-
 ### M3 — Home Assistant: Inbound Command Routing
 
 **Current state:** Hub publishes MQTT discovery payloads so HA knows about buttons (outbound only).

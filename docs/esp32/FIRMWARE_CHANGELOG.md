@@ -7,4 +7,4 @@ New entries are prepended (newest first). Add an entry before every firmware com
 
 | Version | Date | Flash % | Flash bytes | RAM % | RAM bytes | Factory SHA-256 | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| v0.1.0 | 2026-03-02 | 89.5% | 1173009 | 15.1% | 49608 | c7eb2f9c9f51068828de97b61590addb66b65c41b0e59da24a2a5204bf877109 | initial release |
+| v1.0.0 | 2026-04-06 | 90.4% | 1184793 | 15.2% | 49664 | 2ea18c2f96da79764b7b12ac7bcba2edcbf03f3e8f0e08852614184b2bbb2062 | first stable release |
