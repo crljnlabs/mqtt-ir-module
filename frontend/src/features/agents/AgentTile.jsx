@@ -1,4 +1,3 @@
-import React from 'react'
 import Icon from '@mdi/react'
 import { useNavigate } from 'react-router-dom'
 import { mdiCheck, mdiPencilOutline, mdiRestart, mdiTrashCanOutline, mdiUploadOutline } from '@mdi/js'
@@ -31,7 +30,8 @@ export function AgentTile({ agent, onEdit, onDelete, onAccept, onUpdate, onReboo
   const agentType = String(runtime.agent_type || agent.agent_type || '').trim().toLowerCase()
   const typeLabel = agentTypeLabel(agentType, t)
   const isLocalAgent = agentType === 'local'
-  const swVersion = String(runtime.sw_version || agent.sw_version || '').trim()
+  const swVersion = String(runtime.sw_version || agent.sw_version || ota.current_version || '').trim()
+  const latestVersion = String(ota.latest_version || '').trim()
   const updateAvailable = Boolean(ota.update_available && ota.supported)
   const rebootRequired = Boolean(runtime.reboot_required || ota.reboot_required)
   const installation = agent.installation || {}
@@ -42,6 +42,17 @@ export function AgentTile({ agent, onEdit, onDelete, onAccept, onUpdate, onReboo
   const incompatibleSystem = isOnline && compatibility.system === false
   const incompatibleSend = isOnline && compatibility.send === false
   const incompatibleLearn = isOnline && compatibility.learn === false
+
+  // Version shown in subtitle only when no update is pending (avoids duplication with update badge)
+  const subtitleParts = [typeLabel, agent.agent_id]
+  if (swVersion && !showUpdateAvailable) subtitleParts.push(`v${swVersion}`)
+
+  // Update badge text: "v0.1.11 → v1.0.0" if both versions known, fallback to generic label
+  const updateBadgeText = swVersion && latestVersion
+    ? `v${swVersion} → v${latestVersion}`
+    : t('agents.updateAvailable')
+
+  const hasBadges = showUpdateAvailable || installationLabel || rebootRequired || incompatibleSystem || incompatibleSend || incompatibleLearn
 
   return (
     <div
@@ -56,25 +67,39 @@ export function AgentTile({ agent, onEdit, onDelete, onAccept, onUpdate, onReboo
       tabIndex={0}
     >
       <div className="flex items-center gap-3 min-w-0">
-        <div className="h-12 w-12 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] flex items-center justify-center">
-          <Icon path={findIconPath(agent.icon || DEFAULT_AGENT_ICON)} size={1.2} />
+        {/* Icon with online/offline status dot in bottom-right corner */}
+        <div className="relative shrink-0">
+          <div className="h-12 w-12 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] flex items-center justify-center">
+            <Icon path={findIconPath(agent.icon || DEFAULT_AGENT_ICON)} size={1.2} />
+          </div>
+          <div className={[
+            'absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[rgb(var(--card))]',
+            isOnline ? 'bg-[rgb(var(--success))]' : 'bg-[rgb(var(--danger))]',
+          ].join(' ')} />
         </div>
+
         <div className="min-w-0">
           <div className="font-semibold truncate">{agent.name || agent.agent_id}</div>
-          <div className="text-xs text-[rgb(var(--muted))] truncate">{agent.agent_id}</div>
-          <div className="mt-1 flex items-center gap-2 flex-wrap">
-            <Badge variant={isOnline ? 'success' : 'danger'}>
-              {isOnline ? t('health.online') : t('health.offline')}
-            </Badge>
-            <Badge variant="neutral">{typeLabel}</Badge>
-            {swVersion ? <Badge variant="neutral">v{swVersion}</Badge> : null}
-            {installationLabel ? <Badge variant={installationBadgeVariant(installation)}>{installationLabel}</Badge> : null}
-            {showUpdateAvailable ? <Badge variant="warning">{t('agents.updateAvailable')}</Badge> : null}
-            {rebootRequired ? <Badge variant="warning">{t('agents.rebootRequired')}</Badge> : null}
-            {incompatibleSystem ? <Badge variant="danger">{t('agents.incompatibleSystem')}</Badge> : null}
-            {incompatibleSend ? <Badge variant="warning">{t('agents.incompatibleSend')}</Badge> : null}
-            {incompatibleLearn ? <Badge variant="warning">{t('agents.incompatibleLearn')}</Badge> : null}
-          </div>
+          <div className="text-xs text-[rgb(var(--muted))] truncate">{subtitleParts.join(' · ')}</div>
+          {hasBadges && (
+            <div className="mt-1 flex items-center gap-2 flex-wrap">
+              {installationLabel ? <Badge variant={installationBadgeVariant(installation)}>{installationLabel}</Badge> : null}
+              {showUpdateAvailable ? (
+                <button
+                  className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold bg-[rgb(var(--warning))] text-black disabled:opacity-50"
+                  onClick={(e) => { e.stopPropagation(); onUpdate?.(agent) }}
+                  disabled={installationInProgress}
+                >
+                  <Icon path={mdiUploadOutline} size={0.55} />
+                  {updateBadgeText}
+                </button>
+              ) : null}
+              {rebootRequired ? <Badge variant="warning">{t('agents.rebootRequired')}</Badge> : null}
+              {incompatibleSystem ? <Badge variant="danger">{t('agents.incompatibleSystem')}</Badge> : null}
+              {incompatibleSend ? <Badge variant="warning">{t('agents.incompatibleSend')}</Badge> : null}
+              {incompatibleLearn ? <Badge variant="warning">{t('agents.incompatibleLearn')}</Badge> : null}
+            </div>
+          )}
         </div>
       </div>
 
@@ -91,11 +116,6 @@ export function AgentTile({ agent, onEdit, onDelete, onAccept, onUpdate, onReboo
             {!isLocalAgent ? (
               <IconButton label={t('common.delete')} onClick={() => onDelete(agent)}>
                 <Icon path={mdiTrashCanOutline} size={1} />
-              </IconButton>
-            ) : null}
-            {updateAvailable && onUpdate ? (
-              <IconButton label={t('agents.updateAction')} onClick={() => onUpdate?.(agent)} disabled={installationInProgress}>
-                <Icon path={mdiUploadOutline} size={1} />
               </IconButton>
             ) : null}
             {rebootRequired ? (
