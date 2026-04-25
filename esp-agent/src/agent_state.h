@@ -28,6 +28,7 @@ constexpr uint8_t kDefaultIrRxPin = 34;
 constexpr size_t kMqttBufferSize = 32768;
 constexpr unsigned long kMqttReconnectMinMs = 1000;
 constexpr unsigned long kMqttReconnectMaxMs = 60000;
+constexpr unsigned long kWifiReconnectIntervalMs = 30000;
 constexpr unsigned long kActiveWindowMs = 5UL * 60UL * 1000UL;
 constexpr unsigned long kStateHeartbeatMs = 30000;
 constexpr unsigned long kRebootDelayMs = 350;
