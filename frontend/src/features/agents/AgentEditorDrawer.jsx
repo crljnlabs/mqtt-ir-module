@@ -1,6 +1,4 @@
 import React, { useMemo, useState } from 'react'
-import Icon from '@mdi/react'
-import { mdiAutorenew } from '@mdi/js'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 
@@ -17,7 +15,6 @@ import { getFirmwareCatalog } from '../../api/firmwareApi.js'
 import { useToast } from '../../components/ui/ToastProvider.jsx'
 import { ApiErrorMapper } from '../../utils/apiErrorMapper.js'
 import { DEFAULT_AGENT_ICON } from '../../icons/iconRegistry.js'
-import { getAppConfig } from '../../utils/appConfig.js'
 import { isInstallationInProgress, normalizeInstallationStatus } from './installationStatus.js'
 
 export function AgentEditorDrawer({ agent, onClose }) {
@@ -28,13 +25,11 @@ export function AgentEditorDrawer({ agent, onClose }) {
 
   const [name, setName] = useState(typeof agent.name === 'string' ? agent.name : '')
   const [icon, setIcon] = useState(agent.icon ?? null)
-  const [configurationUrl, setConfigurationUrl] = useState(typeof agent.configuration_url === 'string' ? agent.configuration_url : '')
   const initialRxPin = parsePinValue(agent?.runtime?.ir_rx_pin) ?? 34
   const initialTxPin = parsePinValue(agent?.runtime?.ir_tx_pin) ?? 4
   const [irRxPin, setIrRxPin] = useState(initialRxPin == null ? '' : String(initialRxPin))
   const [irTxPin, setIrTxPin] = useState(initialTxPin == null ? '' : String(initialTxPin))
   const [iconPickerOpen, setIconPickerOpen] = useState(false)
-  const appConfig = getAppConfig()
   const runtime = agent?.runtime || {}
   const ota = agent?.ota || {}
   const installation = agent?.installation || {}
@@ -89,25 +84,15 @@ export function AgentEditorDrawer({ agent, onClose }) {
     return preferredOtaVersion
   }, [otaVersionOverride, installableVersions, preferredOtaVersion])
 
-  const fillCurrentUrl = () => {
-    if (typeof window === 'undefined') return
-    const baseUrl = appConfig.publicBaseUrl.endsWith('/') ? appConfig.publicBaseUrl : `${appConfig.publicBaseUrl}/`
-    const path = `${baseUrl}agent/${encodeURIComponent(agent.agent_id)}`
-    const absoluteUrl = `${window.location.origin}${path}`
-    setConfigurationUrl(absoluteUrl)
-  }
-
   const saveMutation = useMutation({
     mutationFn: async () => {
       const metadataPayload = {
         name: name.trim() || null,
         icon: icon ?? null,
-        configuration_url: configurationUrl.trim() || null,
       }
       const metadataChanged =
         metadataPayload.name !== (agent.name ?? null) ||
-        metadataPayload.icon !== (agent.icon ?? null) ||
-        metadataPayload.configuration_url !== (agent.configuration_url ?? null)
+        metadataPayload.icon !== (agent.icon ?? null)
 
       if (metadataChanged) {
         await updateAgent(agent.agent_id, metadataPayload)
@@ -148,8 +133,7 @@ export function AgentEditorDrawer({ agent, onClose }) {
     if (saveMutation.isPending) return
     const metadataChanged =
       (name.trim() || null) !== (agent.name ?? null) ||
-      (icon ?? null) !== (agent.icon ?? null) ||
-      (configurationUrl.trim() || null) !== (agent.configuration_url ?? null)
+      (icon ?? null) !== (agent.icon ?? null)
     const pinsChanged = isEsp32 && (parsedRxPin !== initialRxPin || parsedTxPin !== initialTxPin)
     if (metadataChanged || pinsChanged) {
       saveMutation.mutate()
@@ -218,27 +202,6 @@ export function AgentEditorDrawer({ agent, onClose }) {
             onNameChange={(event) => setName(event.target.value)}
             onIconClick={() => setIconPickerOpen(true)}
           />
-
-          <label className="block">
-            <div className="mb-1 text-sm font-medium">{t('agents.configurationUrlLabel')}</div>
-            <div className="relative">
-              <input
-                className="h-11 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] px-3 pr-12 text-sm text-[rgb(var(--fg))] outline-none focus:ring-2 focus:ring-[rgb(var(--primary))]"
-                value={configurationUrl}
-                onChange={(event) => setConfigurationUrl(event.target.value)}
-              />
-              <button
-                type="button"
-                aria-label={t('agents.configurationUrlAuto')}
-                title={t('agents.configurationUrlAuto')}
-                onClick={fillCurrentUrl}
-                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-[rgb(var(--muted))] hover:text-[rgb(var(--fg))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--primary))] focus:ring-offset-2 focus:ring-offset-[rgb(var(--bg))]"
-              >
-                <Icon path={mdiAutorenew} size={0.8} />
-              </button>
-            </div>
-            <div className="mt-1 text-xs text-[rgb(var(--muted))]">{t('agents.configurationUrlHint')}</div>
-          </label>
 
           {isEsp32 ? (
             <Tooltip wrapperClassName="block" label={!isOnline ? t('agents.onlyWhenOnline') : undefined}>

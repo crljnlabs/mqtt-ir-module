@@ -166,6 +166,7 @@ class Settings(DatabaseBase):
             "language": self._read_text_setting("language", default="en", conn=conn),
             "hub_is_agent": self._read_bool_setting("hub_is_agent", default=True, conn=conn),
             "homeassistant_enabled": self._read_bool_setting("homeassistant_enabled", default=False, conn=conn),
+            "hub_public_url": self._read_text_setting("hub_public_url", default="", conn=conn),
         }
         settings.update(self.get_mqtt_settings(conn=conn))
         settings.update(self.get_learning_settings(conn=conn))
@@ -206,6 +207,7 @@ class Settings(DatabaseBase):
         aggregate_min_match_ratio: Optional[float] = None,
         hub_is_agent: Optional[bool] = None,
         homeassistant_enabled: Optional[bool] = None,
+        hub_public_url: Optional[str] = None,
         mqtt_host: Optional[str] = None,
         mqtt_port: Optional[int] = None,
         mqtt_username: Optional[str] = None,
@@ -226,6 +228,8 @@ class Settings(DatabaseBase):
                 self.set("hub_is_agent", str(bool(hub_is_agent)).lower(), conn=c)
             if homeassistant_enabled is not None:
                 self.set("homeassistant_enabled", str(bool(homeassistant_enabled)).lower(), conn=c)
+            if hub_public_url is not None:
+                self.set("hub_public_url", str(hub_public_url).strip(), conn=c)
 
             if press_takes_default is not None:
                 self.set("press_takes_default", str(press_takes_default), conn=c)

@@ -10,6 +10,7 @@ class SettingsUpdate(BaseModel):
     language: Optional[str] = Field(default=None, min_length=2, max_length=16, description="UI language code (e.g. en, de, pt-PT)")
     hub_is_agent: Optional[bool] = Field(default=None, description="Whether the Hub should register a local agent")
     homeassistant_enabled: Optional[bool] = Field(default=None, description="Enable Home Assistant discovery runtime")
+    hub_public_url: Optional[str] = Field(default=None, max_length=1024, description="Public base URL of this IR Hub (used for HA device links and OTA)")
     mqtt_host: Optional[str] = Field(default=None, max_length=255, description="MQTT broker host")
     mqtt_port: Optional[int] = Field(default=None, ge=1, le=65535, description="MQTT broker port")
     mqtt_username: Optional[str] = Field(default=None, max_length=255, description="MQTT broker username")

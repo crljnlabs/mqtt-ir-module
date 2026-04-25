@@ -19,7 +19,6 @@ class Agents(DatabaseBase):
                 can_learn INTEGER NOT NULL DEFAULT 0,
                 sw_version TEXT NULL,
                 agent_topic TEXT NULL,
-                configuration_url TEXT NULL,
                 pending INTEGER NOT NULL DEFAULT 0,
                 pairing_session_id TEXT NULL,
                 last_seen REAL NULL,
@@ -28,6 +27,12 @@ class Agents(DatabaseBase):
             );
             """
         )
+        # Migration: drop configuration_url column if it still exists from an older schema.
+        try:
+            conn.execute("ALTER TABLE agents DROP COLUMN configuration_url")
+            conn.commit()
+        except Exception:
+            pass
 
     def upsert(
         self,
@@ -41,7 +46,6 @@ class Agents(DatabaseBase):
         sw_version: Optional[str],
         agent_topic: Optional[str],
         last_seen: Optional[float],
-        configuration_url: Optional[str] = None,
         pending: bool = False,
         pairing_session_id: Optional[str] = None,
         conn: Optional[sqlite3.Connection] = None,
@@ -52,7 +56,6 @@ class Agents(DatabaseBase):
 
         normalized_name = self._normalize_name(name)
         normalized_icon = self._normalize_icon(icon)
-        normalized_url = self._normalize_configuration_url(configuration_url)
         normalized_sw_version = self._normalize_optional_text(sw_version)
         normalized_agent_topic = self._normalize_optional_text(agent_topic)
         normalized_pairing_session_id = self._normalize_optional_text(pairing_session_id)
@@ -72,14 +75,13 @@ class Agents(DatabaseBase):
                     can_learn,
                     sw_version,
                     agent_topic,
-                    configuration_url,
                     pending,
                     pairing_session_id,
                     last_seen,
                     created_at,
                     updated_at
                 )
-                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(agent_id) DO UPDATE SET
                     name = excluded.name,
                     icon = COALESCE(excluded.icon, agents.icon),
@@ -89,7 +91,6 @@ class Agents(DatabaseBase):
                     can_learn = excluded.can_learn,
                     sw_version = excluded.sw_version,
                     agent_topic = excluded.agent_topic,
-                    configuration_url = COALESCE(excluded.configuration_url, agents.configuration_url),
                     pending = excluded.pending,
                     pairing_session_id = excluded.pairing_session_id,
                     last_seen = excluded.last_seen,
@@ -105,7 +106,6 @@ class Agents(DatabaseBase):
                     self._to_int_bool(can_learn),
                     normalized_sw_version,
                     normalized_agent_topic,
-                    normalized_url,
                     self._to_int_bool(pending),
                     normalized_pairing_session_id,
                     last_seen,
@@ -141,19 +141,16 @@ class Agents(DatabaseBase):
             existing_data = self._row_to_dict(existing)
             next_name = existing_data.get("name")
             next_icon = existing_data.get("icon")
-            next_configuration_url = existing_data.get("configuration_url")
 
             if "name" in changes:
                 next_name = self._normalize_name(changes.get("name"))
             if "icon" in changes:
                 next_icon = self._normalize_icon(changes.get("icon"))
-            if "configuration_url" in changes:
-                next_configuration_url = self._normalize_configuration_url(changes.get("configuration_url"))
 
             now = time.time()
             c.execute(
-                "UPDATE agents SET name = ?, icon = ?, configuration_url = ?, updated_at = ? WHERE agent_id = ?",
-                (next_name, next_icon, next_configuration_url, now, normalized_agent_id),
+                "UPDATE agents SET name = ?, icon = ?, updated_at = ? WHERE agent_id = ?",
+                (next_name, next_icon, now, normalized_agent_id),
             )
             c.commit()
 
@@ -318,12 +315,6 @@ class Agents(DatabaseBase):
         normalized = str(value).strip()
         if not normalized:
             return None
-        return normalized
-
-    def _normalize_configuration_url(self, value: Optional[str]) -> Optional[str]:
-        if value is None:
-            return None
-        normalized = str(value).strip()
         return normalized
 
     def _normalize_optional_text(self, value: Optional[str]) -> Optional[str]:

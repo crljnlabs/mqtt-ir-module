@@ -8,7 +8,7 @@ import { getElectronicsStatus, getMqttStatus, retryMqttConnection } from '../api
 import { getSettings, updateSettings } from '../api/settingsApi.js'
 import { getFirmwareCatalog } from '../api/firmwareApi.js'
 import Icon from '@mdi/react'
-import { mdiTextBoxSearchOutline } from '@mdi/js'
+import { mdiAutorenew, mdiTextBoxSearchOutline } from '@mdi/js'
 import { Button } from '../components/ui/Button.jsx'
 import { IconButton } from '../components/ui/IconButton.jsx'
 import { Modal } from '../components/ui/Modal.jsx'
@@ -60,6 +60,8 @@ export function SettingsPage() {
   const [mqttPassword, setMqttPassword] = useState('')
   const [mqttInstance, setMqttInstance] = useState('')
   const [homeassistantEnabled, setHomeassistantEnabled] = useState(false)
+  const [appDirty, setAppDirty] = useState(false)
+  const [hubPublicUrl, setHubPublicUrl] = useState('')
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -98,6 +100,11 @@ export function SettingsPage() {
     setMqttPassword('')
     setHomeassistantEnabled(Boolean(settingsQuery.data.homeassistant_enabled ?? false))
   }, [settingsQuery.data, mqttDirty])
+
+  useEffect(() => {
+    if (!settingsQuery.data || appDirty) return
+    setHubPublicUrl(String(settingsQuery.data.hub_public_url ?? ''))
+  }, [settingsQuery.data, appDirty])
 
   const logMutation = useMutation({
     mutationFn: updateSettings,
@@ -139,6 +146,16 @@ export function SettingsPage() {
     onError: (e) => toast.show({ title: t('settings.mqttTitle'), message: errorMapper.getMessage(e, 'settings.mqttSaveFailed') }),
   })
 
+  const appMutation = useMutation({
+    mutationFn: updateSettings,
+    onSuccess: (data) => {
+      queryClient.setQueryData(['settings'], data)
+      setAppDirty(false)
+      toast.show({ title: t('settings.appTitle'), message: t('settings.appSaved') })
+    },
+    onError: (e) => toast.show({ title: t('settings.appTitle'), message: errorMapper.getMessage(e, 'settings.appSaveFailed') }),
+  })
+
   const learningDefaults = settingsQuery.data ? getLearningDefaults(settingsQuery.data) : null
   const mqttDefaults = settingsQuery.data ? getMqttDefaults(settingsQuery.data) : null
 
@@ -154,6 +171,7 @@ export function SettingsPage() {
   const mqttInstanceValue = normalizeText(mqttInstance)
   const mqttPasswordValue = mqttPassword
   const homeassistantEnabledValue = Boolean(homeassistantEnabled)
+  const hubPublicUrlValue = String(hubPublicUrl).trim()
 
   const isPressTakesValid = isNumberInRange(pressTakesValue, 1, 50)
   const isCaptureTimeoutValid = isNumberInRange(captureTimeoutValue, 100, 60000)
@@ -190,6 +208,9 @@ export function SettingsPage() {
     hasMqttPasswordInput
   )
 
+  const hubPublicUrlDefault = String(settingsQuery.data?.hub_public_url ?? '')
+  const hasAppChanges = Boolean(settingsQuery.data) && hubPublicUrlValue !== hubPublicUrlDefault
+
   const logRetentionValue = parseNumberInput(logRetentionDays)
   const isLogRetentionValid = isNumberInRange(logRetentionValue, 1, 365)
   const logRetentionDefault = settingsQuery.data?.log_retention_days ?? 7
@@ -198,9 +219,11 @@ export function SettingsPage() {
   const isSaving = updateMutation.isPending
   const isSavingMqtt = mqttMutation.isPending
   const isSavingLog = logMutation.isPending
+  const isSavingApp = appMutation.isPending
   const disableLearningForm = !settingsQuery.data || isSaving
   const disableMqttForm = !settingsQuery.data || isSavingMqtt
   const disableLogForm = !settingsQuery.data || isSavingLog
+  const disableAppForm = !settingsQuery.data || isSavingApp
   const mqttPasswordStored = Boolean(settingsQuery.data?.mqtt_password_set)
   const showMasterKeyWarning = !hasMasterKey
   const mqttConfigured = Boolean(mqttStatusQuery.data?.configured)
@@ -251,6 +274,11 @@ export function SettingsPage() {
     mqttMutation.mutate(payload)
   }
 
+  const handleSaveApp = () => {
+    if (!settingsQuery.data) return
+    appMutation.mutate({ hub_public_url: hubPublicUrlValue })
+  }
+
   return (
     <div className="space-y-4">
       <Card>
@@ -286,6 +314,48 @@ export function SettingsPage() {
               <div className="text-xs text-[rgb(var(--muted))]">{t('settings.hubIsAgentLabel')}</div>
               <div className="font-semibold">{hubIsAgentReadonlyValue ? t('common.yes') : t('common.no')}</div>
             </div>
+          </div>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('settings.appTitle')}</CardTitle>
+        </CardHeader>
+        <CardBody>
+          <label className="block">
+            <div className="mb-1 text-sm font-medium">{t('settings.hubPublicUrlLabel')}</div>
+            <div className="relative">
+              <input
+                className="h-11 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] px-3 pr-12 text-sm text-[rgb(var(--fg))] outline-none focus:ring-2 focus:ring-[rgb(var(--primary))] disabled:opacity-50 disabled:cursor-not-allowed"
+                value={hubPublicUrl}
+                disabled={disableAppForm}
+                onChange={(event) => {
+                  setAppDirty(true)
+                  setHubPublicUrl(event.target.value)
+                }}
+              />
+              <button
+                type="button"
+                aria-label={t('settings.hubPublicUrlAuto')}
+                title={t('settings.hubPublicUrlAuto')}
+                disabled={disableAppForm}
+                onClick={() => {
+                  if (typeof window === 'undefined') return
+                  setAppDirty(true)
+                  setHubPublicUrl(window.location.origin + config.publicBaseUrl)
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-[rgb(var(--muted))] hover:text-[rgb(var(--fg))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--primary))] focus:ring-offset-2 focus:ring-offset-[rgb(var(--bg))] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Icon path={mdiAutorenew} size={0.8} />
+              </button>
+            </div>
+            <div className="mt-1 text-xs text-[rgb(var(--muted))]">{t('settings.hubPublicUrlHint')}</div>
+          </label>
+          <div className="mt-4 flex justify-end">
+            <Button onClick={handleSaveApp} disabled={disableAppForm || !hasAppChanges}>
+              {t('common.save')}
+            </Button>
           </div>
         </CardBody>
       </Card>
