@@ -54,11 +54,10 @@ class PairingManagerHub:
                 return
             self._running = True
 
-        connection.add_on_connect(self._on_mqtt_connect)
-        self._subscribe(connection)
         with self._lock:
             self._subscribed_offers = True
             self._subscribed_unpair_acks = True
+        connection.add_on_connect(self._on_mqtt_connect)
         self._database.agents.delete_pending()
 
         if self._auto_open:

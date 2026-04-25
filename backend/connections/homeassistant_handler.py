@@ -64,6 +64,20 @@ class HomeAssistantHandler:
             self._ha_connection = None
             self._ha_thread = None
 
+    def cleanup_discovery(self) -> None:
+        """Clear all retained HA discovery topics via the active connection.
+        Called when HA gets disabled, before the MQTT connection itself is stopped.
+        Idempotent — no-op if no active connection or device manager.
+        """
+        with self._lock:
+            device_manager = self._device_manager
+        if device_manager is None:
+            return
+        try:
+            device_manager.teardown()
+        except Exception as exc:
+            self._logger.warning(f"HA cleanup_discovery failed: {exc}")
+
     def status(self) -> Dict[str, Any]:
         with self._lock:
             model = self._connection_model

@@ -19,7 +19,12 @@ class MqttHandler:
         self._active_client_id: Optional[str] = None
         self._last_error: Optional[str] = None
 
-    def start(self, model: MQTTConnectionModel) -> None:
+    def setup(self, model: MQTTConnectionModel) -> None:
+        """Build the MQTT connection object without connecting.
+
+        Subscribers can register add_on_connect callbacks on the returned
+        connection before connect() initiates the TCP handshake.
+        """
         if not model.is_mqtt_configured:
             self.stop()
             with self._lock:
@@ -39,23 +44,41 @@ class MqttHandler:
         self.stop()
         try:
             self._logger.info(
-                f"Connecting MQTT role={self._role} host={model.host} port={model.port} "
+                f"Setting up MQTT role={self._role} host={model.host} port={model.port} "
                 f"app_name={model.app_name} node_id={model.node_id} base_topic={model.base_topic}"
             )
-            connection = self._connect(model)
+            connection = self._build(model)
             with self._lock:
                 self._connection = connection
                 self._active_model = model
                 self._active_client_id = str(connection.client_id or "")
                 self._last_error = None
-            self._logger.info(f"MQTT connected role={self._role} client_id={connection.client_id}")
         except Exception as exc:
             with self._lock:
                 self._active_model = model
                 self._active_client_id = None
                 self._last_error = str(exc)
-            self._logger.warning(f"MQTT start failed: {exc}")
+            self._logger.warning(f"MQTT setup failed: {exc}")
             raise
+
+    def connect(self) -> None:
+        """Initiate the TCP connect on an already-built connection."""
+        with self._lock:
+            connection = self._connection
+        if connection is None or self._is_connected(connection):
+            return
+        try:
+            connection.connect()
+            self._logger.info(f"MQTT connecting role={self._role} client_id={connection.client_id}")
+        except Exception as exc:
+            with self._lock:
+                self._last_error = str(exc)
+            self._logger.warning(f"MQTT connect failed: {exc}")
+            raise
+
+    def start(self, model: MQTTConnectionModel) -> None:
+        self.setup(model)
+        self.connect()
 
     def stop(self) -> None:
         with self._lock:
@@ -165,7 +188,7 @@ class MqttHandler:
             wait_for_publish=wait_for_publish,
         )
 
-    def _connect(self, model: MQTTConnectionModel) -> MQTTConnectionV3:
+    def _build(self, model: MQTTConnectionModel) -> MQTTConnectionV3:
         builder = MQTTBuilderV3(host=model.host, app_name=model.app_name)
         if model.role == "hub" and model.node_id:
             builder.instance_id(model.node_id.replace("_", "-"))
@@ -175,9 +198,7 @@ class MqttHandler:
         if model.username:
             builder.login(model.username, model.password)
         builder.availability(topic=model.availability_topic)
-        connection = builder.build()
-        connection.connect()
-        return connection
+        return builder.build()
 
     def _is_connected(self, connection: Optional[MQTTConnectionV3]) -> bool:
         return connection is not None and bool(connection.is_connected)

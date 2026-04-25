@@ -99,6 +99,21 @@ void configureWifiAndRuntime() {
   saveRuntimeConfig();
 }
 
+void pollWifiConnection() {
+  static unsigned long sLastReconnectAtMs = 0;
+  if (WiFi.status() == WL_CONNECTED) {
+    sLastReconnectAtMs = 0;
+    return;
+  }
+  const unsigned long now = millis();
+  if (sLastReconnectAtMs != 0 && now - sLastReconnectAtMs < kWifiReconnectIntervalMs) {
+    return;
+  }
+  sLastReconnectAtMs = now;
+  logWarn("transport", "Wi-Fi disconnected; attempting reconnect", "wifi_reconnect");
+  WiFi.reconnect();
+}
+
 void pollSetupButton() {
   if (gSetupResetTriggered) {
     return;

@@ -70,7 +70,6 @@ class AgentLogHub:
             if self._running and self._subscribed:
                 return
         connection.add_on_connect(self._on_mqtt_connect)
-        self._subscribe(connection)
         with self._lock:
             self._running = True
             self._subscribed = True

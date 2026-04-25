@@ -501,7 +501,7 @@ async def lifespan(app: FastAPI):
     agent_log_hub.attach_loop(loop)
 
     apply_hub_agent_setting(resolve_hub_agent_setting())
-    runtime_loader.start()
+    runtime_loader.setup()
     agent_log_hub.start()
     runtime_state_hub.start()
     installation_state_hub.start()
@@ -509,6 +509,7 @@ async def lifespan(app: FastAPI):
     register_external_mqtt_agents_from_db()
     availability_hub.start()
     pairing_manager.start()
+    runtime_loader.connect()
 
     # Debug capture data can grow quickly; keep it only when DEBUG=true.
     if not env.debug:
@@ -1104,6 +1105,7 @@ def update_settings(body: SettingsUpdate, x_api_key: Optional[str] = Header(defa
             )
         )
         hub_public_url_changed = body.hub_public_url is not None
+        previous_ha_enabled = bool(database.settings.get_ui_settings().get("homeassistant_enabled"))
         updated = database.settings.update_ui_settings(
             theme=body.theme,
             language=body.language,
@@ -1123,6 +1125,13 @@ def update_settings(body: SettingsUpdate, x_api_key: Optional[str] = Header(defa
             log_retention_days=body.log_retention_days,
         )
         learning.apply_learning_settings(updated)
+        ha_disabling = previous_ha_enabled and (body.homeassistant_enabled is False)
+        if ha_disabling:
+            # Clear retained HA discovery topics while the MQTT connection is still alive.
+            try:
+                runtime_loader.cleanup_homeassistant_discovery()
+            except Exception as exc:
+                _api_logger.warning(f"HA discovery cleanup before disable failed: {exc}")
         if mqtt_runtime_changed:
             command_client.stop()
             pairing_manager.stop()
@@ -1130,13 +1139,14 @@ def update_settings(body: SettingsUpdate, x_api_key: Optional[str] = Header(defa
             installation_state_hub.stop()
             runtime_state_hub.stop()
             agent_log_hub.stop()
-            runtime_loader.reload()
+            runtime_loader.setup()
             agent_log_hub.start()
             runtime_state_hub.start()
             installation_state_hub.start()
             availability_hub.start()
             command_client.start()
             pairing_manager.start()
+            runtime_loader.connect()
         elif hub_public_url_changed:
             try:
                 ha_device_manager.update_hub_public_url(str(updated.get("hub_public_url") or ""))

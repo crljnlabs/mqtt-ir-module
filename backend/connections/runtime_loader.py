@@ -52,12 +52,48 @@ class RuntimeLoader:
         return MQTTConnectionModel.readable_name_for_role(self._role)
 
     def start(self) -> None:
-        self.reload()
+        self.setup()
+        self.connect()
 
     def stop(self) -> None:
         self._cancel_retry()
         self._homeassistant_handler.stop()
         self._mqtt_handler.stop()
+
+    def setup(self) -> None:
+        """Build the MQTT connection object and configure HA without connecting.
+
+        Call connect() separately after all subscribers have registered their
+        add_on_connect callbacks so the first _on_connect fires for everyone.
+        """
+        self._cancel_retry()
+        try:
+            runtime_settings = self._load_runtime_settings()
+            mqtt_model = self._build_mqtt_model(runtime_settings)
+            homeassistant_model = self._build_homeassistant_model(runtime_settings)
+            self._mqtt_handler.setup(mqtt_model)
+            self._homeassistant_handler.configure(homeassistant_model, self._mqtt_handler.connection(), device_manager=self._ha_device_manager)
+        except Exception as exc:
+            self._mqtt_handler.stop()
+            self._homeassistant_handler.stop()
+            self._mqtt_handler.mark_error(str(exc))
+            self._start_retry_loop()
+
+    def connect(self) -> None:
+        """Initiate TCP connect and start HA after all subscribers are ready."""
+        try:
+            self._mqtt_handler.connect()
+            self._homeassistant_handler.start()
+        except Exception as exc:
+            self._mqtt_handler.stop()
+            self._homeassistant_handler.stop()
+            self._mqtt_handler.mark_error(str(exc))
+            self._start_retry_loop()
+
+    def cleanup_homeassistant_discovery(self) -> None:
+        """Clear retained HA discovery topics. Caller is responsible for invoking this
+        BEFORE stopping the MQTT connection (otherwise no broker to publish to)."""
+        self._homeassistant_handler.cleanup_discovery()
 
     def reload(self) -> None:
         # Cancel any running retry before attempting a fresh connect.
