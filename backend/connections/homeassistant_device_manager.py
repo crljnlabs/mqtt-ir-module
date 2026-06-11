@@ -72,7 +72,9 @@ class HomeAssistantDeviceManager:
         self._logger = logging.getLogger("homeassistant_device_manager")
 
         self._ha_connection: Optional[HomeAssistantConnection] = None
-        self._on_connect_registered = False
+        # MQTT connection the on-connect hook is registered on. Tracked by identity so a
+        # rebuilt connection (settings change) gets a fresh registration exactly once.
+        self._hook_mqtt_connection = None
 
         self._hub_origin: Optional[HomeAssistantOrigin] = None
         self._hub_device: Optional[HomeAssistantDevice] = None
@@ -152,13 +154,15 @@ class HomeAssistantDeviceManager:
 
             origins: List[HomeAssistantOrigin] = [hub_origin] + list(self._agent_origins.values())
 
-        # Register the on-connect hook BEFORE adding origins so the first connect (which the
-        # library triggers itself in run()) fires our initial-state publishing.
-        self._register_on_connect_hook(ha_connection)
-
         ha_connection.add_origin(*origins)
 
         self._subscribe_all_agent_logs(ha_connection)
+
+        # The device tree exists only now, so the initial retained state must be
+        # published here — the on-connect hook (registered before the TCP connect via
+        # register_mqtt_connect_hook) may already have fired against an empty tree.
+        # Re-publishes on reconnect are handled by the hook.
+        self._publish_initial_states()
 
     def teardown(self) -> None:
         """Clear all HA discovery topics and reset internal state.
@@ -192,7 +196,6 @@ class HomeAssistantDeviceManager:
             self._agent_log_sensors.clear()
             self._remote_devices.clear()
             self._ha_connection = None
-            self._on_connect_registered = False
 
     # ------------------------------------------------------------------
     # Agent mutations
@@ -416,24 +419,41 @@ class HomeAssistantDeviceManager:
     # MQTT (re)connect hook — initial retained state for all persistent entities
     # ------------------------------------------------------------------
 
-    def _register_on_connect_hook(self, ha_connection: HomeAssistantConnection) -> None:
-        with self._lock:
-            if self._on_connect_registered:
-                return
-            self._on_connect_registered = True
-        try:
-            mqtt_connection = ha_connection.get_connection()
-        except Exception as exc:
-            self._logger.debug(f"on_connect hook: get_connection failed: {exc}")
+    def register_mqtt_connect_hook(self, mqtt_connection) -> None:
+        """Register the on-connect hook on the MQTT connection.
+
+        Must be called BEFORE the TCP connect is initiated (RuntimeLoader.setup phase)
+        so the hook fires on the first connect and on every reconnect. Calling it again
+        with the same connection object is a no-op; a rebuilt connection (settings
+        change) gets a fresh registration.
+        """
+        if mqtt_connection is None:
             return
+        with self._lock:
+            if self._hook_mqtt_connection is mqtt_connection:
+                return
+            self._hook_mqtt_connection = mqtt_connection
         try:
             mqtt_connection.add_on_connect(self._on_mqtt_connect)
         except Exception as exc:
             self._logger.warning(f"on_connect hook: add_on_connect failed: {exc}")
+            with self._lock:
+                self._hook_mqtt_connection = None
 
     def _on_mqtt_connect(self, *_args, **_kwargs) -> None:
-        """Called by jmqtt on every (re)connect. Publishes retained initial state for
-        all persistent entities so HA never sees `unknown` for state-of-the-world values.
+        """Called by jmqtt on every (re)connect.
+
+        Re-publishes retained initial state for all persistent entities and re-subscribes
+        the agent log bridge topics (plain subscriptions are lost on reconnect because the
+        session is clean). On the very first connect the device tree may still be empty —
+        setup() publishes the initial state itself once the tree is built.
+        """
+        self._publish_initial_states()
+        self._resubscribe_agent_logs()
+
+    def _publish_initial_states(self) -> None:
+        """Publish retained initial state for all persistent entities so HA never
+        sees `unknown` for state-of-the-world values.
         """
         # Hub UpdateEntity: immediate fallback (installed=latest=SOFTWARE_VERSION),
         # then async GitHub check refines latest_version.
@@ -948,6 +968,16 @@ class HomeAssistantDeviceManager:
             return
         with self._lock:
             agent_ids = list(self._agent_log_entities.keys())
+        for agent_id in agent_ids:
+            self._do_subscribe_agent_logs(mqtt_connection, agent_id)
+
+    def _resubscribe_agent_logs(self) -> None:
+        """Re-subscribe all agent log bridge topics after an MQTT (re)connect."""
+        with self._lock:
+            mqtt_connection = self._hook_mqtt_connection
+            agent_ids = list(self._agent_log_entities.keys())
+        if mqtt_connection is None:
+            return
         for agent_id in agent_ids:
             self._do_subscribe_agent_logs(mqtt_connection, agent_id)
 

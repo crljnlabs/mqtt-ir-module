@@ -39,6 +39,12 @@ class HomeAssistantHandler:
                 return
             self._ha_connection = HomeAssistantConnection(mqtt_connection)
 
+        # configure() runs in the setup phase, before the TCP connect — registering the
+        # device manager's on-connect hook here guarantees it fires on the first connect
+        # and on every reconnect (initial entity states + log bridge resubscription).
+        if device_manager is not None:
+            device_manager.register_mqtt_connect_hook(mqtt_connection)
+
     def start(self) -> None:
         with self._lock:
             model = self._connection_model

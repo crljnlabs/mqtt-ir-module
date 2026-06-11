@@ -260,8 +260,11 @@ class AgentRuntimeStateStore:
             retain=True,
         )
 
-        # state/agent — static capabilities (retained)
+        # state/agent — static capabilities + client identity (retained)
         agent_payload = {k: v for k, v in extra.items() if k in self.AGENT_FIELDS}
+        client_id = self._runtime_loader.mqtt_client_id()
+        if client_id:
+            agent_payload["id"] = client_id
         if agent_payload:
             self._publish_subtopic(connection, f"{prefix}/agent", agent_payload, retain=True)
 
