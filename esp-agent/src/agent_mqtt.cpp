@@ -209,6 +209,11 @@ bool connectMqtt() {
     return false;
   }
 
+  // Subscribe to the command topic before publishing "online".
+  // The hub may send an OTA or other command immediately after detecting the
+  // retained availability message. Subscribing first ensures the agent can
+  // receive those commands without a race window.
+  gMqttClient.subscribe(topicCommands().c_str());
   gMqttClient.publish(topicStateAvailability().c_str(), "online", true);
   gRetainedHubStateReceived = false;
   gRetainedRuntimeStateReceived = false;
@@ -219,7 +224,6 @@ bool connectMqtt() {
   gMqttClient.subscribe(topicPairingAccept().c_str());
   gMqttClient.subscribe(topicPairingUnpair().c_str());
   gMqttClient.subscribe(topicPairingReclaim().c_str());
-  gMqttClient.subscribe(topicCommands().c_str());
   publishState();
   flushQueuedLogs();
   logInfo(
