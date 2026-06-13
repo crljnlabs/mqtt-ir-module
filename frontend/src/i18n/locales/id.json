@@ -102,6 +102,7 @@
     "themeDarkValue": "gelap",
     "language": "Bahasa",
     "runtime": "Runtime",
+    "hubVersion": "Versi Hub",
     "baseUrl": "URL dasar",
     "apiBaseUrl": "Basis API",
     "writeKeyRequired": "Kunci API tulis diperlukan",

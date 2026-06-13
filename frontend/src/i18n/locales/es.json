@@ -102,6 +102,7 @@
     "themeDarkValue": "oscuro",
     "language": "Idioma",
     "runtime": "Runtime",
+    "hubVersion": "Versión del Hub",
     "baseUrl": "URL base",
     "apiBaseUrl": "Base API",
     "writeKeyRequired": "Se requiere clave API de escritura",

@@ -102,6 +102,7 @@
     "themeDarkValue": "গাঢ়",
     "language": "ভাষা",
     "runtime": "রানটাইম",
+    "hubVersion": "Hub ভার্শন",
     "baseUrl": "বেস URL",
     "apiBaseUrl": "API বেস",
     "writeKeyRequired": "লেখার জন্য API কী প্রয়োজন",

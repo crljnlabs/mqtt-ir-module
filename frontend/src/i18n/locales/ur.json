@@ -102,6 +102,7 @@
     "themeDarkValue": "ڈارک",
     "language": "زبان",
     "runtime": "رن ٹائم",
+    "hubVersion": "Hub ورژن",
     "baseUrl": "بیس URL",
     "apiBaseUrl": "API بیس",
     "writeKeyRequired": "لکھنے کے لیے API کلید درکار ہے",

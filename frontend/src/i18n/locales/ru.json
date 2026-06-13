@@ -102,6 +102,7 @@
     "themeDarkValue": "темная",
     "language": "Язык",
     "runtime": "Среда выполнения",
+    "hubVersion": "Версия Hub",
     "baseUrl": "Базовый URL",
     "apiBaseUrl": "Базовый URL API",
     "writeKeyRequired": "Требуется ключ API для записи",

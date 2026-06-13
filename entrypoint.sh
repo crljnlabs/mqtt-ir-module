@@ -23,7 +23,12 @@ case "${start_mode}" in
         exec python3 agent_main.py
         ;;
     hub|"")
-        exec uvicorn main:app --host 0.0.0.0 --port 80 --ws websockets --ws-ping-interval 15 --ws-ping-timeout 15 --log-config /opt/app/log_config.json
+        # --proxy-headers + --forwarded-allow-ips: trust X-Forwarded-Proto/Host from the
+        # reverse proxy so request.url.scheme reflects the external https scheme. Without it
+        # the hub builds http:// firmware URLs that the proxy 301-redirects, which the ESP32
+        # OTA client cannot follow. The container is only reachable via the proxy, so trusting
+        # all forwarded sources is safe here.
+        exec uvicorn main:app --host 0.0.0.0 --port 80 --proxy-headers --forwarded-allow-ips="*" --ws websockets --ws-ping-interval 15 --ws-ping-timeout 15 --log-config /opt/app/log_config.json
         ;;
     *)
         echo "Unsupported START_MODE: ${start_mode}" >&2

@@ -37,6 +37,21 @@ Response:
 { "ok": true }
 ```
 
+### Version
+
+`GET /api/version`
+
+Response:
+```json
+{
+  "version": "1.0.0",
+  "build_ref": "a1b2c3d",
+  "display_version": "1.0.0 (a1b2c3d)"
+}
+```
+
+`build_ref` is the short git revision baked into the image at build time (empty for local/dev builds); `display_version` combines both for display.
+
 ### Electronics status
 
 `GET /api/status/electronics`

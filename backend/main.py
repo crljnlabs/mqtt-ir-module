@@ -63,7 +63,7 @@ from database import Database
 from marketplace import GitHubMarketplaceIndex, InstallService
 from marketplace.ir_protocol_utils import get_mqtt_protocol_payload
 from pydantic import BaseModel
-from runtime_version import SOFTWARE_VERSION
+from runtime_version import SOFTWARE_VERSION, BUILD_REF, DISPLAY_VERSION
 
 LOCAL_AGENT_LOG_STREAM_LEVEL = "info"
 # Protocol version integers — increment the relevant constant for any breaking change.
@@ -586,7 +586,11 @@ def health() -> Dict[str, Any]:
 
 @api.get("/version")
 def version() -> Dict[str, Any]:
-    return {"version": SOFTWARE_VERSION}
+    return {
+        "version": SOFTWARE_VERSION,
+        "build_ref": BUILD_REF,
+        "display_version": DISPLAY_VERSION,
+    }
 
 
 @api.get("/status/electronics")
