@@ -25,9 +25,11 @@ class AgentInstallationStateHub:
         self,
         runtime_loader: RuntimeLoader,
         version_provider: Optional[Callable[[str], str]] = None,
+        on_state_change: Optional[Callable[[str], None]] = None,
     ) -> None:
         self._runtime_loader = runtime_loader
         self._version_provider = version_provider
+        self._on_state_change = on_state_change
         self._logger = logging.getLogger("agent_installation_state_hub")
         self._lock = threading.Lock()
         self._running = False
@@ -39,6 +41,18 @@ class AgentInstallationStateHub:
         # on the right firmware version.
         self._offline_failed: Dict[str, str] = {}
         self._offline_timers: Dict[str, threading.Timer] = {}
+
+    def set_on_state_change(self, callback: Optional[Callable[[str], None]]) -> None:
+        self._on_state_change = callback
+
+    def _emit_state_change(self, agent_id: str) -> None:
+        callback = self._on_state_change
+        if callback is None:
+            return
+        try:
+            callback(agent_id)
+        except Exception as exc:
+            self._logger.debug(f"installation state_change callback failed for {agent_id}: {exc}")
 
     def start(self) -> None:
         connection = self._runtime_loader.mqtt_connection()
@@ -180,6 +194,7 @@ class AgentInstallationStateHub:
             self._schedule_finished_clear(normalized_agent_id)
         if should_publish and payload is not None:
             self._publish_retained_state(normalized_agent_id, payload)
+            self._emit_state_change(normalized_agent_id)
         return payload
 
     def _on_availability(self, connection: Any, client: Any, userdata: Any, message: MQTTMessage) -> None:
@@ -257,6 +272,7 @@ class AgentInstallationStateHub:
             f"{self.OFFLINE_FAILURE_TIMEOUT_SECONDS:.0f}s"
         )
         self._publish_retained_state(agent_id, recovered_payload)
+        self._emit_state_change(agent_id)
 
     def _try_version_reconcile_after_offline(self, agent_id: str) -> None:
         """Called after device comes back online following an offline-triggered OTA failure.
@@ -291,6 +307,7 @@ class AgentInstallationStateHub:
         self._logger.info(f"OTA for {agent_id} corrected to finished after device returned on target version {target_version}")
         self._schedule_finished_clear(agent_id)
         self._publish_retained_state(agent_id, payload)
+        self._emit_state_change(agent_id)
 
     def _on_state(self, connection: Any, client: Any, userdata: Any, message: MQTTMessage) -> None:
         del connection
@@ -316,6 +333,7 @@ class AgentInstallationStateHub:
             self._schedule_finished_clear(agent_id)
         else:
             self._cancel_clear_timer(agent_id)
+        self._emit_state_change(agent_id)
 
     def _schedule_finished_clear(self, agent_id: str) -> None:
         self._cancel_clear_timer(agent_id)
@@ -346,6 +364,7 @@ class AgentInstallationStateHub:
                 should_clear = True
         if should_clear:
             self._clear_retained(agent_id)
+            self._emit_state_change(agent_id)
 
     def _recover_stale_state(self, agent_id: str) -> None:
         now = time.time()
@@ -375,6 +394,7 @@ class AgentInstallationStateHub:
             return
         self._logger.warning(f"Recovered stale OTA installation state for {agent_id} as failure")
         self._publish_retained_state(agent_id, recovered_payload)
+        self._emit_state_change(agent_id)
 
     def _clear_retained(self, agent_id: str) -> None:
         connection = self._runtime_loader.mqtt_connection()

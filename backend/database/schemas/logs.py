@@ -83,6 +83,22 @@ class Logs(DatabaseBase):
             if close:
                 c.close()
 
+    def last_for_source(
+        self,
+        source_id: str,
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> Optional[Dict[str, Any]]:
+        c, close = self._use_conn(conn)
+        try:
+            row = c.execute(
+                "SELECT * FROM logs WHERE source_id = ? ORDER BY ts DESC LIMIT 1",
+                (str(source_id),),
+            ).fetchone()
+            return self._row_to_dict(row) if row else None
+        finally:
+            if close:
+                c.close()
+
     def delete(
         self,
         levels: Optional[List[str]] = None,

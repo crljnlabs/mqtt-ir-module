@@ -53,6 +53,7 @@ from connections import (
     AgentLogReporter,
     AgentRuntimeStateHub,
     HomeAssistantDeviceManager,
+    HomeAssistantSyncWorker,
     PairingManagerHub,
     RuntimeLoader,
 )
@@ -146,6 +147,8 @@ ha_device_manager = HomeAssistantDeviceManager(
     ir_send_fn=_ha_send_button,
     command_client=None,  # set after command_client is created
 )
+ha_sync_worker = HomeAssistantSyncWorker(device_manager=ha_device_manager)
+ha_device_manager.set_sync_worker(ha_sync_worker)
 runtime_loader = RuntimeLoader(
     settings_store=database.settings,
     settings_cipher=settings_cipher,
@@ -173,7 +176,7 @@ runtime_state_hub = AgentRuntimeStateHub(
     runtime_loader=runtime_loader,
     database=database,
     pairing_manager=pairing_manager,
-    on_sw_version_change=lambda agent_id: ha_device_manager.update_agent(agent_id),
+    on_sw_version_change=lambda agent_id: ha_sync_worker.notify_change(),
 )
 ha_device_manager.set_runtime_state_hub(runtime_state_hub)
 ha_device_manager.set_command_client(command_client)
@@ -181,7 +184,13 @@ ha_device_manager.set_runtime_loader(runtime_loader)
 installation_state_hub = AgentInstallationStateHub(
     runtime_loader=runtime_loader,
     version_provider=lambda agent_id: str((runtime_state_hub.get_state(agent_id) or {}).get("sw_version") or "").strip(),
+    # Live OTA progress into the HA update card — runs on the MQTT thread, so the
+    # actual publish is offloaded to the sync worker.
+    on_state_change=lambda agent_id: ha_sync_worker.run_task(
+        lambda aid=agent_id: ha_device_manager.publish_agent_ota_progress(aid)
+    ),
 )
+ha_device_manager.set_installation_state_hub(installation_state_hub)
 availability_hub = AgentAvailabilityHub(
     runtime_loader=runtime_loader,
     agent_registry=agent_registry,
@@ -501,6 +510,7 @@ async def lifespan(app: FastAPI):
     agent_log_hub.attach_loop(loop)
 
     apply_hub_agent_setting(resolve_hub_agent_setting())
+    ha_sync_worker.start()
     runtime_loader.setup()
     agent_log_hub.start()
     runtime_state_hub.start()
@@ -536,6 +546,7 @@ async def lifespan(app: FastAPI):
         installation_state_hub.stop()
         runtime_state_hub.stop()
         agent_log_hub.stop()
+        ha_sync_worker.stop()
         runtime_loader.stop()
         learning.stop()
 
@@ -979,7 +990,7 @@ def update_agent(
             agent_id=agent_id,
             changes=changes,
         )
-        ha_device_manager.update_agent(agent_id)
+        ha_sync_worker.notify_change()
         return _decorate_agent_payload(updated)
     except ValueError as e:
         message = str(e)
@@ -1005,7 +1016,7 @@ def delete_agent(
         agent_log_hub.clear_agent_logs(agent_id)
         runtime_state_hub.clear_state(agent_id)
         installation_state_hub.reset_state(agent_id)
-        ha_device_manager.remove_agent(agent_id)
+        ha_sync_worker.notify_change()
         return result
     except ValueError as e:
         message = str(e)
@@ -1046,7 +1057,7 @@ def pairing_accept(agent_id: str, x_api_key: Optional[str] = Header(default=None
     try:
         accepted = pairing_manager.accept_offer(agent_id=agent_id)
         register_external_mqtt_agent(accepted, online=True)
-        ha_device_manager.add_agent(str(accepted.get("agent_id") or ""))
+        ha_sync_worker.notify_change()
         return accepted
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -1148,10 +1159,10 @@ def update_settings(body: SettingsUpdate, x_api_key: Optional[str] = Header(defa
             pairing_manager.start()
             runtime_loader.connect()
         elif hub_public_url_changed:
-            try:
-                ha_device_manager.update_hub_public_url(str(updated.get("hub_public_url") or ""))
-            except Exception as exc:
-                _api_logger.warning(f"HA hub_public_url update failed: {exc}")
+            # Discovery republish waits on publish acks — run it on the sync worker
+            # instead of blocking this API request.
+            new_hub_public_url = str(updated.get("hub_public_url") or "")
+            ha_sync_worker.run_task(lambda: ha_device_manager.update_hub_public_url(new_hub_public_url))
         return decorate_settings_payload(updated)
     except ValueError as e:
         message = str(e)
@@ -1195,7 +1206,7 @@ def create_remote(body: RemoteCreate, x_api_key: Optional[str] = Header(default=
     require_api_key(x_api_key)
     try:
         result = database.remotes.create(name=body.name, icon=body.icon)
-        ha_device_manager.add_remote(int(result["id"]))
+        ha_sync_worker.notify_change()
         return result
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -1222,7 +1233,7 @@ def update_remote(remote_id: int, body: RemoteUpdate, x_api_key: Optional[str] =
             carrier_hz=body.carrier_hz,
             duty_cycle=body.duty_cycle,
         )
-        ha_device_manager.update_remote(int(remote_id))
+        ha_sync_worker.notify_change()
         return result
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -1235,7 +1246,7 @@ def delete_remote(remote_id: int, x_api_key: Optional[str] = Header(default=None
     require_api_key(x_api_key)
     try:
         result = database.remotes.delete(remote_id=remote_id)
-        ha_device_manager.remove_remote(int(remote_id))
+        ha_sync_worker.notify_change()
         return result
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -1262,8 +1273,7 @@ def rename_button(button_id: int, body: ButtonUpdate, x_api_key: Optional[str] =
     require_api_key(x_api_key)
     try:
         result = database.buttons.rename(button_id=button_id, name=body.name, icon=body.icon)
-        if result.get("remote_id") is not None:
-            ha_device_manager.update_remote(int(result["remote_id"]))
+        ha_sync_worker.notify_change()
         return result
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -1276,8 +1286,7 @@ def delete_button(button_id: int, x_api_key: Optional[str] = Header(default=None
     require_api_key(x_api_key)
     try:
         result = database.buttons.delete(button_id=button_id)
-        if result.get("remote_id") is not None:
-            ha_device_manager.update_remote(int(result["remote_id"]))
+        ha_sync_worker.notify_change()
         return result
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -1354,12 +1363,7 @@ def learn_stop(x_api_key: Optional[str] = Header(default=None)) -> Dict[str, Any
     require_api_key(x_api_key)
     try:
         result = learning.stop()
-        remote_id = result.get("remote_id") if isinstance(result, dict) else None
-        if remote_id is not None:
-            try:
-                ha_device_manager.update_remote(int(remote_id))
-            except Exception as exc:
-                _api_logger.debug(f"HA update_remote after learn_stop failed: {exc}")
+        ha_sync_worker.notify_change()
         return result
     except Exception as exc:
         _api_logger.error(f"POST /learn/stop failed: {exc}")
@@ -1506,7 +1510,10 @@ def marketplace_install(
 ) -> Dict[str, Any]:
     require_api_key(x_api_key)
     try:
-        return install_service.install(path=body.path, remote_name=body.remote_name)
+        result = install_service.install(path=body.path, remote_name=body.remote_name)
+        # Installed remote + buttons must appear in Home Assistant.
+        ha_sync_worker.notify_change()
+        return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:

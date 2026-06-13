@@ -67,6 +67,7 @@ class HomeAssistantDeviceManager:
         self._command_client = command_client
         self._hub_public_url = str(hub_public_url or "").strip()
         self._runtime_loader = None
+        self._installation_state_hub = None
 
         self._lock = threading.RLock()
         self._logger = logging.getLogger("homeassistant_device_manager")
@@ -75,6 +76,14 @@ class HomeAssistantDeviceManager:
         # MQTT connection the on-connect hook is registered on. Tracked by identity so a
         # rebuilt connection (settings change) gets a fresh registration exactly once.
         self._hook_mqtt_connection = None
+        self._sync_worker = None
+        # Guards reconcile against running while setup() is still building the tree.
+        self._tree_ready = False
+        # Last-built fingerprints — reconcile only touches devices whose desired
+        # fingerprint (from DB) differs. URLs are excluded: update_hub_public_url
+        # patches them in place.
+        self._agent_fingerprints: Dict[str, tuple] = {}
+        self._remote_fingerprints: Dict[int, tuple] = {}
 
         self._hub_origin: Optional[HomeAssistantOrigin] = None
         self._hub_device: Optional[HomeAssistantDevice] = None
@@ -103,6 +112,12 @@ class HomeAssistantDeviceManager:
     def set_command_client(self, command_client) -> None:
         self._command_client = command_client
 
+    def set_sync_worker(self, sync_worker) -> None:
+        self._sync_worker = sync_worker
+
+    def set_installation_state_hub(self, installation_state_hub) -> None:
+        self._installation_state_hub = installation_state_hub
+
     # ------------------------------------------------------------------
     # Public lifecycle API
     # ------------------------------------------------------------------
@@ -112,6 +127,7 @@ class HomeAssistantDeviceManager:
         Builds the full HA tree from current DB + runtime state.
         """
         with self._lock:
+            self._tree_ready = False
             self._ha_connection = ha_connection
             self._hub_origin = None
             self._hub_device = None
@@ -122,6 +138,8 @@ class HomeAssistantDeviceManager:
             self._agent_log_entities.clear()
             self._agent_log_sensors.clear()
             self._remote_devices.clear()
+            self._agent_fingerprints.clear()
+            self._remote_fingerprints.clear()
 
             node_id = self._resolve_node_id()
 
@@ -164,12 +182,21 @@ class HomeAssistantDeviceManager:
         # Re-publishes on reconnect are handled by the hook.
         self._publish_initial_states()
 
+        # Snapshot fingerprints of the freshly built tree so the first reconcile
+        # only acts on real drift, then open the gate for the sync worker.
+        desired_agents, desired_remotes = self._desired_fingerprints()
+        with self._lock:
+            self._agent_fingerprints = dict(desired_agents)
+            self._remote_fingerprints = dict(desired_remotes)
+            self._tree_ready = True
+
     def teardown(self) -> None:
         """Clear all HA discovery topics and reset internal state.
         Called when HA gets disabled — empties retained discovery payloads so HA drops the devices.
         Idempotent.
         """
         with self._lock:
+            self._tree_ready = False
             ha_connection = self._ha_connection
             origins_to_remove: List[HomeAssistantOrigin] = []
             if self._hub_origin is not None:
@@ -195,7 +222,143 @@ class HomeAssistantDeviceManager:
             self._agent_log_entities.clear()
             self._agent_log_sensors.clear()
             self._remote_devices.clear()
+            self._agent_fingerprints.clear()
+            self._remote_fingerprints.clear()
             self._ha_connection = None
+
+    # ------------------------------------------------------------------
+    # Reconciliation — desired state (DB) vs built tree
+    # ------------------------------------------------------------------
+
+    def reconcile(self) -> None:
+        """Align the HA tree with the database, touching only changed devices.
+
+        Runs exclusively on the sync worker thread. Fingerprints decide which
+        agents/remotes need a rebuild; unchanged devices are left alone so HA
+        sees no discovery flapping.
+        """
+        with self._lock:
+            if self._ha_connection is None or not self._tree_ready:
+                return
+
+        desired_agents, desired_remotes = self._desired_fingerprints()
+
+        with self._lock:
+            current_agent_ids = set(self._agent_origins.keys())
+            stored_agent_fps = dict(self._agent_fingerprints)
+            stored_remote_fps = dict(self._remote_fingerprints)
+
+        # Remotes that must be rebuilt regardless of fingerprint equality because an
+        # agent-level rebuild relocated or cleared their device.
+        force_remote_update: set = set()
+
+        for agent_id in current_agent_ids - set(desired_agents.keys()):
+            self.remove_agent(agent_id)
+            force_remote_update.update(
+                rid for rid, fp in desired_remotes.items() if fp[1] == agent_id
+            )
+
+        for agent_id in set(desired_agents.keys()) - current_agent_ids:
+            self.add_agent(agent_id)
+            force_remote_update.update(
+                rid for rid, fp in desired_remotes.items() if fp[1] == agent_id
+            )
+
+        for agent_id in set(desired_agents.keys()) & current_agent_ids:
+            desired_fp = desired_agents[agent_id]
+            stored_fp = stored_agent_fps.get(agent_id)
+            if desired_fp == stored_fp:
+                continue
+            if stored_fp is not None and self._agent_fp_structural(desired_fp) != self._agent_fp_structural(stored_fp):
+                # Entity set changed (e.g. OTA support appeared) — discovery must be
+                # rebuilt, not just patched.
+                self.remove_agent(agent_id)
+                self.add_agent(agent_id)
+                force_remote_update.update(
+                    rid for rid, fp in desired_remotes.items() if fp[1] == agent_id
+                )
+            else:
+                self.update_agent(agent_id)
+
+        with self._lock:
+            current_remote_ids = set(self._remote_devices.keys())
+
+        for remote_id in current_remote_ids - set(desired_remotes.keys()):
+            self.remove_remote(remote_id)
+
+        for remote_id, desired_fp in desired_remotes.items():
+            if remote_id not in current_remote_ids:
+                self.add_remote(remote_id)
+            elif remote_id in force_remote_update or desired_fp != stored_remote_fps.get(remote_id):
+                self.update_remote(remote_id)
+
+        with self._lock:
+            self._agent_fingerprints = dict(desired_agents)
+            self._remote_fingerprints = dict(desired_remotes)
+
+    def _desired_fingerprints(self) -> tuple:
+        """Compute (agent_fingerprints, remote_fingerprints) from the database."""
+        desired_agents: Dict[str, tuple] = {}
+        try:
+            agent_rows = self._database.agents.list()
+        except Exception as exc:
+            self._logger.warning(f"reconcile: agents.list failed: {exc}")
+            agent_rows = []
+        for agent_data in agent_rows:
+            if bool(agent_data.get("pending")):
+                continue
+            transport = str(agent_data.get("transport") or "").strip()
+            if transport not in ("mqtt", "local"):
+                continue
+            agent_id = str(agent_data.get("agent_id") or "").strip()
+            if not agent_id:
+                continue
+            runtime_state = self._runtime_state_hub.get_state(agent_id) or {} if self._runtime_state_hub else {}
+            desired_agents[agent_id] = (
+                str(agent_data.get("name") or agent_id).strip(),
+                transport,
+                self._resolve_sw_version(runtime_state, agent_data, transport),
+                bool(runtime_state.get("ota_supported")),
+            )
+
+        # The select option pool is part of every remote fingerprint: a renamed agent
+        # changes the dropdown of all remotes.
+        options_pool, _ = self._compute_select_options(None)
+
+        desired_remotes: Dict[int, tuple] = {}
+        try:
+            remote_rows = self._database.remotes.list()
+        except Exception as exc:
+            self._logger.warning(f"reconcile: remotes.list failed: {exc}")
+            remote_rows = []
+        for remote in remote_rows:
+            remote_id = remote.get("id")
+            remote_name = str(remote.get("name") or "").strip()
+            if remote_id is None or not remote_name:
+                continue
+            rid = int(remote_id)
+            assigned = str(remote.get("assigned_agent_id") or "").strip() or None
+            try:
+                buttons = self._database.buttons.list(remote_id=rid)
+            except Exception:
+                buttons = []
+            button_fp = tuple(sorted(
+                (int(b["id"]), str(b.get("name") or "").strip())
+                for b in buttons
+                if b.get("id") is not None
+            ))
+            desired_remotes[rid] = (
+                remote_name,
+                assigned,
+                assigned in desired_agents if assigned else False,
+                button_fp,
+                tuple(options_pool),
+            )
+        return desired_agents, desired_remotes
+
+    def _agent_fp_structural(self, fp: tuple) -> tuple:
+        # (transport, ota_supported) decide which entities exist on the device.
+        return (fp[1], fp[3])
 
     # ------------------------------------------------------------------
     # Agent mutations
@@ -229,9 +392,6 @@ class HomeAssistantDeviceManager:
         self._publish_agent_initial_state(normalized_id)
 
         self._subscribe_agent_logs(ha_connection, normalized_id)
-
-        # Agent name appeared in the option pool — refresh all SelectEntities.
-        self._refresh_select_options_for_all_remotes()
 
     def remove_agent(self, agent_id: str) -> None:
         normalized_id = str(agent_id or "").strip()
@@ -273,9 +433,6 @@ class HomeAssistantDeviceManager:
             except Exception as exc:
                 self._logger.warning(f"re-add remote {rid} after agent removal failed: {exc}")
 
-        # SelectEntity option list shrunk — refresh all remotes.
-        self._refresh_select_options_for_all_remotes()
-
     def update_agent(self, agent_id: str) -> None:
         """Rename, sw_version change, or other agent metadata change."""
         normalized_id = str(agent_id or "").strip()
@@ -316,9 +473,6 @@ class HomeAssistantDeviceManager:
             ha_connection.republish_discovery(publish_timeout=_REPUBLISH_TIMEOUT)
         except Exception as exc:
             self._logger.warning(f"republish_discovery after update_agent failed: {exc}")
-
-        # Agent name might have changed — refresh all remote SelectEntities.
-        self._refresh_select_options_for_all_remotes()
 
         # Republish update state in case sw_version changed.
         self._publish_agent_initial_state(normalized_id)
@@ -441,12 +595,22 @@ class HomeAssistantDeviceManager:
                 self._hook_mqtt_connection = None
 
     def _on_mqtt_connect(self, *_args, **_kwargs) -> None:
-        """Called by jmqtt on every (re)connect.
+        """Called by jmqtt on every (re)connect — runs on the MQTT network thread.
 
-        Re-publishes retained initial state for all persistent entities and re-subscribes
-        the agent log bridge topics (plain subscriptions are lost on reconnect because the
-        session is clean). On the very first connect the device tree may still be empty —
-        setup() publishes the initial state itself once the tree is built.
+        The actual work is handed to the sync worker so the network thread never
+        blocks on publish waits. On the very first connect the device tree may still
+        be empty — setup() publishes the initial state itself once the tree is built.
+        """
+        worker = self._sync_worker
+        if worker is not None:
+            worker.notify_connected()
+            return
+        self.handle_mqtt_connected()
+
+    def handle_mqtt_connected(self) -> None:
+        """Re-publish retained initial state for all persistent entities and re-subscribe
+        the agent log bridge topics (plain subscriptions are lost on reconnect because
+        the session is clean). Runs on the sync worker thread.
         """
         self._publish_initial_states()
         self._resubscribe_agent_logs()
@@ -510,8 +674,20 @@ class HomeAssistantDeviceManager:
             self._publish_agent_update_state(agent_id, update_entity)
 
         if log_sensor is not None:
+            # Restore the last known log line from the DB so the sensor never shows
+            # `unknown` after a hub restart while the EventEntity has history.
+            value = ""
             try:
-                log_sensor.publish("", qos=QoS.AtLeastOnce, retain=True)
+                last = self._database.logs.last_for_source(agent_id)
+                if last:
+                    level_display = LOG_LEVEL_DISPLAY.get(str(last.get("level") or "").strip().lower(), "Info")
+                    msg_text = str(last.get("message") or "").strip()[:300]
+                    if msg_text:
+                        value = f"[{level_display}] {msg_text}"
+            except Exception as exc:
+                self._logger.debug(f"Last log lookup failed for {agent_id}: {exc}")
+            try:
+                log_sensor.publish(value, qos=QoS.AtLeastOnce, retain=True)
             except Exception as exc:
                 self._logger.debug(f"Agent log sensor initial publish failed for {agent_id}: {exc}")
 
@@ -641,7 +817,14 @@ class HomeAssistantDeviceManager:
         on_install = None
         if ota_supported:
             def on_install(connection, message, _aid=agent_id):
-                self._handle_agent_ota_install(_aid)
+                # OTA waits up to 45s for the agent reboot — never on the MQTT
+                # network thread, or all message processing stalls meanwhile.
+                threading.Thread(
+                    target=self._handle_agent_ota_install,
+                    args=(_aid,),
+                    daemon=True,
+                    name=f"ha-ota-{_aid}",
+                ).start()
 
         update_entity = UpdateEntity(
             name="Firmware Update",
@@ -710,15 +893,57 @@ class HomeAssistantDeviceManager:
             except Exception as exc:
                 self._logger.debug(f"OTA status lookup failed for {agent_id}: {exc}")
 
+        in_progress, update_percentage = self._ota_progress_fields(agent_id)
+
         try:
             update_entity.publish(
                 installed_version=sw_version,
                 latest_version=latest,
+                in_progress=in_progress,
+                update_percentage=update_percentage,
                 qos=QoS.AtLeastOnce,
                 retain=True,
             )
         except Exception as exc:
             self._logger.debug(f"Agent UpdateEntity publish failed for {agent_id}: {exc}")
+
+    def _ota_progress_fields(self, agent_id: str) -> tuple:
+        """Return (in_progress, update_percentage) for the agent's UpdateEntity.
+
+        Idle/unknown → (False, None): clears any stale progress bar in HA.
+        Active OTA → (True, percentage-or-None): None means indeterminate (HA shows a
+        spinner) until the agent reports a percentage.
+        """
+        if self._installation_state_hub is None:
+            return False, None
+        try:
+            state = self._installation_state_hub.get_state(agent_id) or {}
+        except Exception:
+            return False, None
+        if not bool(state.get("in_progress")):
+            return False, None
+        progress = state.get("progress_pct")
+        if isinstance(progress, (int, float)):
+            return True, int(progress)
+        return True, None
+
+    def publish_agent_ota_progress(self, agent_id: str) -> None:
+        """Re-publish a single agent's UpdateEntity state (installed/latest + OTA progress).
+
+        Invoked from the sync worker whenever the installation state changes, so the HA
+        update card shows a live progress bar during OTA. No-op if HA is inactive or the
+        agent has no UpdateEntity.
+        """
+        normalized_id = str(agent_id or "").strip()
+        if not normalized_id:
+            return
+        with self._lock:
+            if self._ha_connection is None:
+                return
+            update_entity = self._agent_update_entities.get(normalized_id)
+        if update_entity is None:
+            return
+        self._publish_agent_update_state(normalized_id, update_entity)
 
     def _handle_agent_ota_install(self, agent_id: str) -> None:
         self._logger.info(f"HA OTA install requested for agent {agent_id}")
@@ -904,6 +1129,9 @@ class HomeAssistantDeviceManager:
         return options, current_value
 
     def _on_remote_assignment_change(self, remote_id: int, message) -> None:
+        # Runs on the MQTT network thread: only the (fast) DB write happens here.
+        # The device rebuild goes through the sync worker; on any failure the
+        # current state is re-published so HA's optimistic dropdown snaps back.
         try:
             text = str(message.text or "").strip() if hasattr(message, "text") else ""
         except Exception:
@@ -922,15 +1150,18 @@ class HomeAssistantDeviceManager:
                         break
             except Exception as exc:
                 self._logger.warning(f"agents.list failed during HA reassignment: {exc}")
+                self._publish_remote_select_state(remote_id)
                 return
             if new_agent_id is None:
                 self._logger.warning(f"HA reassign: agent name {text!r} not found")
+                self._publish_remote_select_state(remote_id)
                 return
 
         try:
             current = self._database.remotes.get(remote_id)
         except Exception as exc:
             self._logger.warning(f"HA reassign: remote {remote_id} not found: {exc}")
+            self._publish_remote_select_state(remote_id)
             return
 
         try:
@@ -944,19 +1175,14 @@ class HomeAssistantDeviceManager:
             )
         except Exception as exc:
             self._logger.warning(f"HA reassign: update failed for remote {remote_id}: {exc}")
+            self._publish_remote_select_state(remote_id)
             return
 
-        self.update_remote(remote_id)
-
-    def _refresh_select_options_for_all_remotes(self) -> None:
-        """Rebuild every remote's Device so SelectEntity options reflect the current agent pool."""
-        with self._lock:
-            remote_ids = list(self._remote_devices.keys())
-        for rid in remote_ids:
-            try:
-                self.update_remote(rid)
-            except Exception as exc:
-                self._logger.debug(f"refresh remote {rid} failed: {exc}")
+        worker = self._sync_worker
+        if worker is not None:
+            worker.notify_change()
+        else:
+            self.update_remote(remote_id)
 
     # ------------------------------------------------------------------
     # Log bridging
