@@ -102,6 +102,7 @@
     "themeDarkValue": "深色",
     "language": "语言",
     "runtime": "运行时",
+    "hubVersion": "Hub 版本",
     "baseUrl": "基础 URL",
     "apiBaseUrl": "API 基础地址",
     "writeKeyRequired": "写入需要 API 密钥",

@@ -102,6 +102,7 @@
     "themeDarkValue": "داكن",
     "language": "اللغة",
     "runtime": "بيئة التشغيل",
+    "hubVersion": "إصدار Hub",
     "baseUrl": "عنوان URL الأساسي",
     "apiBaseUrl": "أساس API",
     "writeKeyRequired": "مطلوب مفتاح API للكتابة",

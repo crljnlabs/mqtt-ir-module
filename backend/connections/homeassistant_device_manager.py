@@ -971,7 +971,9 @@ class HomeAssistantDeviceManager:
             return
 
         base = self._hub_public_url.rstrip("/")
-        ota_url = f"{base}/firmware/files/{ota_file}"
+        # The /firmware mount already points at the files directory, so the URL is
+        # /firmware/<file> (no extra /files/ segment). Mirror build_firmware_url here.
+        ota_url = f"{base}/firmware/{ota_file}"
         payload = {
             "version": str(firmware.get("version") or ""),
             "url": ota_url,

@@ -102,6 +102,7 @@
     "themeDarkValue": "ダーク",
     "language": "言語",
     "runtime": "ランタイム",
+    "hubVersion": "Hub バージョン",
     "baseUrl": "ベースURL",
     "apiBaseUrl": "APIベース",
     "writeKeyRequired": "書き込みにAPIキーが必要",

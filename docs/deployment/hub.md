@@ -75,5 +75,6 @@ Fields stored in DB:
 - Agent offers are shown as pending and must be explicitly accepted from the UI.
 - Accepted external MQTT agents can execute `send` and `learn` commands via MQTT command/response topics.
 - ESP32 firmware files are served from `${DATA_DIR}/firmware/files` (default `/data/firmware/files`).
+- CI-built images are stamped with a short git revision (`HUB_BUILD_REF` build arg), shown in Settings → Runtime and at `GET /api/version`. Local builds leave it empty.
 - Home Assistant integration is available only in hub role and only when enabled in settings.
 - If you do not mount a volume for `DATA_DIR`, settings/database are lost when the container is recreated.

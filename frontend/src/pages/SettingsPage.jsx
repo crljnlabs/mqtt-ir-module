@@ -7,6 +7,7 @@ import { getAppConfig } from '../utils/appConfig.js'
 import { getElectronicsStatus, getMqttStatus, retryMqttConnection } from '../api/statusApi.js'
 import { getSettings, updateSettings } from '../api/settingsApi.js'
 import { getFirmwareCatalog } from '../api/firmwareApi.js'
+import { getVersion } from '../api/versionApi.js'
 import Icon from '@mdi/react'
 import { mdiAutorenew, mdiTextBoxSearchOutline } from '@mdi/js'
 import { Button } from '../components/ui/Button.jsx'
@@ -34,6 +35,7 @@ export function SettingsPage() {
     queryFn: () => getFirmwareCatalog('esp32'),
     staleTime: 60_000,
   })
+  const versionQuery = useQuery({ queryKey: ['version'], queryFn: getVersion, staleTime: 60_000 })
 
   const irRxDevice = electronicsQuery.data?.ir_rx_device
   const irTxDevice = electronicsQuery.data?.ir_tx_device
@@ -43,6 +45,7 @@ export function SettingsPage() {
   })
   const debugLabel = electronicsQuery.data?.debug ? t('common.yes') : t('common.no')
   const writeKeyRequiredLabel = config.writeRequiresApiKey ? t('common.yes') : t('common.no')
+  const hubVersionText = versionQuery.data?.display_version || versionQuery.data?.version || t('common.notAvailable')
 
   const [helpOpen, setHelpOpen] = useState(false)
   const [learningDirty, setLearningDirty] = useState(false)
@@ -290,6 +293,10 @@ export function SettingsPage() {
         </CardHeader>
         <CardBody>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            <div>
+              <div className="text-xs text-[rgb(var(--muted))]">{t('settings.hubVersion')}</div>
+              <div className="font-semibold break-words">{hubVersionText}</div>
+            </div>
             <div>
               <div className="text-xs text-[rgb(var(--muted))]">{t('settings.baseUrl')}</div>
               <div className="font-semibold break-words">{config.publicBaseUrl}</div>

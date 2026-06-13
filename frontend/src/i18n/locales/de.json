@@ -102,6 +102,7 @@
     "themeDarkValue": "dunkel",
     "language": "Sprache",
     "runtime": "Laufzeit",
+    "hubVersion": "Hub-Version",
     "baseUrl": "Basis-URL",
     "apiBaseUrl": "API-Basis",
     "writeKeyRequired": "Schreib-API-Schlüssel erforderlich",

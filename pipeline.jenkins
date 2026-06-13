@@ -74,7 +74,10 @@ pipeline {
                     env.IS_TAG = isTagged.toString()
                     env.TAG_DESC = desc
                     env.DOCKER_TAG = (env.BRANCH == 'main') ? 'main' : 'dev'
-                    echo "Using BUILD_TAG=${env.BUILD_TAG}, IS_TAG=${env.IS_TAG}, BRANCH=${env.BRANCH}, DOCKER_TAG=${env.DOCKER_TAG}"
+
+                    // Short git revision baked into the image and surfaced at /api/version.
+                    env.GIT_SHA = sh(script: "git rev-parse --short=8 HEAD", returnStdout: true).trim()
+                    echo "Using BUILD_TAG=${env.BUILD_TAG}, IS_TAG=${env.IS_TAG}, BRANCH=${env.BRANCH}, DOCKER_TAG=${env.DOCKER_TAG}, GIT_SHA=${env.GIT_SHA}"
                 }
             }
         }
@@ -101,6 +104,7 @@ pipeline {
                                     IMAGE_PREFIX=\$DOCKER_USERNAME/${PROJECT_PREFIX} \\
                                     BRANCH=${env.DOCKER_TAG} \\
                                     SUFFIX=${ARCH_SUFFIX} \\
+                                    HUB_BUILD_REF=${env.GIT_SHA} \\
                                     docker-compose -f docker-compose.yml build
                                 """
                                 sh """

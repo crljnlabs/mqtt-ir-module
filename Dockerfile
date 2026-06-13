@@ -1,3 +1,6 @@
+# Short git revision injected by CI via docker-compose build arg; surfaced at /api/version.
+ARG HUB_BUILD_REF=""
+
 FROM node:20-alpine AS frontend
 WORKDIR /app
 
@@ -45,6 +48,11 @@ RUN chmod +x /entrypoint.sh
 ENV DATA_DIR=/data
 ENV IR_RX_DEVICE=/dev/lirc0
 ENV DEBUG=false
+
+# Re-declare the global build arg in this stage and persist it into the image env
+# so all runtime targets (hub/agent-hub/agent) inherit the build revision.
+ARG HUB_BUILD_REF
+ENV HUB_BUILD_REF=${HUB_BUILD_REF}
 
 EXPOSE 80
 

@@ -102,6 +102,7 @@
     "themeDarkValue": "डार्क",
     "language": "भाषा",
     "runtime": "रनटाइम",
+    "hubVersion": "Hub संस्करण",
     "baseUrl": "बेस URL",
     "apiBaseUrl": "API बेस",
     "writeKeyRequired": "राइट API key आवश्यक",
