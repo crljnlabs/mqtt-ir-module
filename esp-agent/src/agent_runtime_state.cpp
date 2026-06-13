@@ -40,13 +40,14 @@ void publishState() {
     mqttPublishJson(topicStateVersion(), doc, true);
   }
 
-  // state/agent — static capabilities (retained)
+  // state/agent — static capabilities + client identity (retained)
   {
     JsonDocument doc;
     doc["agent_type"] = kAgentType;
     doc["can_send"] = canSend();
     doc["can_learn"] = canLearn();
     doc["ota_supported"] = true;
+    doc["id"] = gAgentId;
     mqttPublishJson(topicStateAgent(), doc, true);
   }
 

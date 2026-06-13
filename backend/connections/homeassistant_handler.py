@@ -26,17 +26,24 @@ class HomeAssistantHandler:
         mqtt_connection: Optional[MQTTConnectionV3],
         device_manager: Optional["HomeAssistantDeviceManager"] = None,
     ) -> None:
+        # Always tear down the previous runtime first so a stale thread from a
+        # past enable/disable cycle can never block start() (its is_alive() check
+        # would otherwise short-circuit the next start and leave HA without devices).
+        self._shutdown_runtime()
+
         with self._lock:
             self._connection_model = model
             self._device_manager = device_manager
-        if not model.is_homeassistant_configured or mqtt_connection is None:
-            with self._lock:
+            if not model.is_homeassistant_configured or mqtt_connection is None:
                 self._ha_connection = None
-            return
+                return
+            self._ha_connection = HomeAssistantConnection(mqtt_connection)
 
-        ha_connection = HomeAssistantConnection(mqtt_connection)
-        with self._lock:
-            self._ha_connection = ha_connection
+        # configure() runs in the setup phase, before the TCP connect — registering the
+        # device manager's on-connect hook here guarantees it fires on the first connect
+        # and on every reconnect (initial entity states + log bridge resubscription).
+        if device_manager is not None:
+            device_manager.register_mqtt_connect_hook(mqtt_connection)
 
     def start(self) -> None:
         with self._lock:
@@ -59,10 +66,33 @@ class HomeAssistantHandler:
         thread.start()
 
     def stop(self) -> None:
+        self._shutdown_runtime()
         with self._lock:
             self._connection_model = None
+            self._device_manager = None
+
+    def _shutdown_runtime(self, timeout: float = 2.0) -> None:
+        """Stop the HA runtime thread cleanly and drop the connection reference.
+
+        Uses HomeAssistantConnection.stop() to signal the runtime loop to exit, then
+        joins the thread. Safe to call when nothing is running (idempotent).
+        """
+        with self._lock:
+            ha_connection = self._ha_connection
+            thread = self._ha_thread
             self._ha_connection = None
             self._ha_thread = None
+
+        if ha_connection is not None:
+            try:
+                ha_connection.stop(timeout=timeout)
+            except Exception as exc:
+                self._logger.warning(f"HA runtime stop failed: {exc}")
+
+        if thread is not None and thread.is_alive():
+            thread.join(timeout=timeout)
+            if thread.is_alive():
+                self._logger.warning("HA runtime thread did not exit within timeout")
 
     def cleanup_discovery(self) -> None:
         """Clear all retained HA discovery topics via the active connection.

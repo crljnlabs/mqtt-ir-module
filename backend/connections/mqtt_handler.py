@@ -122,6 +122,20 @@ class MqttHandler:
         if not client_id:
             client_id = str(active_client_id or "")
 
+        seconds_since_inbound = None
+        connect_count = 0
+        disconnect_count = 0
+        subscriptions = []
+        if connection is not None:
+            try:
+                health = connection.health
+                seconds_since_inbound = health.seconds_since_inbound
+                connect_count = health.connect_count
+                disconnect_count = health.disconnect_count
+                subscriptions = list(health.subscriptions)
+            except Exception:
+                pass
+
         return {
             "configured": configured,
             "connected": self._is_connected(connection),
@@ -131,6 +145,10 @@ class MqttHandler:
             "app_name": app_name,
             "client_id": client_id,
             "last_error": last_error,
+            "seconds_since_inbound": seconds_since_inbound,
+            "connect_count": connect_count,
+            "disconnect_count": disconnect_count,
+            "subscriptions": subscriptions,
         }
 
     def connection(self) -> Optional[MQTTConnectionV3]:
@@ -195,10 +213,44 @@ class MqttHandler:
         builder.port(model.port)
         builder.keep_alive(60)
         builder.auto_reconnect(min_delay=1, max_delay=30)
+        # Safety net for half-dead links the keep-alive check can miss: force a
+        # reconnect once inbound traffic has been silent for 2x keep-alive.
+        builder.zombie_watchdog(enabled=True, idle_factor=2.0)
         if model.username:
             builder.login(model.username, model.password)
         builder.availability(topic=model.availability_topic)
-        return builder.build()
+        connection = builder.build()
+        # Make transport lifecycle visible in the hub log instead of inferring a
+        # dropped/zombie link from symptoms.
+        connection.add_on_connect(self._log_mqtt_connect)
+        connection.add_on_disconnect(self._log_mqtt_disconnect)
+        return connection
+
+    def _log_mqtt_connect(self, connection: MQTTConnectionV3, *_args: Any) -> None:
+        try:
+            health = connection.health
+            self._logger.info(
+                f"MQTT (re)connected role={self._role} client_id={self.client_id()} "
+                f"connect_count={health.connect_count} subscriptions={list(health.subscriptions)}"
+            )
+        except Exception:
+            self._logger.info(f"MQTT (re)connected role={self._role}")
+
+    def _log_mqtt_disconnect(self, *args: Any) -> None:
+        # jmqtt v3 on_disconnect callback signature: (client, userdata, rc).
+        rc = args[2] if len(args) >= 3 else None
+        with self._lock:
+            connection = self._connection
+        disconnect_count: Optional[int] = None
+        if connection is not None:
+            try:
+                disconnect_count = connection.health.disconnect_count
+            except Exception:
+                pass
+        self._logger.warning(
+            f"MQTT disconnected role={self._role} client_id={self.client_id()} "
+            f"rc={rc} disconnect_count={disconnect_count}"
+        )
 
     def _is_connected(self, connection: Optional[MQTTConnectionV3]) -> bool:
         return connection is not None and bool(connection.is_connected)

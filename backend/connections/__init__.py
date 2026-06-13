@@ -14,3 +14,4 @@ from .agent_runtime_state_hub import AgentRuntimeStateHub
 from .agent_installation_state_hub import AgentInstallationStateHub
 from .agent_availability_hub import AgentAvailabilityHub
 from .homeassistant_device_manager import HomeAssistantDeviceManager
+from .homeassistant_sync_worker import HomeAssistantSyncWorker
