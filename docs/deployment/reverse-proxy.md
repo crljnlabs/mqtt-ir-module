@@ -43,12 +43,40 @@ Use:
 
 ## HTTPS and ESP32 OTA
 
-When the proxy terminates TLS, it must forward the original scheme via
-`X-Forwarded-Proto` (see the Nginx example). The hub runs uvicorn with
-`--proxy-headers`, so it trusts this header and builds firmware download URLs
-with the correct `https://` scheme. Without it the hub emits `http://` URLs that
-the proxy answers with a 301 redirect, which the ESP32 OTA client cannot follow
-(`ota_http_status_invalid`).
+ESP32 OTA always downloads firmware over plain HTTP (`force_scheme="http"`
+in `build_firmware_url`). The hub derives the hostname from the `hub_public_url`
+setting (configured in Settings → Connection) and ignores the request scheme for
+OTA URLs. This avoids TLS overhead on memory-constrained devices and eliminates
+301 redirect loops (`ota_http_status_invalid`).
+
+**Required nginx configuration when TLS is terminated at the proxy:**
+
+Add a separate port-80 server block that passes `/firmware/` through to the
+container while still redirecting everything else to HTTPS:
+
+```nginx
+server {
+    listen 80;
+    server_name <hub-hostname>;
+
+    # OTA firmware download: ESP32 connects here directly over plain HTTP.
+    # Integrity is ensured by the SHA-256 check in the firmware client.
+    location /firmware/ {
+        proxy_pass http://<container-host>:<port>/firmware/;
+        proxy_set_header Host $host;
+    }
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+```
+
+The browser-based Web Flasher continues to use the `hub_public_url` scheme
+(`https://`) and is not affected by this exception.
+
+`X-Forwarded-Proto` (see the Nginx example above) is not required for OTA, but
+is still recommended for other hub routes that construct absolute URLs
+(e.g. Home Assistant discovery links).
 
 ## Security notes
 

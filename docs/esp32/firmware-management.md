@@ -133,6 +133,21 @@ Notes:
 - Downgrades are allowed from UI.
 - OTA is supported for ESP32 agents only.
 
+### OTA behind a TLS reverse proxy
+
+The hub always builds OTA download URLs with `http://` scheme, regardless of
+the proxy setup. This avoids TLS overhead on memory-constrained ESP32 devices
+and prevents 301 redirect failures (`ota_http_status_invalid`).
+
+**Required:**
+1. Set `hub_public_url` in Settings → Connection (e.g. `https://ir.home`).
+   The hub extracts the hostname from this value and constructs the OTA URL.
+2. Configure nginx (or equivalent) to pass port-80 `/firmware/` requests
+   directly to the container — see [reverse-proxy.md](../deployment/reverse-proxy.md#https-and-esp32-ota).
+
+The browser Web Flasher is unaffected: it keeps the `https://` scheme from
+`hub_public_url`.
+
 ## 5. Default IR pins
 
 The firmware uses these GPIO pins by default:
