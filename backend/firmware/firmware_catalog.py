@@ -6,7 +6,7 @@ import threading
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 
 class FirmwareCatalog:
@@ -116,17 +116,39 @@ class FirmwareCatalog:
             return -1
         return 0
 
-    def build_firmware_url(self, request: Any, public_base_url: str, filename: str) -> str:
+    def build_firmware_url(
+        self,
+        request: Any,
+        public_base_url: str,
+        filename: str,
+        hub_public_url: str = "",
+        force_scheme: Optional[str] = None,
+    ) -> str:
         normalized_filename = self._normalize_filename(filename)
-        host = str(request.headers.get("host") or "").strip()
-        scheme = str(request.url.scheme or "http").strip() or "http"
-        if not host:
-            raise ValueError("request_host_missing")
-        base_prefix = self._normalize_base_prefix(public_base_url)
-        path = f"{base_prefix}/firmware/{quote(normalized_filename)}"
-        return f"{scheme}://{host}{path}"
+        base = str(hub_public_url or "").strip()
+        if base:
+            # Build from the configured hub URL so the result is deterministic and
+            # independent of how (or whether) a request reached this code. OTA passes
+            # force_scheme="http" so constrained ESP devices download without TLS,
+            # while the web flasher keeps the hub URL scheme (https).
+            if "://" not in base:
+                base = f"https://{base}"
+            parsed = urlsplit(base)
+            scheme = (force_scheme or parsed.scheme or "http").strip()
+            netloc = parsed.netloc
+            prefix = parsed.path.rstrip("/")
+        else:
+            # Fallback when hub_public_url is not configured: derive from the request.
+            host = str(request.headers.get("host") or "").strip()
+            if not host:
+                raise ValueError("request_host_missing")
+            scheme = force_scheme or str(request.url.scheme or "http").strip() or "http"
+            netloc = host
+            prefix = self._normalize_base_prefix(public_base_url)
+        path = f"{prefix}/firmware/{quote(normalized_filename)}"
+        return f"{scheme}://{netloc}{path}"
 
-    def build_webtools_manifest(self, request: Any, public_base_url: str, agent_type: str = DEFAULT_AGENT_TYPE) -> Dict[str, Any]:
+    def build_webtools_manifest(self, request: Any, public_base_url: str, agent_type: str = DEFAULT_AGENT_TYPE, hub_public_url: str = "") -> Dict[str, Any]:
         firmware = self.resolve_firmware(agent_type=agent_type, version=None, require_installable=True)
         factory_file = str(firmware.get("factory_file") or "").strip()
         ota_file = str(firmware.get("ota_file") or "").strip()
@@ -149,7 +171,7 @@ class FirmwareCatalog:
 
         if not filename:
             raise ValueError("firmware_file_missing")
-        url = self.build_firmware_url(request=request, public_base_url=public_base_url, filename=filename)
+        url = self.build_firmware_url(request=request, public_base_url=public_base_url, filename=filename, hub_public_url=hub_public_url)
         return {
             "name": "ESP32 IR Client",
             "version": str(firmware.get("version") or ""),

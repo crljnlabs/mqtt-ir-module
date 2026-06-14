@@ -786,6 +786,7 @@ def get_webtools_manifest(request: Request, agent_type: str = FirmwareCatalog.DE
             request=request,
             public_base_url=env.public_base_url,
             agent_type=agent_type,
+            hub_public_url=database.settings.get_ui_settings().get("hub_public_url", ""),
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
@@ -843,6 +844,8 @@ def ota_update_agent(
         request=request,
         public_base_url=env.public_base_url,
         filename=ota_file,
+        hub_public_url=database.settings.get_ui_settings().get("hub_public_url", ""),
+        force_scheme="http",
     )
     payload = {
         "version": str(firmware.get("version") or ""),

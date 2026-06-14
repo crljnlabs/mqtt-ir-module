@@ -970,10 +970,16 @@ class HomeAssistantDeviceManager:
             self._logger.warning(f"OTA firmware file missing for agent {agent_id}")
             return
 
-        base = self._hub_public_url.rstrip("/")
-        # The /firmware mount already points at the files directory, so the URL is
-        # /firmware/<file> (no extra /files/ segment). Mirror build_firmware_url here.
-        ota_url = f"{base}/firmware/{ota_file}"
+        # Force http for the device download: the ESP OTA client cannot reliably do TLS,
+        # and integrity is already ensured by the SHA-256 check. The hub host is reused
+        # and served over plain HTTP via the reverse-proxy /firmware exception.
+        ota_url = self._firmware_catalog.build_firmware_url(
+            request=None,
+            public_base_url="",
+            filename=ota_file,
+            hub_public_url=self._hub_public_url,
+            force_scheme="http",
+        )
         payload = {
             "version": str(firmware.get("version") or ""),
             "url": ota_url,
