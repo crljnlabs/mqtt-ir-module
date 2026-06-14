@@ -53,6 +53,7 @@ OtaResult performOta(
 
   int remaining = http.getSize();
   const int totalBytes = remaining;
+  result.totalBytes = totalBytes;
   WiFiClient* stream = http.getStreamPtr();
   if (!stream) {
     result.errorCode = "ota_stream_missing";
@@ -75,7 +76,6 @@ OtaResult performOta(
   uint8_t buffer[1024];
   unsigned long lastDataAtMs = millis();
   unsigned long lastProgressAtMs = 0;
-  size_t downloadedBytes = 0;
 
   auto emitProgress = [&](const String& status, int progressPct, const String& message, bool force) {
     if (!onProgress) {
@@ -158,10 +158,10 @@ OtaResult performOta(
       return result;
     }
     mbedtls_sha256_update_ret(&shaCtx, buffer, static_cast<size_t>(bytesRead));
-    downloadedBytes += static_cast<size_t>(bytesRead);
+    result.downloadedBytes += static_cast<size_t>(bytesRead);
 
     if (totalBytes > 0) {
-      const uint64_t numerator = static_cast<uint64_t>(downloadedBytes) * 100ULL;
+      const uint64_t numerator = static_cast<uint64_t>(result.downloadedBytes) * 100ULL;
       const int progressPct = static_cast<int>(numerator / static_cast<uint64_t>(totalBytes));
       emitProgress("downloading", progressPct, "Downloading firmware", false);
     } else {

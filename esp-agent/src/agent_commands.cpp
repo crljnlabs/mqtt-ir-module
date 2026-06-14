@@ -7,6 +7,7 @@
 #include "agent_runtime_state.h"
 #include "agent_state.h"
 
+#include <WiFi.h>
 #include <cmath>
 #include <functional>
 #include <mbedtls/base64.h>
@@ -518,7 +519,9 @@ void processPendingOtaRequest() {
                                 message, code);
       logWarn("runtime",
               String("OTA failed request_id=") + requestId + " error=" + code +
-                  " message=" + message,
+                  " message=" + message + " downloaded=" +
+                  ota.downloadedBytes + "/" + ota.totalBytes +
+                  " rssi=" + WiFi.RSSI() + " heap=" + ESP.getFreeHeap(),
               code);
     }
     clearPendingOtaRequest();
