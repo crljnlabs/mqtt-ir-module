@@ -348,6 +348,7 @@
     "agentIdLabel": "代理 ID",
     "typeLabel": "类型",
     "typeEsp32": "ESP32",
+    "pendingBadge": "新",
     "typeDocker": "Docker",
     "typeLocal": "本地",
     "typeUnknown": "未知",

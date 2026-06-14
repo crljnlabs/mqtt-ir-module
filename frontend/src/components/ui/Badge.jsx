@@ -7,6 +7,7 @@ export function Badge({ variant = 'neutral', className, ...props }) {
     success: 'bg-[rgb(var(--success))] text-white',
     warning: 'bg-[rgb(var(--warning))] text-black',
     danger: 'bg-[rgb(var(--danger))] text-white',
+    primary: 'bg-[rgb(var(--primary))] text-[rgb(var(--primary-contrast))]',
   }
 
   return <span className={cn('inline-flex items-center rounded-full px-2 py-1 text-[11px] font-semibold', variants[variant], className)} {...props} />

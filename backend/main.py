@@ -1021,7 +1021,7 @@ def delete_agent(
         result = pairing_manager.unpair_and_delete_agent(agent_id, force=bool(force))
         agent_registry.unregister_agent(agent_id)
         agent_log_hub.clear_agent_logs(agent_id)
-        runtime_state_hub.clear_state(agent_id)
+        runtime_state_hub.mark_deleted(agent_id)
         installation_state_hub.reset_state(agent_id)
         ha_sync_worker.notify_change()
         return result

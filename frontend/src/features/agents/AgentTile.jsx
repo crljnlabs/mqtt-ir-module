@@ -57,10 +57,10 @@ export function AgentTile({ agent, onEdit, onDelete, onAccept, onUpdate, onReboo
   return (
     <div
       className={[
-        'rounded-2xl border bg-[rgb(var(--card))] shadow-[var(--shadow)] p-4 flex items-center justify-between gap-3 transition-shadow',
+        'rounded-2xl border shadow-[var(--shadow)] p-4 flex items-center justify-between gap-3 transition-shadow hover:shadow-[0_14px_30px_rgba(2,6,23,0.12)]',
         agent.pending
-          ? 'border-[rgb(var(--primary))] hover:shadow-[0_14px_30px_rgba(2,6,23,0.12)]'
-          : 'border-[rgb(var(--border))] hover:shadow-[0_14px_30px_rgba(2,6,23,0.12)]',
+          ? 'border-[rgb(var(--primary))] bg-[rgb(var(--primary)_/_0.1)]'
+          : 'border-[rgb(var(--border))] bg-[rgb(var(--card))]',
       ].join(' ')}
       onClick={() => navigate(`/agent/${agent.agent_id}`, { state: { from: '/agents' } })}
       role="button"
@@ -79,27 +79,32 @@ export function AgentTile({ agent, onEdit, onDelete, onAccept, onUpdate, onReboo
         </div>
 
         <div className="min-w-0">
-          <div className="font-semibold truncate">{agent.name || agent.agent_id}</div>
+          {/* Name and status badges share one line so the card height stays constant
+              whether or not an update/status badge is present. */}
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-semibold truncate min-w-0">{agent.name || agent.agent_id}</span>
+            {agent.pending ? <Badge variant="primary" className="shrink-0">{t('agents.pendingBadge')}</Badge> : null}
+            {hasBadges ? (
+              <div className="flex items-center gap-2 shrink-0">
+                {installationLabel ? <Badge variant={installationBadgeVariant(installation)}>{installationLabel}</Badge> : null}
+                {showUpdateAvailable ? (
+                  <button
+                    className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold bg-[rgb(var(--warning))] text-black disabled:opacity-50"
+                    onClick={(e) => { e.stopPropagation(); onUpdate?.(agent) }}
+                    disabled={installationInProgress}
+                  >
+                    <Icon path={mdiUploadOutline} size={0.55} />
+                    {updateBadgeText}
+                  </button>
+                ) : null}
+                {rebootRequired ? <Badge variant="warning">{t('agents.rebootRequired')}</Badge> : null}
+                {incompatibleSystem ? <Badge variant="danger">{t('agents.incompatibleSystem')}</Badge> : null}
+                {incompatibleSend ? <Badge variant="warning">{t('agents.incompatibleSend')}</Badge> : null}
+                {incompatibleLearn ? <Badge variant="warning">{t('agents.incompatibleLearn')}</Badge> : null}
+              </div>
+            ) : null}
+          </div>
           <div className="text-xs text-[rgb(var(--muted))] truncate">{subtitleParts.join(' · ')}</div>
-          {hasBadges && (
-            <div className="mt-1 flex items-center gap-2 flex-wrap">
-              {installationLabel ? <Badge variant={installationBadgeVariant(installation)}>{installationLabel}</Badge> : null}
-              {showUpdateAvailable ? (
-                <button
-                  className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold bg-[rgb(var(--warning))] text-black disabled:opacity-50"
-                  onClick={(e) => { e.stopPropagation(); onUpdate?.(agent) }}
-                  disabled={installationInProgress}
-                >
-                  <Icon path={mdiUploadOutline} size={0.55} />
-                  {updateBadgeText}
-                </button>
-              ) : null}
-              {rebootRequired ? <Badge variant="warning">{t('agents.rebootRequired')}</Badge> : null}
-              {incompatibleSystem ? <Badge variant="danger">{t('agents.incompatibleSystem')}</Badge> : null}
-              {incompatibleSend ? <Badge variant="warning">{t('agents.incompatibleSend')}</Badge> : null}
-              {incompatibleLearn ? <Badge variant="warning">{t('agents.incompatibleLearn')}</Badge> : null}
-            </div>
-          )}
         </div>
       </div>
 

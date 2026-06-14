@@ -348,6 +348,7 @@
     "agentIdLabel": "এজেন্ট আইডি",
     "typeLabel": "ধরন",
     "typeEsp32": "ESP32",
+    "pendingBadge": "নতুন",
     "typeDocker": "Docker",
     "typeLocal": "স্থানীয়",
     "typeUnknown": "অজানা",

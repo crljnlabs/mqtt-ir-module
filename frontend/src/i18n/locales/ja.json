@@ -348,6 +348,7 @@
     "agentIdLabel": "エージェントID",
     "typeLabel": "タイプ",
     "typeEsp32": "ESP32",
+    "pendingBadge": "新規",
     "typeDocker": "Docker",
     "typeLocal": "ローカル",
     "typeUnknown": "不明",

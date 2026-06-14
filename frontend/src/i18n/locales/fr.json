@@ -348,6 +348,7 @@
     "agentIdLabel": "ID de l'agent",
     "typeLabel": "Type",
     "typeEsp32": "ESP32",
+    "pendingBadge": "Nouveau",
     "typeDocker": "Docker",
     "typeLocal": "Local",
     "typeUnknown": "Inconnu",

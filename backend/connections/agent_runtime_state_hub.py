@@ -17,6 +17,11 @@ class AgentRuntimeStateHub:
     # Wildcard covers all state subtopics: state/hub, state/version, state/agent,
     # state/runtime, state/diagnostics
     STATE_TOPIC_WILDCARD = "ir/agents/+/state/+"
+    # Retained state subtopics wiped on deletion so a removed agent cannot be
+    # resurrected from stale retained MQTT state (the device rebinds from state/hub).
+    RETAINED_STATE_SUBTOPICS = ("hub", "version", "agent", "runtime")
+    # Grace window after a deliberate delete during which auto-reclaim is suppressed.
+    DELETION_GRACE_SECONDS = 120.0
 
     def __init__(
         self,
@@ -35,6 +40,7 @@ class AgentRuntimeStateHub:
         self._subscribed = False
         self._states: Dict[str, Dict[str, Any]] = {}
         self._reclaim_sent: Set[str] = set()
+        self._deleted_at: Dict[str, float] = {}
 
     def set_on_sw_version_change(self, callback: Optional[Callable[[str], None]]) -> None:
         self._on_sw_version_change = callback
@@ -94,6 +100,43 @@ class AgentRuntimeStateHub:
             self._states.pop(normalized_agent_id, None)
             self._reclaim_sent.discard(normalized_agent_id)
 
+    def mark_deleted(self, agent_id: str) -> None:
+        """Forget a deliberately deleted agent and stop it from being recreated.
+
+        Clears cached + reclaim state, opens a grace window that suppresses
+        auto-reclaim, and wipes the retained MQTT state topics so the device
+        cannot restore its hub binding from a stale retained state/hub message.
+        """
+        normalized_agent_id = str(agent_id or "").strip()
+        if not normalized_agent_id:
+            return
+        self.clear_state(normalized_agent_id)
+        with self._lock:
+            self._deleted_at[normalized_agent_id] = time.time()
+        self._clear_retained_state(normalized_agent_id)
+
+    def _recently_deleted(self, agent_id: str) -> bool:
+        with self._lock:
+            deleted_at = self._deleted_at.get(agent_id)
+            if deleted_at is None:
+                return False
+            if time.time() - deleted_at <= self.DELETION_GRACE_SECONDS:
+                return True
+            # Grace window elapsed — drop the tombstone so legitimate reclaim can resume.
+            self._deleted_at.pop(agent_id, None)
+            return False
+
+    def _clear_retained_state(self, agent_id: str) -> None:
+        connection = self._runtime_loader.mqtt_connection()
+        if connection is None:
+            return
+        for subtopic in self.RETAINED_STATE_SUBTOPICS:
+            topic = f"ir/agents/{agent_id}/state/{subtopic}"
+            try:
+                connection.publish(topic, "", qos=QoS.AtLeastOnce, retain=True)
+            except Exception as exc:
+                self._logger.warning(f"Failed to clear retained state topic {topic}: {exc}")
+
     def _on_state(self, connection: Any, client: Any, userdata: Any, message: MQTTMessage) -> None:
         del connection
         del client
@@ -151,6 +194,9 @@ class AgentRuntimeStateHub:
     def _sync_agent_capabilities(self, agent_id: str, state: Dict[str, Any]) -> None:
         agent = self._database.agents.get(agent_id)
         if not agent:
+            # A just-deleted agent must not be recreated from late or retained state.
+            if self._recently_deleted(agent_id):
+                return
             # Create a stub entry for agents recovered via reclaim after hub data loss.
             with self._lock:
                 was_reclaimed = agent_id in self._reclaim_sent
@@ -205,6 +251,9 @@ class AgentRuntimeStateHub:
 
     def _maybe_reclaim_agent(self, agent_id: str, state: Dict[str, Any]) -> None:
         if self._pairing_manager is None:
+            return
+        # Suppress reclaim right after a deliberate delete so the agent stays gone.
+        if self._recently_deleted(agent_id):
             return
         pairing_hub_id = str(state.get("pairing_hub_id") or "").strip()
         if pairing_hub_id:

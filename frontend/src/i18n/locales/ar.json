@@ -348,6 +348,7 @@
     "agentIdLabel": "معرّف الوكيل",
     "typeLabel": "النوع",
     "typeEsp32": "ESP32",
+    "pendingBadge": "جديد",
     "typeDocker": "Docker",
     "typeLocal": "محلي",
     "typeUnknown": "غير معروف",

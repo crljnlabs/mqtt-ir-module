@@ -348,6 +348,7 @@
     "agentIdLabel": "ID agen",
     "typeLabel": "Tipe",
     "typeEsp32": "ESP32",
+    "pendingBadge": "Baru",
     "typeDocker": "Docker",
     "typeLocal": "Lokal",
     "typeUnknown": "Tidak dikenal",

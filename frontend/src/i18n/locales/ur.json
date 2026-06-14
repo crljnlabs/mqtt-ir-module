@@ -348,6 +348,7 @@
     "agentIdLabel": "ایجنٹ آئی ڈی",
     "typeLabel": "قسم",
     "typeEsp32": "ESP32",
+    "pendingBadge": "نیا",
     "typeDocker": "Docker",
     "typeLocal": "مقامی",
     "typeUnknown": "نامعلوم",
